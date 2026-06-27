@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/attached_file.dart';
 import '../models/device_session.dart';
+import '../models/pack_result.dart';
 import '../services/file_service.dart';
+import '../services/packing_service.dart';
 import '../services/prefs_service.dart';
 import '../widgets/attached_file_tile.dart';
 
@@ -45,6 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 파일 선택/복사 진행 중일 때 true → 버튼 비활성화
   bool _fileBusy = false;
+
+  PackResult? _packResult; // 압축 완료 후 결과 보관 (다음 단계 공유에 사용)
 
   DeviceSession? _session;
   PrefsService? _prefs;
@@ -156,28 +160,66 @@ class _HomeScreenState extends State<HomeScreen> {
     await _prefs?.saveHeight(height);
     await _prefs?.saveWeight(weight);
 
-    // TODO: 다음 단계에서 파일 압축 및 Quick Share 전송 추가
     if (!mounted) return;
 
-    final totalFiles =
-        _fitFiles.length + _colaFiles.length + _captureFiles.length;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '입력 확인 완료 — $name / ${height}cm / ${weight}kg / $watchName'
-          '\n첨부 파일 $totalFiles개 (FIT ${_fitFiles.length}, Cola ${_colaFiles.length}, 캡처 ${_captureFiles.length})',
+    // 압축 진행 다이얼로그 (뒤로가기로 닫기 불가)
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('파일 압축 중...'),
+              ],
+            ),
+          ),
         ),
-        backgroundColor: Colors.green[700],
-        duration: const Duration(seconds: 4),
       ),
     );
 
-    debugPrint('=== 전송 준비 정보 ===');
-    debugPrint('이름: $name  키: ${height}cm  몸무게: ${weight}kg  워치: $watchName');
-    debugPrint('메모: $memo');
-    debugPrint('세션ID: ${_session?.sessionId}');
-    for (final f in [..._fitFiles, ..._colaFiles, ..._captureFiles]) {
-      debugPrint('  첨부: ${f.name} (${f.sizeLabel}) → tempPath: ${f.tempPath}');
+    try {
+      final result = await PackingService.pack(
+        name: name,
+        heightCm: height,
+        weightKg: weight,
+        watch: watchName,
+        memo: memo,
+        session: _session!,
+        fitFiles: _fitFiles,
+        colaFiles: _colaFiles,
+        captureFiles: _captureFiles,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // 다이얼로그 닫기
+      setState(() => _packResult = result);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('압축 완료: ${result.zipName} (${result.sizeLabel})'),
+          backgroundColor: Colors.green[700],
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('압축 실패: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     }
   }
 
@@ -268,6 +310,12 @@ class _HomeScreenState extends State<HomeScreen> {
             // ── 자동 수집 정보 ────────────────────────────────────
             _SectionHeader('자동 수집 정보'),
             _DeviceInfoCard(session: _session!),
+
+            // ── 압축 결과 (보내기 완료 후 표시) ───────────────────
+            if (_packResult != null) ...[
+              const SizedBox(height: 24),
+              _PackResultCard(result: _packResult!),
+            ],
           ],
         ),
       ),
@@ -512,6 +560,81 @@ class _DeviceInfoCard extends StatelessWidget {
             );
           }).toList(),
         ),
+      ),
+    );
+  }
+}
+
+// ── 압축 결과 카드 ────────────────────────────────────────────────
+
+class _PackResultCard extends StatelessWidget {
+  final PackResult result;
+  const _PackResultCard({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      color: cs.primaryContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: cs.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  '압축 완료',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: cs.primary,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _row('파일명', result.zipName),
+            _row('크기', result.sizeLabel),
+            const Divider(height: 20),
+            Text(
+              '다음 단계: 공유하기로 관리자에게 전송',
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.outline,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 52,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }
