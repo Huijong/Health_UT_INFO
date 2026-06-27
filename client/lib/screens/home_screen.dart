@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../config/app_config.dart';
 import '../models/attached_file.dart';
 import '../models/device_session.dart';
 import '../models/pack_result.dart';
 import '../services/file_service.dart';
 import '../services/packing_service.dart';
 import '../services/prefs_service.dart';
+import '../services/share_service.dart';
+import '../services/sms_service.dart';
 import '../widgets/attached_file_tile.dart';
 
 /// Galaxy Watch 드롭다운 선택지
@@ -28,7 +32,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
 
   // 텍스트 컨트롤러
@@ -48,7 +52,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // 파일 선택/복사 진행 중일 때 true → 버튼 비활성화
   bool _fileBusy = false;
 
-  PackResult? _packResult; // 압축 완료 후 결과 보관 (다음 단계 공유에 사용)
+  PackResult? _packResult; // 압축 완료 후 결과 보관 (공유·SMS에 사용)
+  String? _lastProcessedLink; // 클립보드 중복 처리 방지
 
   DeviceSession? _session;
   PrefsService? _prefs;
@@ -57,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _init();
   }
 
@@ -84,7 +90,114 @@ class _HomeScreenState extends State<HomeScreen> {
     _weightCtrl.dispose();
     _memoCtrl.dispose();
     _customWatchCtrl.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  // ── 라이프사이클 + 클립보드 감시 ──────────────────────────────────
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 앱이 포그라운드로 복귀할 때 1회 확인
+    // (Quick Share에서 '링크 복사' 후 이 앱으로 돌아오는 타이밍)
+    if (state == AppLifecycleState.resumed && _packResult != null) {
+      Future.delayed(const Duration(milliseconds: 400), _checkClipboard);
+    }
+  }
+
+  Future<void> _checkClipboard() async {
+    if (!mounted || _packResult == null) return;
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text?.trim() ?? '';
+      if (text.isEmpty) return;
+      if (text == _lastProcessedLink) return; // 같은 링크 중복 처리 방지
+      if (!text.startsWith('http')) return; // URL 형식 기본 확인
+      // Quick Share 도메인 패턴 포함 여부 확인 (대소문자 무시)
+      final pattern = AppConfig.quickSharePattern.toLowerCase();
+      if (!text.toLowerCase().contains(pattern)) return;
+
+      _lastProcessedLink = text;
+      _handleQuickShareLink(text);
+    } catch (_) {
+      // 클립보드 접근 실패는 조용히 무시
+    }
+  }
+
+  Future<void> _handleQuickShareLink(String link) async {
+    if (!mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Quick Share 링크 감지'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('클립보드에서 Quick Share 링크를 감지했습니다.'),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                link.length > 60 ? '${link.substring(0, 60)}…' : link,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text('문자로 전송하시겠습니까?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('문자 전송'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await SmsService.send(
+        link: link,
+        sessionId: _session?.sessionId ?? '',
+        testerName: _nameCtrl.text.trim(),
+      );
+    } on SmsConfigException catch (e) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('SMS 설정 오류'),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('문자 앱 오류: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   // ── 파일 선택 핸들러 ──────────────────────────────────────────
@@ -144,6 +257,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _shareZip() async {
+    if (_packResult == null) return;
+    try {
+      await ShareService.shareZip(_packResult!.zipPath, _packResult!.zipName);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('공유 실패: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
   // ── 보내기 버튼 핸들러 ─────────────────────────────────────────
   Future<void> _onSend() async {
     if (!_formKey.currentState!.validate()) return;
@@ -201,15 +329,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
       Navigator.of(context).pop(); // 다이얼로그 닫기
-      setState(() => _packResult = result);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('압축 완료: ${result.zipName} (${result.sizeLabel})'),
-          backgroundColor: Colors.green[700],
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      // 공유 시트 즉시 호출 — 사용자가 Quick Share 선택 후 링크 복사
+      // 취소/실패 시에도 결과 카드는 표시
+      try {
+        await ShareService.shareZip(result.zipPath, result.zipName);
+      } catch (_) {}
+
+      if (!mounted) return;
+      setState(() => _packResult = result);
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -314,7 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // ── 압축 결과 (보내기 완료 후 표시) ───────────────────
             if (_packResult != null) ...[
               const SizedBox(height: 24),
-              _PackResultCard(result: _packResult!),
+              _PackResultCard(result: _packResult!, onShare: _shareZip),
             ],
           ],
         ),
@@ -565,11 +693,12 @@ class _DeviceInfoCard extends StatelessWidget {
   }
 }
 
-// ── 압축 결과 카드 ────────────────────────────────────────────────
+// ── 공유 결과 카드 ────────────────────────────────────────────────
 
 class _PackResultCard extends StatelessWidget {
   final PackResult result;
-  const _PackResultCard({required this.result});
+  final VoidCallback onShare;
+  const _PackResultCard({required this.result, required this.onShare});
 
   @override
   Widget build(BuildContext context) {
@@ -582,12 +711,13 @@ class _PackResultCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 헤더
             Row(
               children: [
                 Icon(Icons.check_circle_rounded, color: cs.primary, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  '압축 완료',
+                  '공유 완료',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: cs.primary,
@@ -597,15 +727,49 @@ class _PackResultCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            _row('파일명', result.zipName),
-            _row('크기', result.sizeLabel),
-            const Divider(height: 20),
-            Text(
-              '다음 단계: 공유하기로 관리자에게 전송',
-              style: TextStyle(
-                fontSize: 12,
-                color: cs.outline,
-                fontStyle: FontStyle.italic,
+            _row('파일명', result.zipName, cs),
+            _row('크기', result.sizeLabel, cs),
+            const SizedBox(height: 12),
+
+            // Quick Share 안내 배너
+            Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: cs.tertiaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: cs.tertiary, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "Quick Share에서 '링크 복사' 후\n이 앱으로 돌아오세요",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onTertiaryContainer,
+                        fontWeight: FontWeight.w500,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // 다시 공유 버튼
+            OutlinedButton.icon(
+              onPressed: onShare,
+              icon: const Icon(Icons.share_outlined, size: 18),
+              label: const Text('다시 공유'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(40),
+                foregroundColor: cs.primary,
+                side: BorderSide(color: cs.primary),
               ),
             ),
           ],
@@ -614,24 +778,22 @@ class _PackResultCard extends StatelessWidget {
     );
   }
 
-  Widget _row(String label, String value) {
+  Widget _row(String label, String value, ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 52,
             child: Text(
               label,
-              style: const TextStyle(fontSize: 13, color: Colors.grey),
+              style: TextStyle(fontSize: 13, color: cs.outline),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ),
         ],
