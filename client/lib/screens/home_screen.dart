@@ -8,7 +8,11 @@ import '../services/file_service.dart';
 import '../services/packing_service.dart';
 import '../services/prefs_service.dart';
 import '../services/share_service.dart';
+<<<<<<< HEAD
 import '../services/email_service.dart';
+=======
+import '../services/sms_service.dart';
+>>>>>>> 75dd2f07525ba2627191774c0b6f543f0e93fca0
 import '../widgets/attached_file_tile.dart';
 
 /// Galaxy Watch 드롭다운 선택지
@@ -114,6 +118,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (text == _lastProcessedLink) return; // 같은 링크 중복 처리 방지
       if (!text.startsWith('http')) return; // URL 형식 기본 확인
       // Quick Share 도메인 패턴 포함 여부 확인 (대소문자 무시)
+<<<<<<< HEAD
       final lowerText = text.toLowerCase();
       final pattern = AppConfig.quickSharePattern.toLowerCase();
       final isQuickShare = lowerText.contains(pattern) ||
@@ -122,6 +127,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           lowerText.contains('sharing.samsung') ||
           lowerText.contains('q1team.cc');
       if (!isQuickShare) return;
+=======
+      final pattern = AppConfig.quickSharePattern.toLowerCase();
+      if (!text.toLowerCase().contains(pattern)) return;
+>>>>>>> 75dd2f07525ba2627191774c0b6f543f0e93fca0
 
       _lastProcessedLink = text;
       _handleQuickShareLink(text);
@@ -156,17 +165,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(height: 8),
+<<<<<<< HEAD
             const Text('이메일로 전송하시겠습니까?'),
+=======
+            const Text('문자로 전송하시겠습니까?'),
+>>>>>>> 75dd2f07525ba2627191774c0b6f543f0e93fca0
           ],
         ),
         actions: [
           TextButton(
+<<<<<<< HEAD
              onPressed: () => Navigator.pop(ctx, false),
              child: const Text('취소'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('전송'),
+=======
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('문자 전송'),
+>>>>>>> 75dd2f07525ba2627191774c0b6f543f0e93fca0
           ),
         ],
       ),
@@ -174,6 +196,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (confirmed != true || !mounted) return;
 
+<<<<<<< HEAD
     // 전송 로딩 다이얼로그 표시
     showDialog(
       context: context,
@@ -212,6 +235,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('설정 오류'),
+=======
+    try {
+      await SmsService.send(
+        link: link,
+        sessionId: _session?.sessionId ?? '',
+        testerName: _nameCtrl.text.trim(),
+      );
+    } on SmsConfigException catch (e) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('SMS 설정 오류'),
+>>>>>>> 75dd2f07525ba2627191774c0b6f543f0e93fca0
           content: Text(e.toString()),
           actions: [
             TextButton(
@@ -223,10 +260,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     } catch (e) {
       if (!mounted) return;
+<<<<<<< HEAD
       Navigator.pop(context); // 로딩 다이얼로그 닫기
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('전송 오류: $e'),
+=======
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('문자 앱 오류: $e'),
+>>>>>>> 75dd2f07525ba2627191774c0b6f543f0e93fca0
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -363,13 +406,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       Navigator.of(context).pop(); // 다이얼로그 닫기
 
+<<<<<<< HEAD
       setState(() => _packResult = result);
 
+=======
+>>>>>>> 75dd2f07525ba2627191774c0b6f543f0e93fca0
       // 공유 시트 즉시 호출 — 사용자가 Quick Share 선택 후 링크 복사
       // 취소/실패 시에도 결과 카드는 표시
       try {
         await ShareService.shareZip(result.zipPath, result.zipName);
       } catch (_) {}
+<<<<<<< HEAD
+=======
+
+      if (!mounted) return;
+      setState(() => _packResult = result);
+>>>>>>> 75dd2f07525ba2627191774c0b6f543f0e93fca0
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop();

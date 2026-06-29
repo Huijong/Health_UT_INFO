@@ -20,6 +20,7 @@ class AppConfig {
   /// SMS 수신 번호 (하이픈 없이, 예: 01012345678)
   static const smsRecipient = String.fromEnvironment(
     'SMS_RECIPIENT',
+<<<<<<< HEAD
     defaultValue: '01096028934',
   );
 
@@ -39,5 +40,8 @@ class AppConfig {
   static const emailRecipient = String.fromEnvironment(
     'EMAIL_RECIPIENT',
     defaultValue: 'huijongwpi2@gmail.com',
+=======
+    defaultValue: '',
+>>>>>>> 75dd2f07525ba2627191774c0b6f543f0e93fca0
   );
 }
