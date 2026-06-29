@@ -7,6 +7,7 @@ import uvicorn
 from config import MONGO_URL, DB_NAME, CHECK_INTERVAL_SECONDS
 from mail_parser import start_mail_parser_loop
 
+
 # MongoDB 비동기 연결 객체
 db_client = None
 db = None
