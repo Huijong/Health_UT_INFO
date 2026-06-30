@@ -12,18 +12,45 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 def parse_email_body(body_text):
     # 정규식 패턴을 통한 데이터 추출
     name_match = re.search(r"이름:\s*(.*)", body_text)
+    height_match = re.search(r"키:\s*(.*)", body_text)
+    weight_match = re.search(r"몸무게:\s*(.*)", body_text)
     session_match = re.search(r"세션 ID:\s*(.*)", body_text)
     model_match = re.search(r"기기 모델:\s*(.*)", body_text)
     version_match = re.search(r"Android 버전:\s*(.*)", body_text)
     
-    # http로 시작하는 다운로드 링크 추출
-    link_match = re.search(r"(https?://[^\s\r\n]+)", body_text)
+    watch_match = re.search(r"착용 워치:\s*(.*)", body_text)
+    strap_match = re.search(r"착용 스트랩:\s*(.*)", body_text)
+    exercise_match = re.search(r"선택 운동:\s*(.*)", body_text)
+    
+    position_match = re.search(r"착용 위치:\s*(.*)", body_text)
+    tightness_match = re.search(r"착용 정도:\s*(.*)", body_text)
+    competitor_match = re.search(r"동시착용 타사기기:\s*(.*)", body_text)
+    training_match = re.search(r"훈련 종류:\s*(.*)", body_text)
+    location_match = re.search(r"장소:\s*(.*)", body_text)
+    remarks_match = re.search(r"특이 사항:\s*(.*)", body_text)
+    
+    # http로 시작하는 다운로드 링크 추출 (보통 가장 마지막 줄 부근)
+    # 뒤쪽에서부터 매칭하거나 본문 아래쪽의 link를 정확하게 잡도록 함
+    link_match = re.search(r"Quick Share\)\s*\n(https?://[^\s\r\n]+)", body_text)
+    if not link_match:
+        link_match = re.search(r"(https?://[^\s\r\n]+)", body_text)
     
     return {
         "tester_name": name_match.group(1).strip() if name_match else "알 수 없음",
+        "height": height_match.group(1).strip() if height_match else "알 수 없음",
+        "weight": weight_match.group(1).strip() if weight_match else "알 수 없음",
         "session_id": session_match.group(1).strip() if session_match else "알 수 없음",
         "device_model": model_match.group(1).strip() if model_match else "알 수 없음",
         "android_version": version_match.group(1).strip() if version_match else "알 수 없음",
+        "watch": watch_match.group(1).strip() if watch_match else "알 수 없음",
+        "strap": strap_match.group(1).strip() if strap_match else "알 수 없음",
+        "exercise": exercise_match.group(1).strip() if exercise_match else "알 수 없음",
+        "wearing_position": position_match.group(1).strip() if position_match else "알 수 없음",
+        "wearing_tightness": tightness_match.group(1).strip() if tightness_match else "알 수 없음",
+        "competitor_watch": competitor_match.group(1).strip() if competitor_match else "알 수 없음",
+        "training_type": training_match.group(1).strip() if training_match else "알 수 없음",
+        "location": location_match.group(1).strip() if location_match else "알 수 없음",
+        "remarks": remarks_match.group(1).strip() if remarks_match else "",
         "share_link": link_match.group(1).strip() if link_match else "",
     }
 
