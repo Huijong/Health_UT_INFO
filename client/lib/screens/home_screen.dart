@@ -12,6 +12,7 @@ import '../services/prefs_service.dart';
 import '../services/share_service.dart';
 import '../services/email_service.dart';
 import '../widgets/attached_file_tile.dart';
+import 'settings_screen.dart';
 
 /// Galaxy Watch 드롭다운 선택지 (2단계 전용)
 const List<String> kWatchOptions = [
@@ -146,10 +147,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (h != null) _heightCtrl.text = h.toStringAsFixed(1);
     if (w != null) _weightCtrl.text = w.toStringAsFixed(1);
 
+    final savedWatch = prefs.watch;
+    final savedStrap = prefs.strap;
+    if (savedWatch.isNotEmpty) _selectedWatch = savedWatch;
+    _customWatchCtrl.text = prefs.customWatch;
+    if (savedStrap.isNotEmpty) _selectedStrap = savedStrap;
+    _customStrapCtrl.text = prefs.customStrap;
+
     setState(() {
       _prefs = prefs;
       _session = session;
+      _currentStep = prefs.onboardingComplete ? 4 : 1;
       _isLoading = false;
+    });
+  }
+
+  void _reloadPrefs() {
+    if (_prefs == null) return;
+    setState(() {
+      _nameCtrl.text = _prefs!.name;
+      final h = _prefs!.height;
+      final w = _prefs!.weight;
+      if (h != null) _heightCtrl.text = h.toStringAsFixed(1);
+      if (w != null) _weightCtrl.text = w.toStringAsFixed(1);
+
+      final savedWatch = _prefs!.watch;
+      final savedStrap = _prefs!.strap;
+      if (savedWatch.isNotEmpty) _selectedWatch = savedWatch;
+      _customWatchCtrl.text = _prefs!.customWatch;
+      if (savedStrap.isNotEmpty) _selectedStrap = savedStrap;
+      _customStrapCtrl.text = _prefs!.customStrap;
     });
   }
 
@@ -347,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // ── 데이터 초기화 후 1단계로 리셋 ──────────────────────────────
   void _resetVerification() {
     setState(() {
-      _currentStep = 1;
+      _currentStep = (_prefs?.onboardingComplete ?? false) ? 4 : 1;
       _fitFiles.clear();
       _colaFiles.clear();
       _logFiles.clear();
@@ -568,58 +595,78 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-              const SizedBox(width: 40), // 균형
+              if (_currentStep == 4)
+                IconButton(
+                  icon: const Icon(Icons.settings_rounded, size: 22, color: Color(0xFF3DFFC1)),
+                  onPressed: () async {
+                    if (_prefs == null) return;
+                    final updated = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SettingsScreen(prefs: _prefs!),
+                      ),
+                    );
+                    if (updated == true) {
+                      _reloadPrefs();
+                    }
+                  },
+                )
+              else
+                const SizedBox(width: 40), // 균형
             ],
           ),
-          const SizedBox(height: 12),
-          // 가로형 프리미엄 스태퍼
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: Container(
-              height: 6,
-              width: double.infinity,
-              color: Colors.white.withOpacity(0.1),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: _currentStep,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF2E5BFF), Color(0xFF3DFFC1)],
+          if (_currentStep < 6) ...[
+            const SizedBox(height: 12),
+            // 가로형 프리미엄 스태퍼
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: Container(
+                height: 6,
+                width: double.infinity,
+                color: Colors.white.withOpacity(0.1),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: _currentStep,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF2E5BFF), Color(0xFF3DFFC1)],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    flex: 6 - _currentStep,
-                    child: const SizedBox(),
-                  ),
-                ],
+                    if (5 - _currentStep > 0)
+                      Expanded(
+                        flex: 5 - _currentStep,
+                        child: const SizedBox(),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Step $_currentStep of 5',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: const Color(0xFFE2E2E2).withOpacity(0.6),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Step $_currentStep of 5',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: const Color(0xFFE2E2E2).withOpacity(0.6),
+                  ),
                 ),
-              ),
-              Text(
-                '${((_currentStep / 5.0) * 100).toInt().clamp(0, 100)}% 완료',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF3DFFC1),
-                  fontWeight: FontWeight.bold,
+                Text(
+                  '${((_currentStep / 5.0) * 100).toInt().clamp(0, 100)}% 완료',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF3DFFC1),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1660,9 +1707,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 if (isStep5) {
                   _onSend();
                 } else if (canNext) {
-                  // 1단계 입력 검증
                   if (_currentStep == 1) {
                     if (!_formKey1.currentState!.validate()) return;
+                    _prefs?.saveName(_nameCtrl.text.trim());
+                    _prefs?.saveHeight(double.tryParse(_heightCtrl.text) ?? 0.0);
+                    _prefs?.saveWeight(double.tryParse(_weightCtrl.text) ?? 0.0);
+                  } else if (_currentStep == 2) {
+                    if (_selectedWatch == '직접입력' && _customWatchCtrl.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('워치 기종명을 입력해 주세요')),
+                      );
+                      return;
+                    }
+                    _prefs?.saveWatch(_selectedWatch);
+                    _prefs?.saveCustomWatch(_customWatchCtrl.text.trim());
+                  } else if (_currentStep == 3) {
+                    if (_selectedStrap == '직접입력' && _customStrapCtrl.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('스트랩 종류를 입력해 주세요')),
+                      );
+                      return;
+                    }
+                    _prefs?.saveStrap(_selectedStrap);
+                    _prefs?.saveCustomStrap(_customStrapCtrl.text.trim());
+                    _prefs?.saveOnboardingComplete(true);
                   }
                   setState(() => _currentStep++);
                 }
