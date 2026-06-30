@@ -46,6 +46,7 @@ class AttachedFileTile extends StatelessWidget {
     final (icon, color) = switch (file.type) {
       AttachType.fit => (Icons.fitness_center, cs.primary),
       AttachType.cola => (Icons.folder_zip_outlined, cs.tertiary),
+      AttachType.log => (Icons.folder_zip_outlined, Colors.blueGrey),
       AttachType.capture => (Icons.image_outlined, cs.secondary),
     };
     return CircleAvatar(

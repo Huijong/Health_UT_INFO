@@ -27,6 +27,7 @@ class FileChannelPlugin(
         const val CHANNEL = "com.samsung.health.client/file_picker"
         private const val REQ_FIT  = 9001
         private const val REQ_COLA = 9002
+        private const val REQ_LOG  = 9003
         // Android 외부 저장소 Documents Provider authority
         private const val AUTHORITY = "com.android.externalstorage.documents"
     }
@@ -55,6 +56,12 @@ class FileChannelPlugin(
                         mimeType    = "application/zip",
                         docId       = "primary:Documents/COLA_FILE"
                     )
+                    "pickLog" -> openPicker(
+                        activity    = activity,
+                        requestCode = REQ_LOG,
+                        mimeType    = "application/zip",
+                        docId       = "primary:Documents/COLA_FILE"
+                    )
                     else -> result.notImplemented()
                 }
             }
@@ -78,7 +85,7 @@ class FileChannelPlugin(
      * 우리 요청 코드면 true 반환(처리 완료), 아니면 false 반환(상위로 위임).
      */
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-        if (requestCode != REQ_FIT && requestCode != REQ_COLA) return false
+        if (requestCode != REQ_FIT && requestCode != REQ_COLA && requestCode != REQ_LOG) return false
 
         val uri = if (resultCode == Activity.RESULT_OK) data?.data else null
         if (uri == null) {

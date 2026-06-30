@@ -1,4 +1,4 @@
-enum AttachType { fit, cola, capture }
+enum AttachType { fit, cola, capture, log }
 
 /// 사용자가 선택한 첨부 파일 하나를 나타내는 모델
 class AttachedFile {
