@@ -13,6 +13,17 @@ class EmailService {
     required String testerName,
     required String deviceModel,
     required String androidVersion,
+    required String height,
+    required String weight,
+    required String watch,
+    required String strap,
+    required String exercise,
+    required String wearingPosition,
+    required String wearingTightness,
+    required String competitorWatch,
+    required String trainingType,
+    required String location,
+    required String remarks,
   }) async {
     final sender = AppConfig.emailSender;
     final password = AppConfig.emailAppPassword;
@@ -34,10 +45,24 @@ class EmailService {
     final body = '''
 ■ 테스터 정보
 - 이름: $testerName
+- 키: $height cm
+- 몸무게: $weight kg
 - 세션 ID: $sessionId
 - 기기 모델: $deviceModel
 - Android 버전: $androidVersion
 
+■ 워치 & 스트랩 정보
+- 착용 워치: $watch
+- 착용 스트랩: $strap
+- 선택 운동: $exercise
+
+■ 검증 디테일
+- 착용 위치: $wearingPosition
+- 착용 정도: $wearingTightness
+- 동시착용 타사기기: $competitorWatch
+- 훈련 종류: $trainingType
+- 장소: $location
+${remarks.isNotEmpty ? '- 특이 사항: $remarks\n' : ''}
 ■ 수집 데이터 링크 (Quick Share)
 $link
 ''';
@@ -45,7 +70,7 @@ $link
     final message = mailer.Message()
       ..from = mailer.Address(sender, 'SH 수집기 ($testerName)')
       ..recipients.add(recipient)
-      ..subject = '[SH 수집] $testerName - $sessionId'
+      ..subject = '[SH 수집] $testerName - $exercise - $sessionId'
       ..text = body;
 
     try {

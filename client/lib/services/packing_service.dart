@@ -19,6 +19,13 @@ class PackingService {
     required double heightCm,
     required double weightKg,
     required String watch,
+    required String strap,
+    required String exercise,
+    required String wearingPosition,
+    required String wearingTightness,
+    required String competitorWatch,
+    required String trainingType,
+    required String location,
     required String memo,
     required DeviceSession session,
     required List<AttachedFile> fitFiles,
@@ -41,6 +48,13 @@ class PackingService {
         'height_cm': heightCm,
         'weight_kg': weightKg,
         'watch': watch,
+        'strap': strap,
+        'exercise': exercise,
+        'wearing_position': wearingPosition,
+        'wearing_tightness': wearingTightness,
+        'competitor_watch': competitorWatch,
+        'training_type': trainingType,
+        'location': location,
       },
       'device': {
         'model': session.deviceModel,
@@ -66,6 +80,13 @@ class PackingService {
         heightCm: heightCm,
         weightKg: weightKg,
         watch: watch,
+        strap: strap,
+        exercise: exercise,
+        wearingPosition: wearingPosition,
+        wearingTightness: wearingTightness,
+        competitorWatch: competitorWatch,
+        trainingType: trainingType,
+        location: location,
         memo: memo,
         session: session,
         fitFiles: fitFiles,
@@ -125,6 +146,13 @@ class PackingService {
     required double heightCm,
     required double weightKg,
     required String watch,
+    required String strap,
+    required String exercise,
+    required String wearingPosition,
+    required String wearingTightness,
+    required String competitorWatch,
+    required String trainingType,
+    required String location,
     required String memo,
     required DeviceSession session,
     required List<AttachedFile> fitFiles,
@@ -147,7 +175,17 @@ class PackingService {
     sb.writeln('키         : $heightCm cm');
     sb.writeln('몸무게     : $weightKg kg');
     sb.writeln('착용 워치  : $watch');
-    if (memo.isNotEmpty) sb.writeln('메모       : $memo');
+    sb.writeln('착용 스트랩: $strap');
+    sb.writeln('선택 운동  : $exercise');
+    sb.writeln();
+
+    sb.writeln('[ 검증 디테일 ]');
+    sb.writeln('착용 위치  : $wearingPosition');
+    sb.writeln('착용 정도  : $wearingTightness');
+    sb.writeln('동시착용 타사기기: $competitorWatch');
+    sb.writeln('훈련 종류  : $trainingType');
+    sb.writeln('장소       : $location');
+    if (memo.isNotEmpty) sb.writeln('특이 사항  : $memo');
     sb.writeln();
 
     sb.writeln('[ 기기 정보 ]');

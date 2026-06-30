@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../config/app_config.dart';
@@ -11,7 +13,7 @@ import '../services/share_service.dart';
 import '../services/email_service.dart';
 import '../widgets/attached_file_tile.dart';
 
-/// Galaxy Watch 드롭다운 선택지
+/// Galaxy Watch 드롭다운 선택지 (2단계 전용)
 const List<String> kWatchOptions = [
   'Galaxy Watch 4',
   'Galaxy Watch 4 Classic',
@@ -25,6 +27,48 @@ const List<String> kWatchOptions = [
   '직접입력',
 ];
 
+/// 워치 스트랩 선택지 (3단계 전용)
+const List<Map<String, String>> kStrapOptions = [
+  {
+    'name': '스포츠 밴드',
+    'desc': '불소고무 소재의 뛰어난 착용감',
+  },
+  {
+    'name': 'D-버클 하이브리드 레더',
+    'desc': '레더와 불소고무의 하이브리드 매치',
+  },
+  {
+    'name': '익스트림 스포츠 밴드',
+    'desc': '통기성이 우수한 홀 구조 디자인',
+  },
+  {
+    'name': '패브릭 밴드',
+    'desc': '가볍고 수면 시 편리한 패브릭 소재',
+  },
+  {
+    'name': '밀레니즈 루프',
+    'desc': '메탈 메쉬 구조의 고급스러운 스타일',
+  },
+  {
+    'name': '직접입력',
+    'desc': '사용 중인 다른 스트랩 입력',
+  },
+];
+
+/// 운동 종류 선택지 (4단계 전용)
+const List<Map<String, dynamic>> kExerciseOptions = [
+  {'name': '야외 걷기', 'icon': Icons.directions_walk_rounded},
+  {'name': '야외 달리기', 'icon': Icons.directions_run_rounded},
+  {'name': '러닝머신 걷기', 'icon': Icons.directions_walk_outlined},
+  {'name': '러닝머신 달리기', 'icon': Icons.directions_run_outlined},
+  {'name': '하이킹', 'icon': Icons.terrain_rounded},
+  {'name': '트레일 러닝', 'icon': Icons.forest_rounded},
+  {'name': '실내 수영', 'icon': Icons.pool_rounded},
+  {'name': '야외 수영', 'icon': Icons.water_rounded},
+  {'name': '근력 운동', 'icon': Icons.fitness_center_rounded},
+  {'name': '기타운동', 'icon': Icons.sports_rounded},
+];
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -33,28 +77,53 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey1 = GlobalKey<FormState>();
+  final _formKey5 = GlobalKey<FormState>();
 
-  // 텍스트 컨트롤러
+  // 현재 위저드 단계 (1 ~ 6)
+  int _currentStep = 1;
+
+  // 1단계 컨트롤러
   final _nameCtrl = TextEditingController();
   final _heightCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
-  final _memoCtrl = TextEditingController();
+
+  // 2단계 워치
+  String _selectedWatch = kWatchOptions.first;
   final _customWatchCtrl = TextEditingController();
 
-  String _selectedWatch = kWatchOptions.first;
+  // 3단계 스트랩
+  String _selectedStrap = kStrapOptions.first['name']!;
+  final _customStrapCtrl = TextEditingController();
 
-  // 첨부 파일 목록
+  // 4단계 운동
+  String _selectedExercise = kExerciseOptions.first['name'];
+
+  // 5단계 디테일 및 첨부파일
   final List<AttachedFile> _fitFiles = [];
   final List<AttachedFile> _colaFiles = [];
   final List<AttachedFile> _logFiles = [];
   final List<AttachedFile> _captureFiles = [];
 
-  // 파일 선택/복사 진행 중일 때 true → 버튼 비활성화
   bool _fileBusy = false;
+  String _wearingPosition = '왼쪽'; // 왼쪽 / 오른쪽
+  String _wearingTightness = '적당히'; // 충분히 / 적당히 / 느슨하게
+  String _competitorWatch = '없음'; // 가민 / 애플 / 크로스 / 없음 / 직접입력
+  final _customCompetitorCtrl = TextEditingController();
 
-  PackResult? _packResult; // 압축 완료 후 결과 보관 (공유·SMS에 사용)
-  String? _lastProcessedLink; // 클립보드 중복 처리 방지
+  String _trainingType = '조깅'; // 조깅 / 인터벌 / LSD / 변속주 / 지속주 / 직접입력
+  final _customTrainingCtrl = TextEditingController();
+
+  final _locationCtrl = TextEditingController();
+  final _memoCtrl = TextEditingController(); // 특이 사항
+
+  // 6단계 완료 정보 및 상태
+  PackResult? _packResult;
+  String? _lastProcessedLink;
+  bool _isPackaging = false;
+  bool _emailSending = false;
+  bool _emailSent = false;
+  String? _emailError;
 
   DeviceSession? _session;
   PrefsService? _prefs;
@@ -89,32 +158,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _nameCtrl.dispose();
     _heightCtrl.dispose();
     _weightCtrl.dispose();
-    _memoCtrl.dispose();
     _customWatchCtrl.dispose();
+    _customStrapCtrl.dispose();
+    _customCompetitorCtrl.dispose();
+    _customTrainingCtrl.dispose();
+    _locationCtrl.dispose();
+    _memoCtrl.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  // ── 라이프사이클 + 클립보드 감시 ──────────────────────────────────
-
+  // ── 클립보드 감시 및 이메일 전송 ──────────────────────────────────
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // 앱이 포그라운드로 복귀할 때 1회 확인
-    // (Quick Share에서 '링크 복사' 후 이 앱으로 돌아오는 타이밍)
     if (state == AppLifecycleState.resumed && _packResult != null) {
       Future.delayed(const Duration(milliseconds: 400), _checkClipboard);
     }
   }
 
   Future<void> _checkClipboard() async {
-    if (!mounted || _packResult == null) return;
+    if (!mounted || _packResult == null || _emailSent) return;
     try {
       final data = await Clipboard.getData(Clipboard.kTextPlain);
       final text = data?.text?.trim() ?? '';
       if (text.isEmpty) return;
-      if (text == _lastProcessedLink) return; // 같은 링크 중복 처리 방지
-      if (!text.startsWith('http')) return; // URL 형식 기본 확인
-      // Quick Share 도메인 패턴 포함 여부 확인 (대소문자 무시)
+      if (text == _lastProcessedLink) return;
+      if (!text.startsWith('http')) return;
+
       final lowerText = text.toLowerCase();
       final pattern = AppConfig.quickSharePattern.toLowerCase();
       final isQuickShare = lowerText.contains(pattern) ||
@@ -124,118 +194,184 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           lowerText.contains('q1team.cc');
       if (!isQuickShare) return;
 
-      _lastProcessedLink = text;
-      _handleQuickShareLink(text);
-    } catch (_) {
-      // 클립보드 접근 실패는 조용히 무시
-    }
+      setState(() {
+        _lastProcessedLink = text;
+      });
+
+      // 클립보드 링크가 감지되면 자동으로 이메일 전송 트리거
+      await _sendEmail(text);
+    } catch (_) {}
   }
 
-  Future<void> _handleQuickShareLink(String link) async {
+  Future<void> _sendEmail(String link) async {
     if (!mounted) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Quick Share 링크 감지'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('클립보드에서 Quick Share 링크를 감지했습니다.'),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                link.length > 60 ? '${link.substring(0, 60)}…' : link,
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text('이메일로 전송하시겠습니까?'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('전송'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    // 전송 로딩 다이얼로그 표시
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const PopScope(
-        canPop: false,
-        child: AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Text('이메일 발송 중...'),
-            ],
-          ),
-        ),
-      ),
-    );
+    setState(() {
+      _emailSending = true;
+      _emailError = null;
+    });
 
     try {
+      final watchName = _selectedWatch == '직접입력'
+          ? _customWatchCtrl.text.trim()
+          : _selectedWatch;
+      final strapName = _selectedStrap == '직접입력'
+          ? _customStrapCtrl.text.trim()
+          : _selectedStrap;
+      final compDevice = _competitorWatch == '직접입력'
+          ? _customCompetitorCtrl.text.trim()
+          : _competitorWatch;
+      final tType = _trainingType == '직접입력'
+          ? _customTrainingCtrl.text.trim()
+          : _trainingType;
+
       await EmailService.send(
         link: link,
         sessionId: _session?.sessionId ?? '',
         testerName: _nameCtrl.text.trim(),
         deviceModel: _session?.deviceModel ?? 'Unknown',
         androidVersion: _session?.androidVersion ?? 'Unknown',
+        height: _heightCtrl.text.trim(),
+        weight: _weightCtrl.text.trim(),
+        watch: watchName,
+        strap: strapName,
+        exercise: _selectedExercise,
+        wearingPosition: _wearingPosition,
+        wearingTightness: _wearingTightness,
+        competitorWatch: compDevice,
+        trainingType: tType,
+        location: _locationCtrl.text.trim(),
+        remarks: _memoCtrl.text.trim(),
       );
-      if (!mounted) return;
-      Navigator.pop(context); // 로딩 다이얼로그 닫기
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이메일 전송에 성공했습니다!')),
-      );
-    } on EmailConfigException catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context); // 로딩 다이얼로그 닫기
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('설정 오류'),
-          content: Text(e.toString()),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('확인'),
-            ),
-          ],
-        ),
-      );
+
+      if (mounted) {
+        setState(() {
+          _emailSending = false;
+          _emailSent = true;
+        });
+      }
     } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context); // 로딩 다이얼로그 닫기
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('전송 오류: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          _emailSending = false;
+          _emailError = e.toString();
+        });
+      }
     }
   }
 
-  // ── 파일 선택 핸들러 ──────────────────────────────────────────
+  // ── 압축 및 전송 시작 ───────────────────────────────────────
+  Future<void> _onSend() async {
+    if (!_formKey5.currentState!.validate()) return;
 
+    setState(() {
+      _isPackaging = true;
+      _currentStep = 6;
+      _emailSent = false;
+      _emailError = null;
+      _lastProcessedLink = null;
+    });
+
+    try {
+      final newSession = await DeviceSession.collect();
+      if (!mounted) return;
+      setState(() {
+        _session = newSession;
+      });
+
+      final name = _nameCtrl.text.trim();
+      final height = double.parse(_heightCtrl.text.trim());
+      final weight = double.parse(_weightCtrl.text.trim());
+      final watchName = _selectedWatch == '직접입력'
+          ? _customWatchCtrl.text.trim()
+          : _selectedWatch;
+      final strapName = _selectedStrap == '직접입력'
+          ? _customStrapCtrl.text.trim()
+          : _selectedStrap;
+      final compDevice = _competitorWatch == '직접입력'
+          ? _customCompetitorCtrl.text.trim()
+          : _competitorWatch;
+      final tType = _trainingType == '직접입력'
+          ? _customTrainingCtrl.text.trim()
+          : _trainingType;
+      final memo = _memoCtrl.text.trim();
+
+      await _prefs?.saveName(name);
+      await _prefs?.saveHeight(height);
+      await _prefs?.saveWeight(weight);
+
+      final result = await PackingService.pack(
+        name: name,
+        heightCm: height,
+        weightKg: weight,
+        watch: watchName,
+        strap: strapName,
+        exercise: _selectedExercise,
+        wearingPosition: _wearingPosition,
+        wearingTightness: _wearingTightness,
+        competitorWatch: compDevice,
+        trainingType: tType,
+        location: _locationCtrl.text.trim(),
+        memo: memo,
+        session: _session!,
+        fitFiles: _fitFiles,
+        colaFiles: _colaFiles,
+        logFiles: _logFiles,
+        captureFiles: _captureFiles,
+      );
+
+      if (mounted) {
+        setState(() {
+          _packResult = result;
+          _isPackaging = false;
+        });
+      }
+
+      // 압축 성공 후 자동으로 Quick Share 호출
+      await ShareService.shareZip(result.zipPath, result.zipName);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isPackaging = false;
+          _currentStep = 5; // 실패 시 다시 5단계로 복귀
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('압축 실패: $e'),
+            backgroundColor: const Color(0xFFFF5252),
+          ),
+        );
+      }
+    }
+  }
+
+  // ── 데이터 초기화 후 1단계로 리셋 ──────────────────────────────
+  void _resetVerification() {
+    setState(() {
+      _currentStep = 1;
+      _fitFiles.clear();
+      _colaFiles.clear();
+      _logFiles.clear();
+      _captureFiles.clear();
+      _memoCtrl.clear();
+      _locationCtrl.clear();
+      _customWatchCtrl.clear();
+      _customStrapCtrl.clear();
+      _customCompetitorCtrl.clear();
+      _customTrainingCtrl.clear();
+      _wearingPosition = '왼쪽';
+      _wearingTightness = '적당히';
+      _competitorWatch = '없음';
+      _trainingType = '조깅';
+      _packResult = null;
+      _lastProcessedLink = null;
+      _isPackaging = false;
+      _emailSending = false;
+      _emailSent = false;
+      _emailError = null;
+    });
+  }
+
+  // ── 파일 선택 핸들러 ──────────────────────────────────────────
   Future<void> _pickFit() async {
     if (_fileBusy) return;
     setState(() => _fileBusy = true);
@@ -299,408 +435,1183 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('$label 선택 오류: $e'),
-        backgroundColor: Theme.of(context).colorScheme.error,
+        backgroundColor: const Color(0xFFFF5252),
       ),
     );
   }
 
-  Future<void> _shareZip() async {
-    if (_packResult == null) return;
-    try {
-      await ShareService.shareZip(_packResult!.zipPath, _packResult!.zipName);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('공유 실패: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-    }
-  }
-
-  Future<void> _onSend() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    // 새 전송 시 마다 새로운 세션 ID 발급 (기기 정보 최신화 및 타임스탬프 갱신)
-    final newSession = await DeviceSession.collect();
-    if (!mounted) return;
-    setState(() {
-      _session = newSession;
-    });
-
-    final name = _nameCtrl.text.trim();
-    final height = double.parse(_heightCtrl.text.trim());
-    final weight = double.parse(_weightCtrl.text.trim());
-    final watchName = _selectedWatch == '직접입력'
-        ? _customWatchCtrl.text.trim()
-        : _selectedWatch;
-    final memo = _memoCtrl.text.trim();
-
-    await _prefs?.saveName(name);
-    await _prefs?.saveHeight(height);
-    await _prefs?.saveWeight(weight);
-
-    if (!mounted) return;
-
-    // 압축 진행 다이얼로그 (뒤로가기로 닫기 불가)
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 20),
-                Text('파일 압축 중...'),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    try {
-      final result = await PackingService.pack(
-        name: name,
-        heightCm: height,
-        weightKg: weight,
-        watch: watchName,
-        memo: memo,
-        session: _session!,
-        fitFiles: _fitFiles,
-        colaFiles: _colaFiles,
-        logFiles: _logFiles,
-        captureFiles: _captureFiles,
-      );
-
-      if (!mounted) return;
-      Navigator.of(context).pop(); // 다이얼로그 닫기
-
-      setState(() => _packResult = result);
-
-      // 공유 시트 즉시 호출 — 사용자가 Quick Share 선택 후 링크 복사
-      // 취소/실패 시에도 결과 카드는 표시
-      try {
-        await ShareService.shareZip(result.zipPath, result.zipName);
-      } catch (_) {}
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('압축 실패: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-    }
-  }
-
-  // ── 빌드 ──────────────────────────────────────────────────────
+  // ── 빌드 영역 ──────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Color(0xFF0C0F0F),
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+          ),
+        ),
+      );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Samsung Health 검증 수집기'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-          children: [
-            // ── 사용자 정보 ──────────────────────────────────────
-            _SectionHeader('사용자 정보'),
-            _nameField(),
-            const SizedBox(height: 12),
-            _heightWeightRow(),
-            const SizedBox(height: 12),
-            _watchDropdown(),
-            if (_selectedWatch == '직접입력') ...[
-              const SizedBox(height: 12),
-              _customWatchField(),
-            ],
-            const SizedBox(height: 12),
-            _memoField(),
-            const SizedBox(height: 24),
-
-            // ── 파일 첨부 ─────────────────────────────────────────
-            _SectionHeader('파일 첨부'),
-
-            // FIT
-            _AttachButton(
-              icon: Icons.fitness_center,
-              label: 'FIT 파일 추가',
-              hint: '삼성 헬스 → 다운로드/삼성 헬스/fit',
-              busy: _fileBusy,
-              onTap: _fileBusy ? null : _pickFit,
+    return Theme(
+      data: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF0C0F0F),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF2E5BFF),
+          secondary: Color(0xFF3DFFC1),
+          surface: Color(0xFF1E2020),
+          error: Color(0xFFFF5252),
+        ),
+        textTheme: Theme.of(context).textTheme.apply(
+              fontFamily: 'Plus_Jakarta_Sans',
+              bodyColor: const Color(0xFFE2E2E2),
+              displayColor: Colors.white,
             ),
-            ..._fitFiles.asMap().entries.map(
-              (e) => AttachedFileTile(
-                file: e.value,
-                onDelete: () => _removeFile(_fitFiles, e.key),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Cola.zip
-            _AttachButton(
-              icon: Icons.folder_zip_outlined,
-              label: 'Cola.zip 추가',
-              hint: 'Documents/COLA_FILE 폴더 → COLA_FILE*.zip',
-              busy: _fileBusy,
-              onTap: _fileBusy ? null : _pickCola,
-            ),
-            ..._colaFiles.asMap().entries.map(
-              (e) => AttachedFileTile(
-                file: e.value,
-                onDelete: () => _removeFile(_colaFiles, e.key),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // 로그 파일 추가
-            _AttachButton(
-              icon: Icons.folder_zip_outlined,
-              label: '로그 파일 추가',
-              hint: 'Documents/COLA_FILE 폴더 → log_*.zip',
-              busy: _fileBusy,
-              onTap: _fileBusy ? null : _pickLog,
-            ),
-            ..._logFiles.asMap().entries.map(
-              (e) => AttachedFileTile(
-                file: e.value,
-                onDelete: () => _removeFile(_logFiles, e.key),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // 운동 캡처
-            _AttachButton(
-              icon: Icons.photo_library_outlined,
-              label: '운동 캡처 선택 (다중)',
-              hint: '갤러리에서 여러 장 선택 가능',
-              busy: _fileBusy,
-              onTap: _fileBusy ? null : _pickCaptures,
-            ),
-            ..._captureFiles.asMap().entries.map(
-              (e) => AttachedFileTile(
-                file: e.value,
-                onDelete: () => _removeFile(_captureFiles, e.key),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // ── 자동 수집 정보 ────────────────────────────────────
-            _SectionHeader('자동 수집 정보'),
-            _DeviceInfoCard(session: _session!),
-
-            // ── 압축 결과 (보내기 완료 후 표시) ───────────────────
-            if (_packResult != null) ...[
-              const SizedBox(height: 24),
-              _PackResultCard(result: _packResult!, onShare: _shareZip),
-            ],
-          ],
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.04),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF2E5BFF), width: 1.5),
+          ),
+          labelStyle: TextStyle(color: const Color(0xFFE2E2E2).withOpacity(0.7)),
         ),
       ),
-      bottomNavigationBar: _SendBar(onSend: _onSend),
-    );
-  }
-
-  // ── 개별 필드 빌더 ────────────────────────────────────────────
-  Widget _nameField() {
-    return TextFormField(
-      controller: _nameCtrl,
-      textInputAction: TextInputAction.next,
-      decoration: const InputDecoration(
-        labelText: '테스터 이름 *',
-        prefixIcon: Icon(Icons.person_outline),
-        border: OutlineInputBorder(),
+      child: PopScope(
+        canPop: false,
+        onPopInvoked: (didPop) {
+          if (didPop) return;
+          if (_currentStep == 6) {
+            setState(() => _currentStep = 4);
+          } else if (_currentStep > 1) {
+            setState(() => _currentStep--);
+          } else {
+            SystemNavigator.pop();
+          }
+        },
+        child: Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1429A0),
+                  Color(0xFF0A0F24),
+                  Color(0xFF05060C),
+                ],
+                stops: [0.0, 0.6, 1.0],
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  _buildHeader(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      child: _buildCurrentStepView(),
+                    ),
+                  ),
+                  if (_currentStep < 6) _buildFooterButtons(),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
-      validator: (v) {
-        if (v == null || v.trim().isEmpty) return '이름을 입력하세요';
-        return null;
-      },
     );
   }
 
-  Widget _heightWeightRow() {
-    return Row(
+  // ── 헤더 빌더 ──────────────────────────────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                onPressed: () {
+                  if (_currentStep == 6) {
+                    setState(() => _currentStep = 4);
+                  } else if (_currentStep > 1) {
+                    setState(() => _currentStep--);
+                  } else {
+                    SystemNavigator.pop();
+                  }
+                },
+              ),
+              const Expanded(
+                child: Text(
+                  'SH 검증 수집기',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 40), // 균형
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 가로형 프리미엄 스태퍼
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: Container(
+              height: 6,
+              width: double.infinity,
+              color: Colors.white.withOpacity(0.1),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: _currentStep,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF2E5BFF), Color(0xFF3DFFC1)],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 6 - _currentStep,
+                    child: const SizedBox(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Step $_currentStep of 5',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: const Color(0xFFE2E2E2).withOpacity(0.6),
+                ),
+              ),
+              Text(
+                '${((_currentStep / 5.0) * 100).toInt().clamp(0, 100)}% 완료',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF3DFFC1),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── 단계별 뷰 분기 ──────────────────────────────────────────────
+  Widget _buildCurrentStepView() {
+    switch (_currentStep) {
+      case 1:
+        return _buildStep1Profile();
+      case 2:
+        return _buildStep2Watch();
+      case 3:
+        return _buildStep3Strap();
+      case 4:
+        return _buildStep4Exercise();
+      case 5:
+        return _buildStep5Details();
+      case 6:
+        return _buildStep6Completion();
+      default:
+        return _buildStep1Profile();
+    }
+  }
+
+  // ── Step 1: 테스터 프로필 ──────────────────────────────────────
+  Widget _buildStep1Profile() {
+    return Form(
+      key: _formKey1,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '테스터 프로필 입력',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '정밀한 피트니스 분석을 위해 테스터님의 신체 스펙을 입력해 주세요.',
+            style: TextStyle(
+              fontSize: 13,
+              color: const Color(0xFFE2E2E2).withOpacity(0.7),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 24),
+          GlassCard(
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: '이름 *',
+                    prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? '이름을 입력해 주세요' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _heightCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: '키 (cm) *',
+                    prefixIcon: Icon(Icons.height_rounded, size: 20),
+                  ),
+                  validator: _validatePositiveNumber,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _weightCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: '몸무게 (kg) *',
+                    prefixIcon: Icon(Icons.monitor_weight_outlined, size: 20),
+                  ),
+                  validator: _validatePositiveNumber,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Step 2: 착용 워치 선택 ──────────────────────────────────────
+  Widget _buildStep2Watch() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: TextFormField(
-            controller: _heightCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: '키 (cm) *',
-              prefixIcon: Icon(Icons.height),
-              border: OutlineInputBorder(),
-            ),
-            validator: _validatePositiveNumber,
+        const Text(
+          '착용 워치 기종 선택',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '테스트 시 착용한 Galaxy Watch 기종을 목록에서 골라주세요.',
+          style: TextStyle(
+            fontSize: 13,
+            color: const Color(0xFFE2E2E2).withOpacity(0.7),
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: TextFormField(
-            controller: _weightCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: '몸무게 (kg) *',
-              prefixIcon: Icon(Icons.monitor_weight_outlined),
-              border: OutlineInputBorder(),
-            ),
-            validator: _validatePositiveNumber,
+        const SizedBox(height: 20),
+        GlassCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              ...kWatchOptions.map((watch) {
+                final isSel = _selectedWatch == watch;
+                return RadioListTile<String>(
+                  title: Text(
+                    watch,
+                    style: TextStyle(
+                      fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                      color: isSel ? const Color(0xFF3DFFC1) : const Color(0xFFE2E2E2),
+                    ),
+                  ),
+                  value: watch,
+                  activeColor: const Color(0xFF3DFFC1),
+                  groupValue: _selectedWatch,
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _selectedWatch = val);
+                    }
+                  },
+                );
+              }),
+            ],
           ),
+        ),
+        if (_selectedWatch == '직접입력') ...[
+          const SizedBox(height: 16),
+          GlassCard(
+            child: TextFormField(
+              controller: _customWatchCtrl,
+              decoration: const InputDecoration(
+                labelText: '워치 모델 직접 입력 *',
+                prefixIcon: Icon(Icons.edit_rounded, size: 20),
+              ),
+              validator: (v) {
+                if (_selectedWatch == '직접입력' && (v == null || v.trim().isEmpty)) {
+                  return '워치 기종명을 입력해 주세요';
+                }
+                return null;
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Step 3: 착용 스트랩 선택 ────────────────────────────────────
+  Widget _buildStep3Strap() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '착용 스트랩 종류 선택',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '테스트 시 부착한 공식/서드파티 스트랩 디자인을 고르세요.',
+          style: TextStyle(
+            fontSize: 13,
+            color: const Color(0xFFE2E2E2).withOpacity(0.7),
+          ),
+        ),
+        const SizedBox(height: 20),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.1,
+          ),
+          itemCount: kStrapOptions.length,
+          itemBuilder: (ctx, index) {
+            final strap = kStrapOptions[index];
+            final name = strap['name']!;
+            final desc = strap['desc']!;
+            final isSel = _selectedStrap == name;
+
+            // 아이콘 매핑
+            IconData strapIcon = Icons.watch_outlined;
+            if (name.contains('스포츠')) strapIcon = Icons.run_circle_outlined;
+            if (name.contains('레더')) strapIcon = Icons.style_outlined;
+            if (name.contains('패브릭')) strapIcon = Icons.texture_rounded;
+            if (name.contains('밀레니즈')) strapIcon = Icons.grid_3x3_rounded;
+            if (name.contains('입력')) strapIcon = Icons.edit_note_rounded;
+
+            return InkWell(
+              onTap: () => setState(() => _selectedStrap = name),
+              borderRadius: BorderRadius.circular(20),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSel ? const Color(0xFF2E5BFF).withOpacity(0.2) : Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSel ? const Color(0xFF3DFFC1) : Colors.white.withOpacity(0.08),
+                      width: isSel ? 1.5 : 1.0,
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Icon(strapIcon, color: isSel ? const Color(0xFF3DFFC1) : Colors.white60, size: 24),
+                          if (isSel)
+                            const Icon(Icons.check_circle_rounded, color: Color(0xFF3DFFC1), size: 20),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isSel ? const Color(0xFF3DFFC1) : Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            desc,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 10, color: Colors.white54),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        if (_selectedStrap == '직접입력') ...[
+          const SizedBox(height: 16),
+          GlassCard(
+            child: TextFormField(
+              controller: _customStrapCtrl,
+              decoration: const InputDecoration(
+                labelText: '스트랩 직접 입력 *',
+                prefixIcon: Icon(Icons.edit_rounded, size: 20),
+              ),
+              validator: (v) {
+                if (_selectedStrap == '직접입력' && (v == null || v.trim().isEmpty)) {
+                  return '스트랩 정보 명칭을 적어주세요';
+                }
+                return null;
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Step 4: 운동 선택 ──────────────────────────────────────────
+  Widget _buildStep4Exercise() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '운동 종목 선택',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '검증을 위해 테스트를 수행한 운동 대상을 골라주세요.',
+          style: TextStyle(
+            fontSize: 13,
+            color: const Color(0xFFE2E2E2).withOpacity(0.7),
+          ),
+        ),
+        const SizedBox(height: 20),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: kExerciseOptions.length,
+          separatorBuilder: (ctx, idx) => const SizedBox(height: 10),
+          itemBuilder: (ctx, idx) {
+            final ex = kExerciseOptions[idx];
+            final name = ex['name'] as String;
+            final icon = ex['icon'] as IconData;
+            final isSel = _selectedExercise == name;
+
+            return InkWell(
+              onTap: () {
+                setState(() {
+                  _selectedExercise = name;
+                  _currentStep = 5; // 즉시 다음 단계 이동
+                });
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: GlassCard(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                radius: 16,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isSel ? const Color(0xFF3DFFC1).withOpacity(0.15) : Colors.white.withOpacity(0.04),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: isSel ? const Color(0xFF3DFFC1) : Colors.white60, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                          color: isSel ? const Color(0xFF3DFFC1) : Colors.white,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: isSel ? const Color(0xFF3DFFC1) : Colors.white30,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget _watchDropdown() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedWatch,
-      decoration: const InputDecoration(
-        labelText: '착용 워치',
-        prefixIcon: Icon(Icons.watch_outlined),
-        border: OutlineInputBorder(),
+  // ── Step 5: 파일 첨부 및 디테일 입력 ─────────────────────────────────
+  Widget _buildStep5Details() {
+    final bool hasFiles = _fitFiles.isNotEmpty || _colaFiles.isNotEmpty || _logFiles.isNotEmpty || _captureFiles.isNotEmpty;
+
+    return Form(
+      key: _formKey5,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '검증 파일 및 디테일 등록',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.directions_run_rounded, color: Color(0xFF3DFFC1), size: 16),
+              const SizedBox(width: 4),
+              Text(
+                '선택된 운동: $_selectedExercise',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF3DFFC1),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // ── 파일 첨부 카드 섹션 ──
+          const Text(
+            '1. 검증 데이터 첨부',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
+          ),
+          const SizedBox(height: 10),
+
+          // FIT
+          _buildAttachCard(
+            icon: Icons.fitness_center_rounded,
+            title: 'FIT 파일 추가',
+            hint: '삼성 헬스 → 다운로드/삼성 헬스/fit',
+            busy: _fileBusy,
+            onTap: _pickFit,
+            files: _fitFiles,
+          ),
+          const SizedBox(height: 10),
+
+          // Cola
+          _buildAttachCard(
+            icon: Icons.folder_zip_outlined,
+            title: 'Cola.zip 추가',
+            hint: 'Documents/COLA_FILE/COLA_FILE*.zip',
+            busy: _fileBusy,
+            onTap: _pickCola,
+            files: _colaFiles,
+          ),
+          const SizedBox(height: 10),
+
+          // Logs
+          _buildAttachCard(
+            icon: Icons.article_outlined,
+            title: '로그 파일 추가',
+            hint: 'Documents/COLA_FILE/log_*.zip',
+            busy: _fileBusy,
+            onTap: _pickLog,
+            files: _logFiles,
+          ),
+          const SizedBox(height: 10),
+
+          // Captures (Multi)
+          _buildCaptureAttachCard(),
+          const SizedBox(height: 14),
+
+          if (!hasFiles) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white.withOpacity(0.12), style: BorderStyle.none),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.cloud_upload_outlined, size: 36, color: Colors.white.withOpacity(0.3)),
+                  const SizedBox(height: 8),
+                  Text(
+                    '필수 검증 파일을 한 개 이상 첨부해 주세요.',
+                    style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+
+          const Divider(height: 32, color: Colors.white10),
+
+          // ── 디테일 선택 영역 ──
+          const Text(
+            '2. 착용 상태 및 환경 설정',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
+          ),
+          const SizedBox(height: 16),
+
+          // 착용 위치 (스위치 UI)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('착용 위치', style: TextStyle(fontSize: 14)),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    _buildSwitchTab('왼쪽', _wearingPosition == '왼쪽'),
+                    _buildSwitchTab('오른쪽', _wearingPosition == '오른쪽'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 착용 정도 (세그먼트 3버튼 UI)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('착용 정도', style: TextStyle(fontSize: 14)),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    _buildSegmentTab('충분히', _wearingTightness == '충분히'),
+                    _buildSegmentTab('적당히', _wearingTightness == '적당히'),
+                    _buildSegmentTab('느슨하게', _wearingTightness == '느슨하게'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // 동시에 착용한 타사 모델
+          _buildCompetitorSection(),
+          const SizedBox(height: 16),
+
+          // 훈련 종류
+          _buildTrainingSection(),
+          const SizedBox(height: 16),
+
+          // 장소 입력
+          TextFormField(
+            controller: _locationCtrl,
+            decoration: const InputDecoration(
+              labelText: '운동 장소 직접 입력 (예: 공원, 실내체육관)',
+              prefixIcon: Icon(Icons.place_outlined, size: 20),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 특이 사항 TextArea
+          TextFormField(
+            controller: _memoCtrl,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: '특이 사항 및 메모',
+              alignLabelWithHint: true,
+              hintText: '특이 사항이 있다면 적어주세요. (착용감 흔들림, 센서 오작동 등)',
+            ),
+          ),
+          const SizedBox(height: 30),
+        ],
       ),
-      items: kWatchOptions
-          .map((w) => DropdownMenuItem(value: w, child: Text(w)))
-          .toList(),
-      onChanged: (v) =>
-          setState(() => _selectedWatch = v ?? kWatchOptions.first),
     );
   }
 
-  Widget _customWatchField() {
-    return TextFormField(
-      controller: _customWatchCtrl,
-      textInputAction: TextInputAction.next,
-      decoration: const InputDecoration(
-        labelText: '워치 이름 직접입력 *',
-        prefixIcon: Icon(Icons.edit_outlined),
-        border: OutlineInputBorder(),
-      ),
-      validator: (v) {
-        if (_selectedWatch == '직접입력' && (v == null || v.trim().isEmpty)) {
-          return '워치 이름을 입력하세요';
-        }
-        return null;
-      },
-    );
-  }
-
-  Widget _memoField() {
-    return TextFormField(
-      controller: _memoCtrl,
-      maxLines: 3,
-      textInputAction: TextInputAction.newline,
-      decoration: const InputDecoration(
-        labelText: '세션 메모',
-        prefixIcon: Icon(Icons.notes_outlined),
-        border: OutlineInputBorder(),
-        alignLabelWithHint: true,
+  Widget _buildSwitchTab(String text, bool active) {
+    return GestureDetector(
+      onTap: () => setState(() => _wearingPosition = text),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF2E5BFF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            color: active ? Colors.white : Colors.white54,
+          ),
+        ),
       ),
     );
   }
 
-  String? _validatePositiveNumber(String? v) {
-    if (v == null || v.trim().isEmpty) return '값을 입력하세요';
-    final num = double.tryParse(v.trim());
-    if (num == null || num <= 0) return '올바른 숫자를 입력하세요';
-    return null;
+  Widget _buildSegmentTab(String text, bool active) {
+    return GestureDetector(
+      onTap: () => setState(() => _wearingTightness = text),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF2E5BFF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            color: active ? Colors.white : Colors.white54,
+          ),
+        ),
+      ),
+    );
   }
-}
 
-// ── 재사용 위젯들 ─────────────────────────────────────────────────
+  Widget _buildAttachCard({
+    required IconData icon,
+    required String title,
+    required String hint,
+    required bool busy,
+    required VoidCallback onTap,
+    required List<AttachedFile> files,
+  }) {
+    return GlassCard(
+      padding: const EdgeInsets.all(12),
+      radius: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: const Color(0xFF3DFFC1), size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Text(hint, style: const TextStyle(fontSize: 10, color: Colors.white38)),
+                  ],
+                ),
+              ),
+              OutlinedButton(
+                onPressed: busy ? null : onTap,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(60, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  side: const BorderSide(color: Color(0xFF3DFFC1)),
+                  foregroundColor: const Color(0xFF3DFFC1),
+                ),
+                child: busy
+                    ? const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 1.5, valueColor: AlwaysStoppedAnimation(Color(0xFF3DFFC1))),
+                      )
+                    : const Text('추가', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          if (files.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...files.asMap().entries.map((e) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: AttachedFileTile(
+                  file: e.value,
+                  onDelete: () => _removeFile(files, e.key),
+                ),
+              );
+            }),
+          ]
+        ],
+      ),
+    );
+  }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader(this.title);
+  Widget _buildCaptureAttachCard() {
+    return GlassCard(
+      padding: const EdgeInsets.all(12),
+      radius: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.photo_library_outlined, color: Color(0xFF3DFFC1), size: 22),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('운동 캡처 선택 (다중)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Text('갤러리 다중 이미지 첨부 가능', style: TextStyle(fontSize: 10, color: Colors.white38)),
+                  ],
+                ),
+              ),
+              OutlinedButton(
+                onPressed: _fileBusy ? null : _pickCaptures,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(60, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  side: const BorderSide(color: Color(0xFF3DFFC1)),
+                  foregroundColor: const Color(0xFF3DFFC1),
+                ),
+                child: const Text('선택', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          if (_captureFiles.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: _captureFiles.length,
+              itemBuilder: (ctx, index) {
+                final file = _captureFiles[index];
+                final path = file.tempPath ?? file.originalPath;
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(path),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: GestureDetector(
+                        onTap: () => _removeFile(_captureFiles, index),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close, size: 12, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ]
+        ],
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildCompetitorSection() {
+    final List<String> compOptions = ['가민', '애플', '크로스', '없음', '직접입력'];
+    return GlassCard(
+      radius: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('동시 착용 타사 모델', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: _competitorWatch,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.compare_arrows_rounded, size: 20),
+            ),
+            items: compOptions
+                .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) {
+                setState(() => _competitorWatch = val);
+              }
+            },
+          ),
+          if (_competitorWatch == '직접입력') ...[
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _customCompetitorCtrl,
+              decoration: const InputDecoration(
+                labelText: '타사 기기 직접 입력 *',
+              ),
+            ),
+          ]
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrainingSection() {
+    final List<String> trOptions = ['조깅', '인터벌', 'LSD', '변속주', '지속주', '직접입력'];
+    return GlassCard(
+      radius: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('훈련 종류', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: _trainingType,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.sports_score_rounded, size: 20),
+            ),
+            items: trOptions
+                .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) {
+                setState(() => _trainingType = val);
+              }
+            },
+          ),
+          if (_trainingType == '직접입력') ...[
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _customTrainingCtrl,
+              decoration: const InputDecoration(
+                labelText: '훈련 종류 직접 입력 *',
+              ),
+            ),
+          ]
+        ],
+      ),
+    );
+  }
+
+  // ── Step 6: 압축 & 전송 완료 (Dashboard) ─────────────────────────
+  Widget _buildStep6Completion() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const SizedBox(height: 16),
+        // 1. 상태 아이콘 및 모션 원
+        SizedBox(
+          width: 140,
+          height: 140,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (_isPackaging || _emailSending)
+                const CircularProgressIndicator(
+                  strokeWidth: 6,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+                )
+              else
+                Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF3DFFC1).withOpacity(0.12),
+                    border: Border.all(color: const Color(0xFF3DFFC1), width: 3),
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: Color(0xFF3DFFC1),
+                    size: 52,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          _isPackaging
+              ? '파일을 압축 중입니다...'
+              : (_emailSending
+                  ? '이메일로 전송을 완료하는 중...'
+                  : '데이터 제출 성공'),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 24),
+
+        // 2. 압축 완료 정보 카드
+        if (_packResult != null)
+          GlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.inventory_2_outlined, color: Color(0xFF2E5BFF), size: 18),
+                    SizedBox(width: 8),
+                    Text('압축 결과 리포트', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const Divider(height: 20, color: Colors.white10),
+                _buildInfoRow('파일명', _packResult!.zipName),
+                _buildInfoRow('파일 크기', _packResult!.sizeLabel),
+                _buildInfoRow('압축된 파일', '${_fitFiles.length + _colaFiles.length + _logFiles.length + _captureFiles.length}개'),
+              ],
+            ),
+          ),
+        const SizedBox(height: 16),
+
+        // 3. 전송 상태 타임라인 패널
+        GlassCard(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('전송 완료 상태', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              const Divider(height: 20, color: Colors.white10),
+
+              // Timeline Step 1: 압축 성공
+              _buildTimelineStep(
+                title: '검증 정보 로컬 압축',
+                status: _isPackaging ? '진행 중' : '완료',
+                isDone: !_isPackaging,
+              ),
+
+              // Timeline Step 2: 클립보드 Quick Share 링크 감지
+              _buildTimelineStep(
+                title: 'Quick Share 링크 감지',
+                status: _lastProcessedLink != null
+                    ? '성공'
+                    : (_packResult == null ? '대기 중' : '클립보드 복사 대기 중...'),
+                desc: _lastProcessedLink != null
+                    ? (_lastProcessedLink!.length > 40 ? '${_lastProcessedLink!.substring(0, 40)}…' : _lastProcessedLink)
+                    : '공유 창에서 Quick Share 링크를 복사해 주세요.',
+                isDone: _lastProcessedLink != null,
+                isWarning: _lastProcessedLink == null,
+              ),
+
+              // Timeline Step 3: 백엔드 이메일 발송
+              _buildTimelineStep(
+                title: '이메일 발송 상태',
+                status: _emailSent ? '발송 완료' : (_emailSending ? '발송 중...' : '감지 대기 중'),
+                desc: _emailError != null ? '오류: $_emailError' : null,
+                isDone: _emailSent,
+                isError: _emailError != null,
+              ),
+
+              if (!_emailSending && _lastProcessedLink != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => _sendEmail(_lastProcessedLink!),
+                      icon: const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF2E5BFF)),
+                      label: const Text('메일 다시 보내기', style: TextStyle(fontSize: 12, color: Color(0xFF2E5BFF))),
+                    ),
+                  ),
+                )
+            ],
+          ),
+        ),
+        const SizedBox(height: 30),
+
+        // 4. 새로운 검증 시작하기 버튼
+        ElevatedButton.icon(
+          onPressed: _resetVerification,
+          icon: const Icon(Icons.restart_alt_rounded, color: Colors.black),
+          label: const Text(
+            '새로운 검증 시작하기',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF3DFFC1),
+            minimumSize: const Size.fromHeight(54),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+        ),
+        const SizedBox(height: 30),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String val) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.white60)),
+          Text(val, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineStep({
+    required String title,
+    required String status,
+    String? desc,
+    bool isDone = false,
+    bool isWarning = false,
+    bool isError = false,
+  }) {
+    IconData icon = Icons.circle_outlined;
+    Color color = Colors.white30;
+    if (isDone) {
+      icon = Icons.check_circle_rounded;
+      color = const Color(0xFF3DFFC1);
+    } else if (isWarning) {
+      icon = Icons.hourglass_empty_rounded;
+      color = const Color(0xFFFFB300);
+    } else if (isError) {
+      icon = Icons.error_rounded;
+      color = const Color(0xFFFF5252);
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-      ),
-    );
-  }
-}
-
-class _AttachButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String hint;
-  final VoidCallback? onTap;
-  final bool busy;
-
-  const _AttachButton({
-    required this.icon,
-    required this.label,
-    required this.hint,
-    required this.onTap,
-    this.busy = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final active = onTap != null && !busy;
-    final color = active
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).disabledColor;
-
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(56),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        side: BorderSide(color: color),
-        foregroundColor: color,
-        alignment: Alignment.centerLeft,
-      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          busy
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: color),
-                )
-              : Icon(icon),
+          Icon(icon, color: color, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-                Text(
-                  hint,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    Text(status, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.bold)),
+                  ],
                 ),
+                if (desc != null) ...[
+                  const SizedBox(height: 2),
+                  Text(desc, style: const TextStyle(fontSize: 11, color: Colors.white54)),
+                ],
               ],
             ),
           ),
@@ -708,186 +1619,111 @@ class _AttachButton extends StatelessWidget {
       ),
     );
   }
-}
 
-class _DeviceInfoCard extends StatelessWidget {
-  final DeviceSession session;
-  const _DeviceInfoCard({required this.session});
+  // ── 하단 버튼 패널 빌더 (Step 1~5 공통) ────────────────────────────────
+  Widget _buildFooterButtons() {
+    final isStep5 = _currentStep == 5;
+    final bool canNext = _currentStep < 5;
 
-  @override
-  Widget build(BuildContext context) {
-    final rows = [
-      ('기기 모델', session.deviceModel),
-      ('Android 버전', session.androidVersion),
-      ('앱 버전', session.appVersion),
-      ('생성 일시', session.createdAt),
-      ('세션 ID', session.sessionId),
-    ];
-
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: rows.map((r) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 100,
-                    child: Text(
-                      r.$1,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      r.$2,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C0F0F).withOpacity(0.4),
+        border: Border(
+          top: BorderSide(color: Colors.white.withOpacity(0.04)),
         ),
       ),
-    );
-  }
-}
-
-// ── 공유 결과 카드 ────────────────────────────────────────────────
-
-class _PackResultCard extends StatelessWidget {
-  final PackResult result;
-  final VoidCallback onShare;
-  const _PackResultCard({required this.result, required this.onShare});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      color: cs.primaryContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 헤더
-            Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: cs.primary, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  '공유 완료',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: cs.primary,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _row('파일명', result.zipName, cs),
-            _row('크기', result.sizeLabel, cs),
-            const SizedBox(height: 12),
-
-            // Quick Share 안내 배너
-            Container(
-              width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: cs.tertiaryContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, color: cs.tertiary, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      "Quick Share에서 '링크 복사' 후\n이 앱으로 돌아오세요",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onTertiaryContainer,
-                        fontWeight: FontWeight.w500,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // 다시 공유 버튼
-            OutlinedButton.icon(
-              onPressed: onShare,
-              icon: const Icon(Icons.share_outlined, size: 18),
-              label: const Text('다시 공유'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(40),
-                foregroundColor: cs.primary,
-                side: BorderSide(color: cs.primary),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _row(String label, String value, ColorScheme cs) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          SizedBox(
-            width: 52,
-            child: Text(
-              label,
-              style: TextStyle(fontSize: 13, color: cs.outline),
+          if (_currentStep > 1) ...[
+            Expanded(
+              flex: 1,
+              child: OutlinedButton(
+                onPressed: () {
+                  setState(() => _currentStep--);
+                },
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('이전'),
+              ),
             ),
-          ),
+            const SizedBox(width: 12),
+          ],
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            flex: 2,
+            child: ElevatedButton(
+              onPressed: () {
+                if (isStep5) {
+                  _onSend();
+                } else if (canNext) {
+                  // 1단계 입력 검증
+                  if (_currentStep == 1) {
+                    if (!_formKey1.currentState!.validate()) return;
+                  }
+                  setState(() => _currentStep++);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E5BFF),
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: Text(
+                isStep5 ? '압축 및 보내기' : '다음 단계로',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  String? _validatePositiveNumber(String? v) {
+    if (v == null || v.trim().isEmpty) return '값을 입력해 주세요';
+    final num = double.tryParse(v.trim());
+    if (num == null || num <= 0) return '올바른 숫자를 입력해 주세요';
+    return null;
+  }
 }
 
-class _SendBar extends StatelessWidget {
-  final VoidCallback onSend;
-  const _SendBar({required this.onSend});
+// ── 글래스모피즘 카드 위젯 ────────────────────────────────────────────
+class GlassCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+  final double? radius;
+
+  const GlassCard({
+    super.key,
+    required this.child,
+    this.padding,
+    this.radius,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: FilledButton.icon(
-          onPressed: onSend,
-          icon: const Icon(Icons.send_rounded),
-          label: const Text(
-            '보내기',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius ?? 24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(radius ?? 24),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.08),
+              width: 1.0,
+            ),
           ),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          child: Padding(
+            padding: padding ?? const EdgeInsets.all(20),
+            child: child,
+          ),
         ),
       ),
     );
