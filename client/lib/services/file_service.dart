@@ -31,6 +31,13 @@ class FileService {
     return _fromLocalPath(path, AttachType.cola);
   }
 
+  // ── 로그 파일 선택 ─────────────────────────────────────────────
+  /// COLA_FILE 경로(primary:Documents/COLA_FILE)로 바로 이동 후 log_*.zip 선택
+  static Future<AttachedFile?> pickLog() async {
+    final path = await _ch.invokeMethod<String?>('pickLog');
+    return _fromLocalPath(path, AttachType.log);
+  }
+
   // ── 운동 캡처 다중 선택 ───────────────────────────────────────
   static Future<List<AttachedFile>> pickCaptures() async {
     final images = await _imagePicker.pickMultiImage();

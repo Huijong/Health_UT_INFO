@@ -1,23 +1,36 @@
->>> 1단계: dev 브랜치에서 작업하고 올리기
+1단계: dev 브랜치에서 일상적인 개발 및 푸시
 
-# 1. 원격 저장소의 최신 상태를 가져오고 dev 브랜치로 이동
-git fetch origin
+# (혹시 다른 브랜치에 있었다면) dev 브랜치로 이동
 git checkout dev
-git pull origin dev
 
-# 2. 파일 수정 작업 진행 (예: index.html, app.js 등 수정)
+# 코드를 열심히 수정하고 기능을 구현합니다... (예: index.html 수정)
 
-# 3. 변경된 파일 스테이징 및 커밋
+# 변경 사항 저장하기
 git add .
-git commit -m "feat: 개발 브랜치에서 신규 기능 구현 완료"
+git commit -m "feat: 로그인 기능 구현 완료"
 
-# 4. GitHub의 dev 브랜치로 푸시
-git push origin dev
-
-
+# GitHub dev 브랜치로 푸시
+git push
 
 
->>> 2단계: 최종 main 브랜치로 병합(Merge)하기
+2단계: 최종 배포를 위해 main 브랜치로 합치기 (Merge)
+
+# 1. 배포용 main 브랜치로 이동
+git checkout main
+
+# 2. 혹시 그사이 main에 다른 수정사항이 반영되었을지 모르니 최신화
+git pull origin main
+
+여기에서 방법 A
+
+# 3. dev 브랜치의 변경 내용을 main으로 병합
+git merge dev
+
+# 4. 합쳐진 최종 main 상태를 GitHub에 업로드 (배포)
+git push origin main
+
+S
+
 방법 A
 dev 브랜치에서 기능 구현과 테스트가 모두 끝나서, 이제 실제 서비스용인 main 브랜치에 합칠 차례입니다.
 
@@ -33,23 +46,3 @@ base: main ⬅️ compare: dev 로 설정합니다. (dev를 main으로 합치겠
 변경 사항을 확인하고 [Create pull request]를 생성합니다.
 
 문제가 없다면 [Merge pull request]를 눌러 최종 병합합니다.
-
-
-방법 B: 내 컴퓨터(로컬) 터미널에서 바로 합치기
-만약 혼자 작업하거나 터미널에서 바로 반영하고 싶다면 아래 명령어를 순서대로 입력하세요.
-# 1. 최종 배포용 main 브랜치로 이동
-git checkout main
-
-# 2. 혹시 그사이 main에 반영된 다른 수정사항이 있을지 모르니 최신화
-git pull origin main
-
-# 3. dev 브랜치의 변경 내용을 main 브랜치로 병합
-git merge dev
-
-# 4. 합쳐진 최신 main 브랜치를 GitHub 원격 저장소에 최종 반영
-git push origin main
-
-
->>> 3단계: 다음 작업을 위한 마무리
-# 다시 개발 브랜치로 이동해서 다음 작업 준비하기
-git checkout dev

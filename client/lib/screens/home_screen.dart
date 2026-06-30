@@ -47,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // 첨부 파일 목록
   final List<AttachedFile> _fitFiles = [];
   final List<AttachedFile> _colaFiles = [];
+  final List<AttachedFile> _logFiles = [];
   final List<AttachedFile> _captureFiles = [];
 
   // 파일 선택/복사 진행 중일 때 true → 버튼 비활성화
@@ -261,6 +262,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _pickLog() async {
+    if (_fileBusy) return;
+    setState(() => _fileBusy = true);
+    try {
+      final f = await FileService.pickLog();
+      if (f != null && mounted) setState(() => _logFiles.add(f));
+    } catch (e) {
+      _showFileError('로그 파일', e);
+    } finally {
+      if (mounted) setState(() => _fileBusy = false);
+    }
+  }
+
   Future<void> _pickCaptures() async {
     if (_fileBusy) return;
     setState(() => _fileBusy = true);
@@ -363,6 +377,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         session: _session!,
         fitFiles: _fitFiles,
         colaFiles: _colaFiles,
+        logFiles: _logFiles,
         captureFiles: _captureFiles,
       );
 
@@ -453,6 +468,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               (e) => AttachedFileTile(
                 file: e.value,
                 onDelete: () => _removeFile(_colaFiles, e.key),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // 로그 파일 추가
+            _AttachButton(
+              icon: Icons.folder_zip_outlined,
+              label: '로그 파일 추가',
+              hint: 'Documents/COLA_FILE 폴더 → log_*.zip',
+              busy: _fileBusy,
+              onTap: _fileBusy ? null : _pickLog,
+            ),
+            ..._logFiles.asMap().entries.map(
+              (e) => AttachedFileTile(
+                file: e.value,
+                onDelete: () => _removeFile(_logFiles, e.key),
               ),
             ),
             const SizedBox(height: 8),

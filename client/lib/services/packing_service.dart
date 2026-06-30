@@ -23,6 +23,7 @@ class PackingService {
     required DeviceSession session,
     required List<AttachedFile> fitFiles,
     required List<AttachedFile> colaFiles,
+    required List<AttachedFile> logFiles,
     required List<AttachedFile> captureFiles,
   }) async {
     // 세션 ID에서 날짜·시간 추출: "SH_20240627_143052_1234" → ["SH","20240627","143052","1234"]
@@ -50,6 +51,7 @@ class PackingService {
       'files': [
         ...fitFiles.map(_fileMeta),
         ...colaFiles.map(_fileMeta),
+        ...logFiles.map(_fileMeta),
         ...captureFiles.map(_fileMeta),
       ],
     };
@@ -68,6 +70,7 @@ class PackingService {
         session: session,
         fitFiles: fitFiles,
         colaFiles: colaFiles,
+        logFiles: logFiles,
         captureFiles: captureFiles,
       ),
     );
@@ -78,8 +81,8 @@ class PackingService {
     archive.addFile(ArchiveFile('meta.json', metaBytes.length, metaBytes));
     archive.addFile(ArchiveFile('info.txt', infoBytes.length, infoBytes));
 
-    // FIT + Cola: 루트 레벨
-    for (final f in [...fitFiles, ...colaFiles]) {
+    // FIT + Cola + Log: 루트 레벨
+    for (final f in [...fitFiles, ...colaFiles, ...logFiles]) {
       final bytes = await _readFile(f);
       archive.addFile(ArchiveFile(f.name, bytes.length, bytes));
     }
@@ -126,6 +129,7 @@ class PackingService {
     required DeviceSession session,
     required List<AttachedFile> fitFiles,
     required List<AttachedFile> colaFiles,
+    required List<AttachedFile> logFiles,
     required List<AttachedFile> captureFiles,
   }) {
     final sb = StringBuffer();
@@ -155,6 +159,7 @@ class PackingService {
     sb.writeln('[ 첨부 파일 ]');
     _appendFileList(sb, 'FIT 파일', fitFiles);
     _appendFileList(sb, 'Cola.zip', colaFiles);
+    _appendFileList(sb, '로그 파일', logFiles);
     _appendFileList(sb, '운동 캡처', captureFiles);
 
     sb.writeln('=========================================');

@@ -1,5 +1,5 @@
 ## 프로젝트 개요
-- 목적: Samsung Health 앱 검증을 위해 테스터 단말에서 FIT / Cola.zip / 운동 캡처 + 사용자 정보를 수집
+- 목적: Samsung Health 앱 검증을 위해 테스터 단말에서 FIT / Cola.zip / 로그 파일 / 운동 캡처 + 사용자 정보를 수집
 - 모듈 구성: 
   1. **client 앱** (테스터용, Flutter)
   2. **server** (FastAPI + MongoDB 기반 수집 서버 및 대시보드 웹)
