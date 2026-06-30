@@ -81,7 +81,7 @@ async def get_dashboard(request: Request):
                 align-items: center;
             }
             .container {
-                max-width: 1400px;
+                max-width: 96%;
                 width: 100%;
                 box-sizing: border-box;
             }
@@ -188,17 +188,18 @@ async def get_dashboard(request: Request):
                 border-radius: 14px;
                 box-shadow: 0 4px 20px rgba(148, 163, 184, 0.08);
                 border: 1px solid var(--border);
-                overflow: hidden;
+                overflow-x: auto; /* 가로 스크롤을 활성화하여 14개 열이 구겨지지 않게 함 */
             }
             table {
                 width: 100%;
                 border-collapse: collapse;
                 text-align: left;
+                min-width: 100%; /* 대화면에서 전체 가로폭을 채우도록 백분율로 변경 */
             }
             th, td {
-                padding: 18px 24px;
+                padding: 16px 20px;
                 border-bottom: 1px solid var(--border);
-                font-size: 14px;
+                font-size: 13.5px;
             }
             th {
                 background-color: var(--primary-light);
@@ -233,9 +234,9 @@ async def get_dashboard(request: Request):
             }
             .badge {
                 display: inline-block;
-                padding: 6px 10px;
+                padding: 4px 8px;
                 border-radius: 6px;
-                font-size: 12px;
+                font-size: 11px;
                 font-weight: 600;
                 background-color: #F1F5F9;
                 color: #475569;
@@ -246,10 +247,10 @@ async def get_dashboard(request: Request):
                 background-color: var(--primary-light);
                 color: var(--primary);
                 text-decoration: none;
-                padding: 8px 14px;
+                padding: 6px 12px;
                 border-radius: 6px;
                 font-weight: 600;
-                font-size: 13px;
+                font-size: 12px;
                 transition: background-color 0.2s;
             }
             .link-btn:hover {
@@ -260,9 +261,9 @@ async def get_dashboard(request: Request):
                 border: none;
                 color: var(--primary);
                 cursor: pointer;
-                font-size: 13px;
+                font-size: 12px;
                 font-weight: 600;
-                margin-left: 10px;
+                margin-left: 8px;
                 text-decoration: underline;
             }
             .copy-btn:hover {
@@ -489,7 +490,7 @@ async def get_dashboard(request: Request):
             function renderTable(data) {
                 const tbody = document.getElementById('table-body');
                 if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="no-data">조건에 맞는 수집 내역이 없습니다.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="14" class="no-data">조건에 맞는 수집 내역이 없습니다.</td></tr>`;
                     return;
                 }
                 
@@ -504,6 +505,7 @@ async def get_dashboard(request: Request):
                     const tightness = item.wearing_tightness || '-';
                     const competitor = item.competitor_watch || '-';
                     const training = item.training_type || '-';
+                    const location = item.location || '-';
                     const remarks = item.remarks || '';
 
                     // 단위 중복 방지 처리
@@ -514,31 +516,25 @@ async def get_dashboard(request: Request):
 
                     html += `
                         <tr>
-                            <td style="color: var(--text-muted); font-size: 13px; white-space: nowrap;">${item.received_at}</td>
-                            <td>
-                                <strong style="font-size: 14px;">${item.tester_name}</strong><br>
-                                <span style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">${hStr}<br>${wStr}</span>
-                            </td>
-                            <td>
-                                <span style="font-weight: 600;">${watch}</span><br>
-                                <span style="font-size: 12px; color: var(--text-muted);">${strap}</span>
-                            </td>
-                            <td>
-                                <span style="font-weight: 600; color: #10B981;">${exercise}</span><br>
-                                <span style="font-size: 11px; color: var(--text-muted);">${training}</span>
-                            </td>
-                            <td>
-                                <span style="font-size: 12px;">위치: <strong>${position}</strong></span><br>
-                                <span style="font-size: 12px;">조임: <strong>${tightness}</strong></span><br>
-                                <span style="font-size: 11px; color: var(--text-muted);">타사기기: ${competitor}</span>
-                            </td>
-                            <td style="max-width: 180px; font-size: 12px; color: #475569;" title="${remarks}">
+                            <td style="color: var(--text-muted); font-size: 12.5px; white-space: nowrap;">${item.received_at}</td>
+                            <td><span style="font-size: 13.5px; white-space: nowrap;">${item.tester_name}</span></td>
+                            <td style="white-space: nowrap;">${hStr}</td>
+                            <td style="white-space: nowrap;">${wStr}</td>
+                            <td><span class="badge" style="background-color: #E8EBF5; color: #1429A0; white-space: nowrap;">${watch}</span></td>
+                            <td style="white-space: nowrap;">${strap}</td>
+                            <td><span style="color: #10B981; white-space: nowrap;">${exercise}</span></td>
+                            <td style="white-space: nowrap;">${training}</td>
+                            <td style="white-space: nowrap;">${position}</td>
+                            <td style="white-space: nowrap;">${tightness}</td>
+                            <td style="white-space: nowrap;">${competitor}</td>
+                            <td style="white-space: nowrap;">${location}</td>
+                            <td style="max-width: 180px; font-size: 12px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${remarks}">
                                 ${remarks ? remarks : '<span style="color: #cbd5e1; font-style: italic;">없음</span>'}
                             </td>
-                            <td>
+                            <td style="white-space: nowrap;">
                                 ${item.share_link ? `
-                                    <a href="${item.share_link}" target="_blank" class="link-btn" style="display: block; text-align: center; margin-bottom: 4px;">다운로드</a>
-                                    <button class="copy-btn" onclick="copyToClipboard('${item.share_link}')" style="display: block; width: 100%; text-align: center; margin-left: 0;">주소 복사</button>
+                                    <a href="${item.share_link}" target="_blank" class="link-btn">다운로드</a>
+                                    <button class="copy-btn" onclick="copyToClipboard('${item.share_link}')">복사</button>
                                 ` : '<span style="color: var(--text-muted);">링크 없음</span>'}
                             </td>
                         </tr>
@@ -607,17 +603,24 @@ async def get_dashboard(request: Request):
                     <thead>
                         <tr>
                             <th class="sortable" onclick="handleSort('received_at')">수신 일시 <span class="sort-indicator" id="sort-icon-received_at">▼</span></th>
-                            <th class="sortable" onclick="handleSort('tester_name')">테스터 정보 <span class="sort-indicator" id="sort-icon-tester_name">↕</span></th>
-                            <th class="sortable" onclick="handleSort('watch')">워치 & 스트랩 <span class="sort-indicator" id="sort-icon-watch">↕</span></th>
-                            <th class="sortable" onclick="handleSort('exercise')">운동 정보 <span class="sort-indicator" id="sort-icon-exercise">↕</span></th>
-                            <th>착용 상태</th>
+                            <th class="sortable" onclick="handleSort('tester_name')">이름 <span class="sort-indicator" id="sort-icon-tester_name">↕</span></th>
+                            <th class="sortable" onclick="handleSort('height')">키 <span class="sort-indicator" id="sort-icon-height">↕</span></th>
+                            <th class="sortable" onclick="handleSort('weight')">몸무게 <span class="sort-indicator" id="sort-icon-weight">↕</span></th>
+                            <th class="sortable" onclick="handleSort('watch')">착용 워치 <span class="sort-indicator" id="sort-icon-watch">↕</span></th>
+                            <th class="sortable" onclick="handleSort('strap')">착용 스트랩 <span class="sort-indicator" id="sort-icon-strap">↕</span></th>
+                            <th class="sortable" onclick="handleSort('exercise')">운동 종류 <span class="sort-indicator" id="sort-icon-exercise">↕</span></th>
+                            <th class="sortable" onclick="handleSort('training_type')">훈련 종류 <span class="sort-indicator" id="sort-icon-training_type">↕</span></th>
+                            <th class="sortable" onclick="handleSort('wearing_position')">착용 위치 <span class="sort-indicator" id="sort-icon-wearing_position">↕</span></th>
+                            <th class="sortable" onclick="handleSort('wearing_tightness')">착용 정도 <span class="sort-indicator" id="sort-icon-wearing_tightness">↕</span></th>
+                            <th class="sortable" onclick="handleSort('competitor_watch')">동시착용 모델 <span class="sort-indicator" id="sort-icon-competitor_watch">↕</span></th>
+                            <th class="sortable" onclick="handleSort('location')">운동 장소 <span class="sort-indicator" id="sort-icon-location">↕</span></th>
                             <th>특이 사항</th>
                             <th>Quick Share</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
                         <tr>
-                            <td colspan="7" style="text-align: center; padding: 50px; color: var(--text-muted);">데이터를 불러오는 중입니다...</td>
+                            <td colspan="14" style="text-align: center; padding: 50px; color: var(--text-muted);">데이터를 불러오는 중입니다...</td>
                         </tr>
                     </tbody>
                 </table>
