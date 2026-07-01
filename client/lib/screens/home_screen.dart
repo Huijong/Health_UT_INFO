@@ -13,6 +13,7 @@ import '../services/share_service.dart';
 import '../services/email_service.dart';
 import '../widgets/attached_file_tile.dart';
 import 'settings_screen.dart';
+import 'location_picker_screen.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1209,9 +1210,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           // 장소 입력
           TextFormField(
             controller: _locationCtrl,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: '운동 장소 직접 입력 (예: 공원, 실내체육관)',
-              prefixIcon: Icon(Icons.place_outlined, size: 20),
+              prefixIcon: const Icon(Icons.place_outlined, size: 20),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.gps_fixed_rounded, color: Color(0xFF3DFFC1), size: 20),
+                onPressed: () async {
+                  final selectedAddress = await Navigator.push<String>(
+                    context,
+                    InstantPageRoute(
+                      page: const LocationPickerScreen(),
+                    ),
+                  );
+                  if (selectedAddress != null && selectedAddress.isNotEmpty) {
+                    setState(() {
+                      _locationCtrl.text = selectedAddress;
+                    });
+                  }
+                },
+                tooltip: '지도에서 장소 선택',
+              ),
             ),
           ),
           const SizedBox(height: 16),
