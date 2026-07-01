@@ -10,6 +10,9 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileOutputStream
+import android.os.Environment
+import android.os.Build
+import android.provider.MediaStore
 
 /**
  * FIT / Cola.zip 전용 파일 피커 MethodChannel
@@ -42,6 +45,7 @@ class FileChannelPlugin(
                     result.error("NO_ACTIVITY", "Activity not available", null)
                     return@setMethodCallHandler
                 }
+
                 pendingResult = result
                 when (call.method) {
                     "pickFit" -> openPicker(
