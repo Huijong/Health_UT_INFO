@@ -14,6 +14,8 @@ import '../services/email_service.dart';
 import '../widgets/attached_file_tile.dart';
 import 'settings_screen.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
 /// Galaxy Watch 드롭다운 선택지 (2단계 전용)
 const List<String> kWatchOptions = [
   'Galaxy Watch 4',
@@ -31,29 +33,89 @@ const List<String> kWatchOptions = [
 /// 워치 스트랩 선택지 (3단계 전용)
 const List<Map<String, String>> kStrapOptions = [
   {
-    'name': '스포츠 밴드',
-    'desc': '불소고무 소재의 뛰어난 착용감',
+    'name': '갤럭시 워치8 시리즈 하이브리드 밴드 (S/M/L)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/hybrid-band-for-galaxy-watch-8/ET-SLL50LWEGKR/'
   },
   {
-    'name': 'D-버클 하이브리드 레더',
-    'desc': '레더와 불소고무의 하이브리드 매치',
+    'name': '갤럭시 워치8 시리즈 스포츠 밴드 (슬림, S/M)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/sports-band-slim-sm-for-galaxy-watch-8/ET-SNL32SNEGKR/'
   },
   {
-    'name': '익스트림 스포츠 밴드',
-    'desc': '통기성이 우수한 홀 구조 디자인',
+    'name': '갤럭시 워치8 시리즈 스포츠 밴드 (와이드, M/L)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/sports-band-wide-ml-for-galaxy-watch-8/ET-SNL33LBEGKR/'
   },
   {
-    'name': '패브릭 밴드',
-    'desc': '가볍고 수면 시 편리한 패브릭 소재',
+    'name': '갤럭시 워치8 시리즈 애슬레저 밴드 (슬림, S/M)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/athleisure-band-slim-sm-for-galaxy-watch-8/ET-SOL32SNEGKR/'
   },
   {
-    'name': '밀레니즈 루프',
-    'desc': '메탈 메쉬 구조의 고급스러운 스타일',
+    'name': '갤럭시 워치8 시리즈 애슬레저 밴드 (와이드, M/L)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/athleisure-band-wide-ml-for-galaxy-watch-8/ET-SOL33LNEGKR/'
+  },
+  {
+    'name': '갤럭시 워치8 시리즈 패브릭 밴드 (슬림, S/M)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/fabric-band-slim-sm-for-galaxy-watch-8/ET-SVL32SNEGKR/'
+  },
+  {
+    'name': '갤럭시 워치8 시리즈 패브릭 밴드 (와이드, M/L)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/fabric-band-wide-ml-for-galaxy-watch-8/ET-SVL33LNEGKR/'
+  },
+  {
+    'name': '갤럭시 워치8 시리즈 프리미엄 레더 밴드',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/premium-leather-band-for-galaxy-watch-8/GP-TYL505AMBBK/'
+  },
+  {
+    'name': '갤럭시 워치8 시리즈 슬림 레더 밴드',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/slim-leather-band-for-galaxy-watch-8/GP-TYL325AMBBK/'
+  },
+  {
+    'name': '갤럭시 워치8 시리즈 나토 밴드',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/nato-band-galaxy-watch-8/GP-TYL335AMBJK/'
+  },
+  {
+    'name': '갤럭시 워치8 시리즈 벨크로 밴드',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/velcro-band-for-galaxy-watch-8/GP-TYL335HICNK/'
+  },
+  {
+    'name': '갤럭시 워치 울트라 마린 밴드',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/marine-band-galaxy-watch-ultra/ET-SNL70MNEGKR/'
+  },
+  {
+    'name': '갤럭시 워치 울트라 트레일 밴드',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/trail-band-galaxy-watch-ultra/ET-SVL70MNEGKR/'
+  },
+  {
+    'name': '갤럭시 워치 울트라 픽폼 밴드',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/peakform-band-for-galaxy-watch-ultra/ET-SBL70MBEGKR/'
+  },
+  {
+    'name': '갤럭시 워치7 스포츠 밴드 (와이드, M/L)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/sports-band-wide-ml-for-galaxy-watch-7/ET-SNL31LKEGKR/'
+  },
+  {
+    'name': '갤럭시 워치7 스포츠 밴드 (슬림, S/M)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/sports-band-slim-sm-for-galaxy-watch-7/ET-SNL30SOEGKR/'
+  },
+  {
+    'name': '갤럭시 워치7 애슬레저 밴드 (와이드, M/L)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/athleisure-band-slim-sm-for-galaxy-watch-7/ET-SOL31LLEGKR/'
+  },
+  {
+    'name': '갤럭시 워치7 애슬레저 밴드 (슬림, S/M)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/athleisure-band-wide-ml-for-galaxy-watch-7/ET-SOL30SPEGKR/'
+  },
+  {
+    'name': '갤럭시 워치7 패브릭 밴드 (와이드, M/L)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/fabric-band-wide-ml-for-galaxy-watch-7/ET-SVL31LWEGKR/'
+  },
+  {
+    'name': '갤럭시 워치7 패브릭 밴드 (슬림, S/M)',
+    'url': 'https://www.samsung.com/sec/mobile-accessories/fabric-band-slim-sm-for-galaxy-watch-7/ET-SVL30SWEGKR/'
   },
   {
     'name': '직접입력',
-    'desc': '사용 중인 다른 스트랩 입력',
-  },
+    'url': ''
+  }
 ];
 
 /// 운동 종류 선택지 (4단계 전용)
@@ -549,7 +611,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       child: _buildCurrentStepView(),
                     ),
                   ),
-                  if (_currentStep < 6) _buildFooterButtons(),
+                  if (_currentStep < 6 && _currentStep != 4) _buildFooterButtons(),
                 ],
               ),
             ),
@@ -584,11 +646,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   }
                 },
               ),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'SH 검증 수집기',
+                  _getStepTitle(),
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.5,
@@ -602,8 +664,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     if (_prefs == null) return;
                     final updated = await Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => SettingsScreen(prefs: _prefs!),
+                      InstantPageRoute(
+                        page: SettingsScreen(prefs: _prefs!),
                       ),
                     );
                     if (updated == true) {
@@ -672,6 +734,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  String _getStepTitle() {
+    switch (_currentStep) {
+      case 1:
+        return '테스트 프로필 입력';
+      case 2:
+        return '착용 워치 기종 선택';
+      case 3:
+        return '착용 스트랩 종류 선택';
+      case 4:
+        return '운동 종목 선택';
+      case 5:
+        return '검증 파일 및 디테일 등록';
+      case 6:
+        return '패키징 및 전송 완료';
+      default:
+        return 'SH 검증 수집기';
+    }
+  }
+
   // ── 단계별 뷰 분기 ──────────────────────────────────────────────
   Widget _buildCurrentStepView() {
     switch (_currentStep) {
@@ -699,11 +780,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '테스터 프로필 입력',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
           Text(
             '정밀한 피트니스 분석을 위해 테스터님의 신체 스펙을 입력해 주세요.',
             style: TextStyle(
@@ -757,11 +833,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '착용 워치 기종 선택',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
         Text(
           '테스트 시 착용한 Galaxy Watch 기종을 목록에서 골라주세요.',
           style: TextStyle(
@@ -785,7 +856,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   value: watch,
-                  activeColor: const Color(0xFF3DFFC1),
+                  activeColor: Colors.white,
                   groupValue: _selectedWatch,
                   onChanged: (val) {
                     if (val != null) {
@@ -819,16 +890,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _launchUrl(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('링크를 열 수 없습니다: $urlString')),
+        );
+      }
+    }
+  }
+
   // ── Step 3: 착용 스트랩 선택 ────────────────────────────────────
   Widget _buildStep3Strap() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '착용 스트랩 종류 선택',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
         Text(
           '테스트 시 부착한 공식/서드파티 스트랩 디자인을 고르세요.',
           style: TextStyle(
@@ -837,83 +914,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 20),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.1,
-          ),
-          itemCount: kStrapOptions.length,
-          itemBuilder: (ctx, index) {
-            final strap = kStrapOptions[index];
-            final name = strap['name']!;
-            final desc = strap['desc']!;
-            final isSel = _selectedStrap == name;
+        GlassCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              ...kStrapOptions.map((strapOpt) {
+                final strapName = strapOpt['name']!;
+                final url = strapOpt['url']!;
+                final isSel = _selectedStrap == strapName;
 
-            // 아이콘 매핑
-            IconData strapIcon = Icons.watch_outlined;
-            if (name.contains('스포츠')) strapIcon = Icons.run_circle_outlined;
-            if (name.contains('레더')) strapIcon = Icons.style_outlined;
-            if (name.contains('패브릭')) strapIcon = Icons.texture_rounded;
-            if (name.contains('밀레니즈')) strapIcon = Icons.grid_3x3_rounded;
-            if (name.contains('입력')) strapIcon = Icons.edit_note_rounded;
-
-            return InkWell(
-              onTap: () => setState(() => _selectedStrap = name),
-              borderRadius: BorderRadius.circular(20),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isSel ? const Color(0xFF2E5BFF).withOpacity(0.2) : Colors.white.withOpacity(0.04),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSel ? const Color(0xFF3DFFC1) : Colors.white.withOpacity(0.08),
-                      width: isSel ? 1.5 : 1.0,
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                return RadioListTile<String>(
+                  title: Row(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Icon(strapIcon, color: isSel ? const Color(0xFF3DFFC1) : Colors.white60, size: 24),
-                          if (isSel)
-                            const Icon(Icons.check_circle_rounded, color: Color(0xFF3DFFC1), size: 20),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: isSel ? const Color(0xFF3DFFC1) : Colors.white,
-                            ),
+                      Expanded(
+                        child: Text(
+                          strapName,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                            color: isSel ? const Color(0xFF3DFFC1) : const Color(0xFFE2E2E2),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            desc,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 10, color: Colors.white54),
-                          ),
-                        ],
+                        ),
                       ),
+                      if (url.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                          color: isSel ? const Color(0xFF3DFFC1) : Colors.white60,
+                          onPressed: () => _launchUrl(url),
+                        ),
                     ],
                   ),
-                ),
-              ),
-            );
-          },
+                  value: strapName,
+                  activeColor: Colors.white,
+                  groupValue: _selectedStrap,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _selectedStrap = val);
+                    }
+                  },
+                );
+              }),
+            ],
+          ),
         ),
         if (_selectedStrap == '직접입력') ...[
           const SizedBox(height: 16),
@@ -942,11 +985,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '운동 종목 선택',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
         Text(
           '검증을 위해 테스트를 수행한 운동 대상을 골라주세요.',
           style: TextStyle(
@@ -1022,11 +1060,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '검증 파일 및 디테일 등록',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 6),
           Row(
             children: [
               const Icon(Icons.directions_run_rounded, color: Color(0xFF3DFFC1), size: 16),
