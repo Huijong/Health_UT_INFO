@@ -3,6 +3,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:client/services/prefs_service.dart';
 import 'package:client/screens/home_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+ThemeData getSettingsTheme(BuildContext context) {
+  return ThemeData.dark().copyWith(
+    scaffoldBackgroundColor: const Color(0xFF0C0F0F),
+    colorScheme: const ColorScheme.dark(
+      primary: Color(0xFF2E5BFF),
+      secondary: Color(0xFF3DFFC1),
+      surface: Color(0xFF1E2020),
+      error: Color(0xFFFF5252),
+    ),
+    textTheme: Theme.of(context).textTheme.apply(
+          fontFamily: 'Plus_Jakarta_Sans',
+          bodyColor: const Color(0xFFE2E2E2),
+          displayColor: Colors.white,
+        ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.04),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF2E5BFF), width: 1.5),
+      ),
+      labelStyle: TextStyle(color: const Color(0xFFE2E2E2).withOpacity(0.7)),
+    ),
+  );
+}
 
 class SettingsScreen extends StatefulWidget {
   final PrefsService prefs;
@@ -52,20 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0C0F0F),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF2E5BFF),
-          secondary: Color(0xFF3DFFC1),
-          surface: Color(0xFF1E2020),
-          error: Color(0xFFFF5252),
-        ),
-        textTheme: Theme.of(context).textTheme.apply(
-              fontFamily: 'Plus_Jakarta_Sans',
-              bodyColor: const Color(0xFFE2E2E2),
-              displayColor: Colors.white,
-            ),
-      ),
+      data: getSettingsTheme(context),
       child: Scaffold(
         body: Container(
           decoration: const BoxDecoration(
@@ -125,8 +147,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onTap: () async {
                           final result = await Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => ProfileEditPage(
+                            InstantPageRoute(
+                              page: ProfileEditPage(
                                 initialName: _name,
                                 initialHeight: _height,
                                 initialWeight: _weight,
@@ -150,8 +172,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onTap: () async {
                           final result = await Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => WatchEditPage(
+                            InstantPageRoute(
+                              page: WatchEditPage(
                                 initialWatch: _watch,
                                 initialCustomWatch: _customWatch,
                               ),
@@ -173,8 +195,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onTap: () async {
                           final result = await Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => StrapEditPage(
+                            InstantPageRoute(
+                              page: StrapEditPage(
                                 initialStrap: _strap,
                                 initialCustomStrap: _customStrap,
                               ),
@@ -326,140 +348,143 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1429A0),
-              Color(0xFF0A0F24),
-              Color(0xFF05060C),
-            ],
-            stops: [0.0, 0.6, 1.0],
+    return Theme(
+      data: getSettingsTheme(context),
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF1429A0),
+                Color(0xFF0A0F24),
+                Color(0xFF05060C),
+              ],
+              stops: [0.0, 0.6, 1.0],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // 헤더
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // 헤더
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const Expanded(
+                        child: Text(
+                          '프로필 수정',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 40),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    const Expanded(
-                      child: Text(
-                        '프로필 수정',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
+  
+                // 본문
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Form(
+                      key: _formKey,
+                      child: _GlassCard(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '테스터 인적 사항',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _nameCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: '이름',
+                                  prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                                ),
+                                validator: (v) => (v == null || v.trim().isEmpty) ? '이름을 입력해주세요' : null,
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _heightCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                ],
+                                decoration: const InputDecoration(
+                                  labelText: '키 (cm)',
+                                  prefixIcon: Icon(Icons.height_rounded, size: 20),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return '키를 입력해주세요';
+                                  if (double.tryParse(v) == null) return '올바른 숫자를 입력해주세요';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _weightCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                ],
+                                decoration: const InputDecoration(
+                                  labelText: '몸무게 (kg)',
+                                  prefixIcon: Icon(Icons.monitor_weight_outlined, size: 20),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return '몸무게를 입력해주세요';
+                                  if (double.tryParse(v) == null) return '올바른 숫자를 입력해주세요';
+                                  return null;
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 40),
-                  ],
+                  ),
                 ),
-              ),
-
-              // 본문
-              Expanded(
-                child: SingleChildScrollView(
+  
+                // 하단 완료 버튼
+                Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Form(
-                    key: _formKey,
-                    child: _GlassCard(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '테스터 인적 사항',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _nameCtrl,
-                              decoration: const InputDecoration(
-                                labelText: '이름',
-                                prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
-                              ),
-                              validator: (v) => (v == null || v.trim().isEmpty) ? '이름을 입력해주세요' : null,
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _heightCtrl,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                              ],
-                              decoration: const InputDecoration(
-                                labelText: '키 (cm)',
-                                prefixIcon: Icon(Icons.height_rounded, size: 20),
-                              ),
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) return '키를 입력해주세요';
-                                if (double.tryParse(v) == null) return '올바른 숫자를 입력해주세요';
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _weightCtrl,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                              ],
-                              decoration: const InputDecoration(
-                                labelText: '몸무게 (kg)',
-                                prefixIcon: Icon(Icons.monitor_weight_outlined, size: 20),
-                              ),
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) return '몸무게를 입력해주세요';
-                                if (double.tryParse(v) == null) return '올바른 숫자를 입력해주세요';
-                                return null;
-                              },
-                            ),
-                          ],
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _onSave,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E5BFF),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
+                      child: const Text('완료', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
-              ),
-
-              // 하단 완료 버튼
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _onSave,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E5BFF),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text('완료', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -508,74 +533,72 @@ class _WatchEditPageState extends State<WatchEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1429A0),
-              Color(0xFF0A0F24),
-              Color(0xFF05060C),
-            ],
-            stops: [0.0, 0.6, 1.0],
+    return Theme(
+      data: getSettingsTheme(context),
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF1429A0),
+                Color(0xFF0A0F24),
+                Color(0xFF05060C),
+              ],
+              stops: [0.0, 0.6, 1.0],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // 헤더
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                      onPressed: () => Navigator.pop(context),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // 헤더
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
                     ),
-                    const Expanded(
-                      child: Text(
-                        '착용 워치 수정',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const Expanded(
+                        child: Text(
+                          '착용 워치 수정',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 40),
-                  ],
+                      const SizedBox(width: 40),
+                    ],
+                  ),
                 ),
-              ),
-
-              // 본문
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: _GlassCard(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '보유 중인 갤럭시 워치 모델',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 16),
-                          ...kWatchOptions.map((model) {
-                            return Theme(
-                              data: Theme.of(context).copyWith(
-                                unselectedWidgetColor: Colors.white.withOpacity(0.3),
-                              ),
-                              child: RadioListTile<String>(
+  
+                // 본문
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: _GlassCard(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '보유 중인 갤럭시 워치 모델',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 16),
+                            ...kWatchOptions.map((model) {
+                              return RadioListTile<String>(
                                 title: Text(
                                   model,
                                   style: TextStyle(
@@ -587,53 +610,53 @@ class _WatchEditPageState extends State<WatchEditPage> {
                                 ),
                                 value: model,
                                 groupValue: _selectedWatch,
-                                activeColor: const Color(0xFF3DFFC1),
+                                activeColor: Colors.white,
                                 contentPadding: EdgeInsets.zero,
                                 onChanged: (v) {
                                   if (v != null) {
                                     setState(() => _selectedWatch = v);
                                   }
                                 },
+                              );
+                            }),
+                            if (_selectedWatch == '직접입력') ...[
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _customWatchCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: '기기명 직접 입력',
+                                  hintText: '예: Galaxy Watch Active 2',
+                                ),
                               ),
-                            );
-                          }),
-                          if (_selectedWatch == '직접입력') ...[
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _customWatchCtrl,
-                              decoration: const InputDecoration(
-                                labelText: '기기명 직접 입력',
-                                hintText: '예: Galaxy Watch Active 2',
-                              ),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-
-              // 하단 완료 버튼
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _onSave,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E5BFF),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+  
+                // 하단 완료 버튼
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _onSave,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E5BFF),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
+                      child: const Text('완료', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
-                    child: const Text('완료', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -680,181 +703,167 @@ class _StrapEditPageState extends State<StrapEditPage> {
     });
   }
 
+  Future<void> _launchUrl(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('링크를 열 수 없습니다: $urlString')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1429A0),
-              Color(0xFF0A0F24),
-              Color(0xFF05060C),
-            ],
-            stops: [0.0, 0.6, 1.0],
+    return Theme(
+      data: getSettingsTheme(context),
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF1429A0),
+                Color(0xFF0A0F24),
+                Color(0xFF05060C),
+              ],
+              stops: [0.0, 0.6, 1.0],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // 헤더
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // 헤더
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    const Expanded(
-                      child: Text(
-                        '착용 스트랩 수정',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 40),
-                  ],
-                ),
-              ),
-
-              // 본문
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.only(left: 4, bottom: 16),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const Expanded(
                         child: Text(
-                          '테스트 중인 워치 스트랩 종류',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 1.15,
-                        ),
-                        itemCount: kStrapOptions.length,
-                        itemBuilder: (context, idx) {
-                          final opt = kStrapOptions[idx];
-                          final name = opt['name']!;
-                          final desc = opt['desc']!;
-                          final isSelected = _selectedStrap == name;
-
-                          return GestureDetector(
-                            onTap: () => setState(() => _selectedStrap = name),
-                            child: _GlassCard(
-                              borderColor: isSelected
-                                  ? const Color(0xFF3DFFC1).withOpacity(0.5)
-                                  : Colors.white.withOpacity(0.08),
-                              backgroundColor: isSelected
-                                  ? Colors.white.withOpacity(0.12)
-                                  : Colors.white.withOpacity(0.04),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            name,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              color: isSelected
-                                                  ? const Color(0xFF3DFFC1)
-                                                  : Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                        if (isSelected)
-                                          const Icon(
-                                            Icons.check_circle_rounded,
-                                            color: Color(0xFF3DFFC1),
-                                            size: 16,
-                                          ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      desc,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: isSelected
-                                            ? Colors.white.withOpacity(0.8)
-                                            : Colors.white.withOpacity(0.5),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      if (_selectedStrap == '직접입력') ...[
-                        const SizedBox(height: 16),
-                        _GlassCard(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: TextField(
-                              controller: _customStrapCtrl,
-                              decoration: const InputDecoration(
-                                labelText: '스트랩 정보 직접 입력',
-                                hintText: '예: 메탈 체인 스트랩',
-                              ),
-                            ),
+                          '착용 스트랩 수정',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
                           ),
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 40),
                     ],
                   ),
                 ),
-              ),
+  
+                // 본문
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(left: 4, bottom: 16),
+                          child: Text(
+                            '테스트 중인 워치 스트랩 종류',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        GlassCard(
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            children: [
+                              ...kStrapOptions.map((strapOpt) {
+                                final strapName = strapOpt['name']!;
+                                final url = strapOpt['url']!;
+                                final isSel = _selectedStrap == strapName;
 
-              // 하단 완료 버튼
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _onSave,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E5BFF),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                                return RadioListTile<String>(
+                                  title: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          strapName,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                            color: isSel ? const Color(0xFF3DFFC1) : const Color(0xFFE2E2E2),
+                                          ),
+                                        ),
+                                      ),
+                                      if (url.isNotEmpty)
+                                        IconButton(
+                                          icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                                          color: isSel ? const Color(0xFF3DFFC1) : Colors.white60,
+                                          onPressed: () => _launchUrl(url),
+                                        ),
+                                    ],
+                                  ),
+                                  value: strapName,
+                                  activeColor: Colors.white,
+                                  groupValue: _selectedStrap,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() => _selectedStrap = val);
+                                    }
+                                  },
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                        if (_selectedStrap == '직접입력') ...[
+                          const SizedBox(height: 16),
+                          GlassCard(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: TextField(
+                                controller: _customStrapCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: '스트랩 정보 직접 입력',
+                                  hintText: '예: 메탈 체인 스트랩',
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    child: const Text('완료', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
-              ),
-            ],
+  
+                // 하단 완료 버튼
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _onSave,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E5BFF),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text('완료', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -894,4 +903,13 @@ class _GlassCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class InstantPageRoute<T> extends PageRouteBuilder<T> {
+  final Widget page;
+  InstantPageRoute({required this.page})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => child,
+        );
 }
