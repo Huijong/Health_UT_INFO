@@ -19,15 +19,18 @@ import 'package:url_launcher/url_launcher.dart';
 
 /// Galaxy Watch 드롭다운 선택지 (2단계 전용)
 const List<String> kWatchOptions = [
-  'Galaxy Watch 4',
-  'Galaxy Watch 4 Classic',
-  'Galaxy Watch 5',
-  'Galaxy Watch 5 Pro',
-  'Galaxy Watch 6',
-  'Galaxy Watch 6 Classic',
-  'Galaxy Watch 7',
+  'Galaxy Watch 9 Small',
+  'Galaxy Watch 9 Large',
+  'Galaxy Watch Ultra2',
+  'Galaxy Watch 9 FE',
+  'Galaxy Watch 8 small',
+  'Galaxy Watch 8 large',
+  'Galaxy Watch 8 Classic',
+  'Galaxy Watch 8 FE',
+  'Galaxy Watch 7 Small',
+  'Galaxy Watch 7 Large',
   'Galaxy Watch Ultra',
-  'Galaxy Watch FE',
+  'Galaxy Watch 7 FE',
   '직접입력',
 ];
 
@@ -582,6 +585,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           if (didPop) return;
           if (_currentStep == 6) {
             setState(() => _currentStep = 4);
+          } else if (_currentStep == 4 || _currentStep == 1) {
+            SystemNavigator.pop();
           } else if (_currentStep > 1) {
             setState(() => _currentStep--);
           } else {
@@ -635,18 +640,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                onPressed: () {
-                  if (_currentStep == 6) {
-                    setState(() => _currentStep = 4);
-                  } else if (_currentStep > 1) {
-                    setState(() => _currentStep--);
-                  } else {
-                    SystemNavigator.pop();
-                  }
-                },
-              ),
+              if (_currentStep == 4)
+                const SizedBox(width: 40)
+              else
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                  onPressed: () {
+                    if (_currentStep == 6) {
+                      setState(() => _currentStep = 4);
+                    } else if (_currentStep > 1) {
+                      setState(() => _currentStep--);
+                    } else {
+                      SystemNavigator.pop();
+                    }
+                  },
+                ),
               Expanded(
                 child: Text(
                   _getStepTitle(),
@@ -678,7 +686,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(width: 40), // 균형
             ],
           ),
-          if (_currentStep < 6) ...[
+          if (_currentStep <= 3) ...[
             const SizedBox(height: 12),
             // 가로형 프리미엄 스태퍼
             ClipRRect(
@@ -699,9 +707,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                       ),
                     ),
-                    if (5 - _currentStep > 0)
+                    if (3 - _currentStep > 0)
                       Expanded(
-                        flex: 5 - _currentStep,
+                        flex: 3 - _currentStep,
                         child: const SizedBox(),
                       ),
                   ],
@@ -713,14 +721,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Step $_currentStep of 5',
+                  'Step $_currentStep of 3',
                   style: TextStyle(
                     fontSize: 11,
                     color: const Color(0xFFE2E2E2).withOpacity(0.6),
                   ),
                 ),
                 Text(
-                  '${((_currentStep / 5.0) * 100).toInt().clamp(0, 100)}% 완료',
+                  '${((_currentStep / 3.0) * 100).toInt().clamp(0, 100)}% 완료',
                   style: const TextStyle(
                     fontSize: 11,
                     color: Color(0xFF3DFFC1),
