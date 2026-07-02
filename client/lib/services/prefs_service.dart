@@ -10,6 +10,7 @@ class PrefsService {
   static const _keyStrap = 'strap_model';
   static const _keyCustomStrap = 'custom_strap';
   static const _keyOnboardingComplete = 'onboarding_complete';
+  static const _keyHasWatchedGuide = 'has_watched_guide';
 
   final SharedPreferences _prefs;
 
@@ -36,6 +37,7 @@ class PrefsService {
   String get strap => _prefs.getString(_keyStrap) ?? '';
   String get customStrap => _prefs.getString(_keyCustomStrap) ?? '';
   bool get onboardingComplete => _prefs.getBool(_keyOnboardingComplete) ?? false;
+  bool get hasWatchedGuide => _prefs.getBool(_keyHasWatchedGuide) ?? false;
 
   Future<void> saveName(String value) => _prefs.setString(_keyName, value);
   Future<void> saveHeight(double value) => _prefs.setDouble(_keyHeight, value);
@@ -45,4 +47,5 @@ class PrefsService {
   Future<void> saveStrap(String value) => _prefs.setString(_keyStrap, value);
   Future<void> saveCustomStrap(String value) => _prefs.setString(_keyCustomStrap, value);
   Future<void> saveOnboardingComplete(bool value) => _prefs.setBool(_keyOnboardingComplete, value);
+  Future<void> saveHasWatchedGuide(bool value) => _prefs.setBool(_keyHasWatchedGuide, value);
 }

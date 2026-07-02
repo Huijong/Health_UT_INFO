@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     if db_client:
         db_client.close()
 
-app = FastAPI(title="HealthPort 대시보드", lifespan=lifespan)
+app = FastAPI(title="HealthPort Lab", lifespan=lifespan)
 
 @app.get("/api/emails")
 async def get_emails():
@@ -54,7 +54,7 @@ async def get_dashboard(request: Request):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>HealthPort 대시보드</title>
+        <title>HealthPort Lab</title>
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
         <style>
             :root {
@@ -552,7 +552,7 @@ async def get_dashboard(request: Request):
     <body>
         <div class="container">
             <header>
-                <h1>HealthPort 대시보드</h1>
+                <h1>HealthPort Lab</h1>
                 <div class="controls-row">
                     <button class="reset-filters-btn" onclick="resetAllFilters()">필터 모두 초기화</button>
                     <button class="refresh-btn" onclick="fetchEmails()">데이터 새로고침</button>

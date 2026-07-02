@@ -14,6 +14,7 @@ import '../services/email_service.dart';
 import '../widgets/attached_file_tile.dart';
 import 'settings_screen.dart';
 import 'location_picker_screen.dart';
+import 'package:video_player/video_player.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -143,9 +144,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
   final _formKey1 = GlobalKey<FormState>();
   final _formKey5 = GlobalKey<FormState>();
+
+  // 가이드 영상 관련 상태 변수 및 애니메이션 컨트롤러
+  AnimationController? _guidePulseController;
+  bool _hasWatchedGuide = false;
 
   // 현재 위저드 단계 (1 ~ 6)
   int _currentStep = 1;
@@ -220,9 +225,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (savedStrap.isNotEmpty) _selectedStrap = savedStrap;
     _customStrapCtrl.text = prefs.customStrap;
 
+    final hasWatched = prefs.hasWatchedGuide;
+    _guidePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    if (!hasWatched) {
+      _guidePulseController?.repeat(reverse: true);
+    }
+
     setState(() {
       _prefs = prefs;
       _session = session;
+      _hasWatchedGuide = hasWatched;
       _currentStep = prefs.onboardingComplete ? 4 : 1;
       _isLoading = false;
     });
@@ -257,6 +272,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _customTrainingCtrl.dispose();
     _locationCtrl.dispose();
     _memoCtrl.dispose();
+    _guidePulseController?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -989,6 +1005,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _showGuideVideo() async {
+    if (!_hasWatchedGuide) {
+      await _prefs?.saveHasWatchedGuide(true);
+      _guidePulseController?.stop();
+      setState(() {
+        _hasWatchedGuide = true;
+      });
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => const _GuideVideoDialog(),
+    );
+  }
+
   // ── Step 4: 운동 선택 ──────────────────────────────────────────
   Widget _buildStep4Exercise() {
     return Column(
@@ -999,6 +1033,71 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           style: TextStyle(
             fontSize: 13,
             color: const Color(0xFFE2E2E2).withOpacity(0.7),
+          ),
+        ),
+        const SizedBox(height: 16),
+        AnimatedBuilder(
+          animation: _guidePulseController!,
+          builder: (context, child) {
+            final double val = _guidePulseController?.value ?? 0.0;
+            final Color pulseColor = Color.lerp(
+              const Color(0xFF2E5BFF),
+              const Color(0xFF3DFFC1),
+              val,
+            )!;
+
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: _hasWatchedGuide
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: pulseColor.withOpacity(0.3 * val),
+                          blurRadius: 10 + (8 * val),
+                          spreadRadius: 1 + (2 * val),
+                        )
+                      ],
+              ),
+              child: child,
+            );
+          },
+          child: InkWell(
+            onTap: _showGuideVideo,
+            borderRadius: BorderRadius.circular(16),
+            child: GlassCard(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              radius: 16,
+              child: Row(
+                children: [
+                  const Icon(Icons.play_circle_outline_rounded, color: Color(0xFF3DFFC1), size: 26),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      '가이드 영상 시청하기 📺',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  if (!_hasWatchedGuide)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3DFFC1).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF3DFFC1), width: 1),
+                      ),
+                      child: const Text(
+                        '필독',
+                        style: TextStyle(fontSize: 10, color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 20),
@@ -1855,4 +1954,192 @@ class GlassCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _GuideVideoDialog extends StatefulWidget {
+  const _GuideVideoDialog();
+
+  @override
+  State<_GuideVideoDialog> createState() => _GuideVideoDialogState();
+}
+
+class _GuideVideoDialogState extends State<_GuideVideoDialog> {
+  late VideoPlayerController _controller;
+  bool _initialized = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _initVideo();
+  }
+
+  void _initVideo() {
+    setState(() {
+      _initialized = false;
+      _errorMessage = null;
+    });
+
+    // 기기 내부에 준비된 로컬 비디오 파일인 'assert/Demo_7.mp4' 에셋을 직접 읽어 무제한 데이터/인터넷 환경에 구애받지 않고 오프라인에서도 100% 정상 작동하도록 설정
+    _controller = VideoPlayerController.asset(
+      'assert/Demo_7.mp4',
+    )..initialize().then((_) {
+        if (!mounted) return;
+        setState(() {
+          _initialized = true;
+        });
+        _controller.play(); // 자동 재생
+        _controller.setLooping(true); // 반복 재생
+      }).catchError((error) {
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = "영상을 불러오지 못했습니다.\n에셋 설정을 확인해 주세요.";
+        });
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final isPortrait = mediaQuery.orientation == Orientation.portrait;
+    
+    // 모단말 하단 네비게이션 바 침범을 확실히 차단하도록 다이내믹 세로 제한 높이 계산
+    final double maxVideoHeight = isPortrait 
+        ? (mediaQuery.size.height * 0.65 - mediaQuery.padding.bottom - mediaQuery.viewInsets.bottom)
+        : (mediaQuery.size.height * 0.5);
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: SafeArea(
+        child: GlassCard(
+          padding: const EdgeInsets.all(16),
+          radius: 20,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.ondemand_video_rounded, color: Color(0xFF3DFFC1), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        '가이드 영상 시청',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: maxVideoHeight,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: AspectRatio(
+                    aspectRatio: _initialized ? _controller.value.aspectRatio : 9 / 16,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (_initialized)
+                          VideoPlayer(_controller)
+                    else if (_errorMessage != null)
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: Colors.white60, size: 36),
+                            const SizedBox(height: 8),
+                            Text(
+                              _errorMessage!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: _initVideo,
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: const Text('재시도', style: TextStyle(fontSize: 12)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2E5BFF),
+                                minimumSize: const Size(80, 32),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            )
+                          ],
+                        ),
+                      )
+                    else
+                      const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+                        ),
+                      ),
+                    if (_initialized)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                          });
+                        },
+                        child: Container(
+                          color: Colors.transparent,
+                          child: Center(
+                            child: AnimatedOpacity(
+                              opacity: _controller.value.isPlaying ? 0.0 : 1.0,
+                              duration: const Duration(milliseconds: 200),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: const BoxDecoration(
+                                  color: Colors.black45,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  _controller.value.isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  color: const Color(0xFF3DFFC1),
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+            const SizedBox(height: 12),
+            if (_initialized)
+              VideoProgressIndicator(
+                _controller,
+                allowScrubbing: true,
+                colors: const VideoProgressColors(
+                  playedColor: Color(0xFF3DFFC1),
+                  bufferedColor: Colors.white24,
+                  backgroundColor: Colors.white10,
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 }
