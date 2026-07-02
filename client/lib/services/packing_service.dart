@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/attached_file.dart';
 import '../models/device_session.dart';
@@ -69,62 +70,42 @@ class PackingService {
         ...captureFiles.map(_fileMeta),
       ],
     };
-    final metaBytes = utf8.encode(
-      const JsonEncoder.withIndent('  ').convert(metaMap),
-    );
+    final metaJson = const JsonEncoder.withIndent('  ').convert(metaMap);
 
     // ── info.txt (사람용) ──────────────────────────────────────
-    final infoBytes = utf8.encode(
-      _buildInfoText(
-        name: name,
-        heightCm: heightCm,
-        weightKg: weightKg,
-        watch: watch,
-        strap: strap,
-        exercise: exercise,
-        wearingPosition: wearingPosition,
-        wearingTightness: wearingTightness,
-        competitorWatch: competitorWatch,
-        trainingType: trainingType,
-        location: location,
-        memo: memo,
-        session: session,
-        fitFiles: fitFiles,
-        colaFiles: colaFiles,
-        logFiles: logFiles,
-        captureFiles: captureFiles,
-      ),
+    final infoText = _buildInfoText(
+      name: name,
+      heightCm: heightCm,
+      weightKg: weightKg,
+      watch: watch,
+      strap: strap,
+      exercise: exercise,
+      wearingPosition: wearingPosition,
+      wearingTightness: wearingTightness,
+      competitorWatch: competitorWatch,
+      trainingType: trainingType,
+      location: location,
+      memo: memo,
+      session: session,
+      fitFiles: fitFiles,
+      colaFiles: colaFiles,
+      logFiles: logFiles,
+      captureFiles: captureFiles,
     );
 
-    // ── zip 구성 ───────────────────────────────────────────────
-    final archive = Archive();
-
-    archive.addFile(ArchiveFile('meta.json', metaBytes.length, metaBytes));
-    archive.addFile(ArchiveFile('info.txt', infoBytes.length, infoBytes));
-
-    // FIT + Cola + Log: 루트 레벨
-    for (final f in [...fitFiles, ...colaFiles, ...logFiles]) {
-      final bytes = await _readFile(f);
-      archive.addFile(ArchiveFile(f.name, bytes.length, bytes));
-    }
-
-    // 캡처: captures/ 하위 폴더
-    for (final f in captureFiles) {
-      final bytes = await _readFile(f);
-      archive.addFile(ArchiveFile('captures/${f.name}', bytes.length, bytes));
-    }
-
-    // 인코딩 & 저장
-    final zipBytes = ZipEncoder().encode(archive);
-    if (zipBytes == null) throw Exception('ZIP 인코딩 실패');
-
-    await File(zipPath).writeAsBytes(zipBytes);
-
-    return PackResult(
+    final params = _PackIsolateParams(
       zipPath: zipPath,
       zipName: zipName,
-      sizeBytes: zipBytes.length,
+      metaJson: metaJson,
+      infoText: infoText,
+      fitPaths: fitFiles.map((f) => f.tempPath ?? f.originalPath).toList(),
+      colaPaths: colaFiles.map((f) => f.tempPath ?? f.originalPath).toList(),
+      logPaths: logFiles.map((f) => f.tempPath ?? f.originalPath).toList(),
+      capturePaths: captureFiles.map((f) => f.tempPath ?? f.originalPath).toList(),
     );
+
+    // 무거운 Zip 인코딩 연산을 백그라운드 스레드(Isolate)에서 처리하여 메인 스레드 ANR 완전 예방
+    return await compute(_packIsolateBody, params);
   }
 
   // ── 내부 헬퍼 ─────────────────────────────────────────────────
@@ -219,4 +200,87 @@ class PackingService {
     }
     sb.writeln();
   }
+}
+
+/// Isolate 압축 전달용 매개변수 클래스
+class _PackIsolateParams {
+  final String zipPath;
+  final String zipName;
+  final String metaJson;
+  final String infoText;
+  final List<String> fitPaths;
+  final List<String> colaPaths;
+  final List<String> logPaths;
+  final List<String> capturePaths;
+
+  _PackIsolateParams({
+    required this.zipPath,
+    required this.zipName,
+    required this.metaJson,
+    required this.infoText,
+    required this.fitPaths,
+    required this.colaPaths,
+    required this.logPaths,
+    required this.capturePaths,
+  });
+}
+
+/// 백그라운드 워커 스레드에서 동작하는 압축 및 파일 저장 로직 (UI 멈춤/ANR 차단)
+PackResult _packIsolateBody(_PackIsolateParams params) {
+  final archive = Archive();
+
+  // 1. 메타 데이터 및 텍스트 추가
+  final metaBytes = utf8.encode(params.metaJson);
+  final infoBytes = utf8.encode(params.infoText);
+  archive.addFile(ArchiveFile('meta.json', metaBytes.length, metaBytes));
+  archive.addFile(ArchiveFile('info.txt', infoBytes.length, infoBytes));
+
+  // 로컬 파일 읽기 & 압축 파일 등록 헬퍼
+  void addFile(String path, String archiveName, bool compress) {
+    final file = File(path);
+    if (!file.existsSync()) return;
+    final bytes = file.readAsBytesSync();
+    
+    final archiveFile = ArchiveFile(archiveName, bytes.length, bytes);
+    // 이미 압축된 파일(.zip, .png, .jpg 등)은 재압축하지 않음 (compress = false) → 속도 대폭 개선
+    archiveFile.compress = compress;
+    archive.addFile(archiveFile);
+  }
+
+  // 2. FIT 파일 추가 (FIT은 무압축 텍스트 데이터 계열이므로 압축률 적용 권장)
+  for (final path in params.fitPaths) {
+    final name = path.split('/').last.split('\\').last;
+    addFile(path, name, true);
+  }
+
+  // 3. Cola 파일 추가 (이미 zip 압축되어 있으므로 Stored 방식 무압축 추가)
+  for (final path in params.colaPaths) {
+    final name = path.split('/').last.split('\\').last;
+    addFile(path, name, false);
+  }
+
+  // 4. Log 파일 추가 (이미 zip 압축되어 있으므로 Stored 방식 무압축 추가)
+  for (final path in params.logPaths) {
+    final name = path.split('/').last.split('\\').last;
+    addFile(path, name, false);
+  }
+
+  // 5. 캡처 이미지 추가 (PNG/JPG 등은 이미 압축된 이미지 포맷이므로 무압축 추가)
+  for (final path in params.capturePaths) {
+    final name = path.split('/').last.split('\\').last;
+    addFile(path, 'captures/$name', false);
+  }
+
+  // 6. Zip 인코딩 수행
+  final zipBytes = ZipEncoder().encode(archive);
+  if (zipBytes == null) throw Exception('ZIP 인코딩 실패');
+
+  // 7. 디스크에 동기식 저장 (Isolate 내부이므로 Sync 메서드 사용으로 오버헤드 최소화)
+  File(params.zipPath).writeAsBytesSync(zipBytes);
+
+  return PackResult(
+    zipPath: params.zipPath,
+    zipName: params.zipName,
+    sizeBytes: zipBytes.length,
+  );
 }
