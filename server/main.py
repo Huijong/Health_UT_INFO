@@ -6,6 +6,10 @@ import threading
 import uvicorn
 from config import MONGO_URL, DB_NAME, CHECK_INTERVAL_SECONDS
 from mail_parser import start_mail_parser_loop
+import firebase_admin
+from firebase_admin import credentials, messaging
+from pydantic import BaseModel
+from datetime import datetime
 
 
 # MongoDB 비동기 연결 객체
@@ -19,6 +23,14 @@ async def lifespan(app: FastAPI):
     db_client = AsyncIOMotorClient(MONGO_URL)
     db = db_client[DB_NAME]
     
+    # Firebase Admin SDK 초기화
+    try:
+        cred = credentials.Certificate("firebase-adminsdk.json")
+        firebase_admin.initialize_app(cred)
+        print("[INFO] Firebase Admin SDK initialized successfully.")
+    except Exception as e:
+        print(f"[ERROR] Failed to initialize Firebase Admin SDK: {e}")
+
     parser_thread = threading.Thread(
         target=start_mail_parser_loop, 
         args=(CHECK_INTERVAL_SECONDS,), 
@@ -42,6 +54,77 @@ async def get_emails():
         for email_item in emails:
             email_item["_id"] = str(email_item["_id"])
         return JSONResponse(content={"status": "success", "data": emails})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+class NoticeCreate(BaseModel):
+    title: str
+    content: str
+
+@app.get("/api/notices")
+async def get_all_notices():
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+        cursor = db["notices"].find({}).sort("created_at", -1)
+        notices = await cursor.to_list(length=100)
+        for notice in notices:
+            notice["_id"] = str(notice["_id"])
+            if isinstance(notice.get("created_at"), datetime):
+                notice["created_at"] = notice["created_at"].isoformat()
+        return JSONResponse(content={"status": "success", "data": notices})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.get("/api/notices/latest")
+async def get_latest_notice():
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+        notice = await db["notices"].find_one(sort=[("created_at", -1)])
+        if notice:
+            notice["_id"] = str(notice["_id"])
+            if isinstance(notice.get("created_at"), datetime):
+                notice["created_at"] = notice["created_at"].isoformat()
+            return JSONResponse(content={"status": "success", "data": notice})
+        return JSONResponse(content={"status": "success", "data": None})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/api/notices")
+async def create_notice(notice: NoticeCreate):
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+        
+        notice_dict = {
+            "title": notice.title,
+            "content": notice.content,
+            "created_at": datetime.utcnow()
+        }
+        
+        result = await db["notices"].insert_one(notice_dict)
+        notice_id = str(result.inserted_id)
+        
+        # 실시간 FCM 토픽 푸시 알림 발송
+        try:
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title=notice.title,
+                    body=notice.content[:100] + ("..." if len(notice.content) > 100 else ""),
+                ),
+                topic="notices",
+                data={
+                    "notice_id": notice_id,
+                    "title": notice.title,
+                }
+            )
+            response = messaging.send(message)
+            print(f"[INFO] FCM 푸시 메시지 전송 성공: {response}")
+        except Exception as fcm_err:
+            print(f"[WARNING] FCM 푸시 발송 실패 (DB 저장은 완료됨): {fcm_err}")
+            
+        return JSONResponse(content={"status": "success", "data": {"id": notice_id}})
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 

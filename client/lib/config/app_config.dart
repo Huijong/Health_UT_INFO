@@ -40,4 +40,10 @@ class AppConfig {
     'EMAIL_RECIPIENT',
     defaultValue: 'huijongwpi2@gmail.com',
   );
+
+  /// FastAPI 서버 주소 (공지사항 조회용)
+  static const apiUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'https://health-port.work',
+  );
 }
