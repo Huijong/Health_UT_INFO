@@ -565,7 +565,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     setState(() => _fileBusy = true);
     try {
       final f = await FileService.pickCola();
-      if (f != null && mounted) setState(() => _colaFiles.add(f));
+      if (f != null && mounted) {
+        final fileName = f.originalPath.split('/').last.split('\\').last;
+        if (!fileName.toLowerCase().startsWith('cola_file')) {
+          _showFileError('Cola.zip', '선택한 파일이 COLA_FILE로 시작하는 zip 파일이 아닙니다.');
+          return;
+        }
+        setState(() => _colaFiles.add(f));
+      }
     } catch (e) {
       _showFileError('Cola.zip', e);
     } finally {
@@ -578,7 +585,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     setState(() => _fileBusy = true);
     try {
       final f = await FileService.pickLog();
-      if (f != null && mounted) setState(() => _logFiles.add(f));
+      if (f != null && mounted) {
+        final fileName = f.originalPath.split('/').last.split('\\').last;
+        if (!fileName.toLowerCase().startsWith('log_')) {
+          _showFileError('로그 파일', '선택한 파일이 log_로 시작하는 zip 파일이 아닙니다.');
+          return;
+        }
+        setState(() => _logFiles.add(f));
+      }
     } catch (e) {
       _showFileError('로그 파일', e);
     } finally {
