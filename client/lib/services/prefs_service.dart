@@ -11,6 +11,9 @@ class PrefsService {
   static const _keyCustomStrap = 'custom_strap';
   static const _keyOnboardingComplete = 'onboarding_complete';
   static const _keyHasWatchedGuide = 'has_watched_guide';
+  static const _keyLastReadNoticeId = 'last_read_notice_id';
+  static const _keyReadNoticeIds = 'read_notice_ids';
+  static const _keyDeletedNoticeIds = 'deleted_notice_ids';
 
   final SharedPreferences _prefs;
 
@@ -38,6 +41,9 @@ class PrefsService {
   String get customStrap => _prefs.getString(_keyCustomStrap) ?? '';
   bool get onboardingComplete => _prefs.getBool(_keyOnboardingComplete) ?? false;
   bool get hasWatchedGuide => _prefs.getBool(_keyHasWatchedGuide) ?? false;
+  String get lastReadNoticeId => _prefs.getString(_keyLastReadNoticeId) ?? '';
+  List<String> get readNoticeIds => _prefs.getStringList(_keyReadNoticeIds) ?? [];
+  List<String> get deletedNoticeIds => _prefs.getStringList(_keyDeletedNoticeIds) ?? [];
 
   Future<void> saveName(String value) => _prefs.setString(_keyName, value);
   Future<void> saveHeight(double value) => _prefs.setDouble(_keyHeight, value);
@@ -48,4 +54,7 @@ class PrefsService {
   Future<void> saveCustomStrap(String value) => _prefs.setString(_keyCustomStrap, value);
   Future<void> saveOnboardingComplete(bool value) => _prefs.setBool(_keyOnboardingComplete, value);
   Future<void> saveHasWatchedGuide(bool value) => _prefs.setBool(_keyHasWatchedGuide, value);
+  Future<void> saveLastReadNoticeId(String value) => _prefs.setString(_keyLastReadNoticeId, value);
+  Future<void> saveReadNoticeIds(List<String> values) => _prefs.setStringList(_keyReadNoticeIds, values);
+  Future<void> saveDeletedNoticeIds(List<String> values) => _prefs.setStringList(_keyDeletedNoticeIds, values);
 }

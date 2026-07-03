@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "803700128030",
+    "project_id": "healport-push",
+    "storage_bucket": "healport-push.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:803700128030:android:e77631d3771895bf37710f",
+        "android_client_info": {
+          "package_name": "com.samsung.health.client"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARG8N2zY_2PHR9i4XcXgXl1ZsUdsDP-5c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 import '../config/app_config.dart';
 import '../models/attached_file.dart';
@@ -14,7 +16,9 @@ import '../services/email_service.dart';
 import '../widgets/attached_file_tile.dart';
 import 'settings_screen.dart';
 import 'location_picker_screen.dart';
+import 'notice_history_screen.dart';
 import 'package:video_player/video_player.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -152,6 +156,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   AnimationController? _guidePulseController;
   bool _hasWatchedGuide = false;
 
+  // 공지사항 관련 상태 변수 및 애니메이션 컨트롤러
+  Map<String, dynamic>? _latestNotice;
+  bool _isNoticeBlinking = false;
+  AnimationController? _noticePulseController;
+
   // 현재 위저드 단계 (1 ~ 6)
   int _currentStep = 1;
 
@@ -234,6 +243,59 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       _guidePulseController?.repeat(reverse: true);
     }
 
+    _noticePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+
+    // Foreground FCM 수신 대기 설정
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final notification = message.notification;
+      if (notification != null && mounted) {
+        // 공지사항 푸시 수신 시 실시간으로 공지 카드도 갱신
+        _fetchLatestNotice();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.notifications_active_rounded, color: Color(0xFF3DFFC1)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(notification.title ?? '공지사항', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(notification.body ?? '', style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 4),
+            backgroundColor: const Color(0xFF1429A0).withOpacity(0.9),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    });
+
+    // 백그라운드 상태에서 푸시 알림을 탭하여 앱을 열었을 때 공지사항 즉시 갱신
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint("[FCM] Notification tapped from background. Reloading notices.");
+      _fetchLatestNotice();
+    });
+
+    // 앱이 완전히 종료된 상태에서 푸시 알림을 탭하여 앱을 시작했을 때 공지사항 즉시 갱신
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        debugPrint("[FCM] App launched from terminated state via notification. Reloading notices.");
+        _fetchLatestNotice();
+      }
+    });
+
     setState(() {
       _prefs = prefs;
       _session = session;
@@ -241,6 +303,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       _currentStep = prefs.onboardingComplete ? 4 : 1;
       _isLoading = false;
     });
+
+    // 최신 공지사항 로드
+    _fetchLatestNotice();
   }
 
   void _reloadPrefs() {
@@ -273,6 +338,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     _locationCtrl.dispose();
     _memoCtrl.dispose();
     _guidePulseController?.dispose();
+    _noticePulseController?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -926,6 +992,134 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
+  Future<void> _fetchLatestNotice() async {
+    try {
+      final response = await http.get(Uri.parse('${AppConfig.apiUrl}/api/notices'));
+      if (response.statusCode == 200) {
+        final decoded = json.decode(utf8.decode(response.bodyBytes));
+        if (decoded['status'] == 'success' && decoded['data'] != null) {
+          final notices = decoded['data'] as List<dynamic>;
+          final deletedIds = _prefs?.deletedNoticeIds ?? [];
+          final readIds = _prefs?.readNoticeIds ?? [];
+          
+          // 삭제되지 않은 가장 최신 공지 찾기
+          Map<String, dynamic>? activeNotice;
+          for (var item in notices) {
+            final noticeMap = item as Map<String, dynamic>;
+            final id = noticeMap['_id'] as String;
+            if (!deletedIds.contains(id)) {
+              activeNotice = noticeMap;
+              break;
+            }
+          }
+
+          if (activeNotice != null) {
+            final noticeId = activeNotice['_id'] as String;
+            final isUnread = !readIds.contains(noticeId);
+            
+            setState(() {
+              _latestNotice = activeNotice;
+              _isNoticeBlinking = isUnread;
+            });
+            
+            if (_isNoticeBlinking) {
+              _noticePulseController?.repeat(reverse: true);
+            } else {
+              _noticePulseController?.stop();
+            }
+          } else {
+            setState(() {
+              _latestNotice = null;
+              _isNoticeBlinking = false;
+            });
+            _noticePulseController?.stop();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Failed to fetch latest notice: $e");
+    }
+  }
+
+  void _showNoticeDialog(Map<String, dynamic> notice) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassCard(
+            padding: const EdgeInsets.all(20),
+            radius: 20,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.notifications_active_rounded, color: Color(0xFFFFD043), size: 24),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '공지사항',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const Divider(color: Colors.white24, height: 20),
+                const SizedBox(height: 8),
+                Text(
+                  notice['title'] ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.4,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      notice['content'] ?? '',
+                      style: const TextStyle(fontSize: 14, color: Colors.white70, height: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E5BFF),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      final noticeId = notice['_id'] as String;
+                      await _prefs?.saveLastReadNoticeId(noticeId);
+                      _noticePulseController?.stop();
+                      setState(() {
+                        _isNoticeBlinking = false;
+                      });
+                    },
+                    child: const Text('확인', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // ── Step 3: 착용 스트랩 선택 ────────────────────────────────────
   Widget _buildStep3Strap() {
     return Column(
@@ -1100,6 +1294,85 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             ),
           ),
         ),
+        if (_latestNotice != null) ...[
+          const SizedBox(height: 12),
+          AnimatedBuilder(
+            animation: _noticePulseController!,
+            builder: (context, child) {
+              final double val = _noticePulseController?.value ?? 0.0;
+              final Color pulseColor = Color.lerp(
+                const Color(0xFFFFAE2E),
+                const Color(0xFFFF4E2E),
+                val,
+              )!;
+
+              return Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: !_isNoticeBlinking
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: pulseColor.withOpacity(0.3 * val),
+                            blurRadius: 10 + (8 * val),
+                            spreadRadius: 1 + (2 * val),
+                          )
+                        ],
+                ),
+                child: child,
+              );
+            },
+            child: InkWell(
+              onTap: () async {
+                if (_prefs != null) {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => NoticeHistoryScreen(prefs: _prefs!),
+                    ),
+                  );
+                  // 히스토리 화면에서 돌어오면 안 읽은 공지나 삭제(숨김) 정보 갱신
+                  _fetchLatestNotice();
+                }
+              },
+              child: GlassCard(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                radius: 16,
+                child: Row(
+                  children: [
+                    const Icon(Icons.notifications_active_rounded, color: Color(0xFFFFD043), size: 26),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '공지사항: ${_latestNotice!['title'] ?? ''} 📢',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    if (_isNoticeBlinking)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD043).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFFD043), width: 1),
+                        ),
+                        child: const Text(
+                          '새소식',
+                          style: TextStyle(fontSize: 10, color: Color(0xFFFFD043), fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 20),
         ListView.separated(
           shrinkWrap: true,

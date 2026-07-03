@@ -45,7 +45,7 @@
 	 - **운동 캡처 선택 (다중)**: 갤러리 접근 버튼을 누르면 밑에 첨부된 이미지들이 둥근 모서리의 그리드 썸네일(Grid Thumbnail)로 배치되고, 썸네일 우측 상단에 이미지 삭제를 위한 미니 'X' 배지가 예쁘게 들어간 UI
   3. 파일이 비어 있을 때 보여지는 부드러운 점선 테두리(Dotted Border)의 "파일을 선택해 주세요" 빈 상태(Empty State) 일러스트/아이콘 UI
   4. 착용 위치를 스위치 UI로 선택할 수 있게 구현 ( 왼쪽, 오른쪽 )
-  5. 착용 정도를 스위치 UI로 선택할 수 있게 구현 ( 충분히, 정닥히, 느슨하게)
+  5. 착용 정도를 스위치 UI로 선택할수 있게 구현 ( 충분히, 정닥히, 느슨하게)
   6. 동시에 착용한 타사 모델  선택할 수 있게 후현 ( 가민, 애플, 크로스) 및 직접입력 시 나타나는 서브 텍스트 필드    
   7. 훈련 종류를 선택하는 둥근 드롭다운 메뉴 (조깅, 인터벌, LSD, 변속주, 지속주) 및 직접입력 시 나타나는 서브 텍스트 필드
   8. 장소를 직접입력 할수 있는 텍스트 필드
@@ -65,3 +65,112 @@
      - "Quick Share 링크 복사 대기 중..." ➡️ 클립보드 감지 시 "링크 획득 성공 (도메인 주소 표시)" ➡️ "이메일 발송 완료" 단계로 이어지는 미려한 타임라인(Timeline) 형태의 상태 가이드 UI
      - 수동으로 메일을 보낼 수 있는 "메일 다시 보내기" 보조 버튼
   5. 메인 하단 버튼: "새로운 검증 시작하기" (데이터 초기화 및 1단계로 이동)
+
+
+
+
+
+
+  🛠️ [사전 준비] Firebase 콘솔 설정 (사용자 직접 수행)
+FCM(푸시 알림)을 사용하려면 Google의 Firebase 프로젝트를 개설하고 설정 파일을 다운로드받아야 합니다. 이 과정은 AI가 대신해줄 수 없으므로 아래 순서대로 클릭만 해주시면 됩니다.
+
+1. Firebase 콘솔 접속: Firebase Console(https://console.firebase.google.com/)에 구글 계정으로 로그인합니다.
+
+2. 프로젝트 생성:
+	- [프로젝트 추가] 버튼을 누릅니다.
+	프로젝트 이름(예: HealthPort-Push)을 입력하고 계속 클릭합니다. (구글 애널리틱스는 해제하셔도 무방합니다.)
+
+3. 안드로이드 앱 추가:
+	생성된 프로젝트 대시보드 화면 중앙의 **안드로이드 아이콘(A)**을 클릭합니다.
+	Android 패키지 이름에 com.samsung.health.client를 입력합니다. (앱 닉네임은 자유롭게 적으시면 됩니다.)
+	[앱 등록] 버튼을 누릅니다.
+
+4. 설정 파일 다운로드 (google-services.json):
+	등록 완료 후 google-services.json 다운로드 버튼이 활성화됩니다. 이 파일을 컴퓨터에 저장합니다.
+	이 파일을 아래 경로에 넣어두시면 AI가 인식하고 세팅을 시작합니다.
+	경로: D:\Health_UT_INFO-main\client\android\app\google-services.json
+a
+5.서버용 비밀키(인증키) 다운로드:
+	Firebase 콘솔 좌측 상단의 **[톱니바퀴 아이콘(설정)] ➡️ [프로젝트 설정]**으로 이동합니다.
+	상단 탭 중 **[서비스 계정(Service Accounts)]**를 클릭합니다.
+	하단의 [새 민감한 비공개 키 생성] 버튼을 눌러 JSON 파일을 다운로드합니다.
+	이 파일은 서버 모듈 폴더에 넣어줍니다. (파일명은 자유롭게 하셔도 됩니다.)
+	경로: D:\Health_UT_INFO-main\server\firebase-adminsdk.json (다운받은 파일명을 이 이름으로 변경해주세요)
+	위 설정 파일 2개(google-services.json, firebase-adminsdk.json)를 제 위치에 잘 넣어주셨다면 이제 다음 단계별로 AI 프롬프트를 차례대로 주시면 됩니다.
+
+
+
+
+1단계: Client 앱에 푸시 알림 수신 코드 구축하기
+
+사용자분이 준비해주신 google-services.json 정보를 인식하여 앱이 실행될 때 Firebase를 활성화하고, 스마트폰 상단바 알림 및 공통 공지 알림 채널(notices 토픽)을 구독하게 만드는 프롬프트입니다.
+
+[FCM 푸시 알림 연동 - 1단계: Client 앱 세팅]
+
+1. client/pubspec.yaml에 다음 패키지들을 추가하고 flutter pub get을 진행해줘.
+   - firebase_core: ^2.27.0 (또는 프로젝트 sdk 버전에 맞는 최신호환버전)
+   - firebase_messaging: ^14.7.19
+
+2. client/android/app/build.gradle.kts와 android/build.gradle 파일에 google-services 플러그인을 정상 적용해줘.
+
+3. client/lib/main.dart 파일에 Firebase 초기화 코드를 추가해줘.
+   - 앱 시작 시 Firebase.initializeApp() 실행
+   - FirebaseMessaging 인스턴스를 얻어 'notices'라는 공용 토픽을 자동으로 구독(subscribeToTopic('notices'))하도록 코딩해줘. (이렇게 하면 모든 테스터 단말이 한 번에 공지를 받게 됨)
+
+4. 백그라운드 및 포어그라운드 푸시 알림 핸들러를 등록해줘.
+   - 앱이 켜져 있을 때(Foreground) 푸시가 오면 화면 상단에 알림 메시지를 담은 Toast나 SnackBar를 보여주게 설정해줘.
+   - 앱이 꺼져 있거나 백그라운드에 있을 때 푸시가 오면 안드로이드 OS 시스템 상단바에 알림(Notification)이 뜨도록 빌드해줘.
+
+
+2단계: 서버(FastAPI)에 FCM 발송 기능 탑재하기
+Admin이 보낸 공지사항 내용을 데이터베이스(MongoDB)에 저장하고, 저장된 즉시 firebase-admin 패키지를 사용해 1단계에서 구축한 notices 토픽 구독 기기 전체에 푸시 알림을 무선으로 쏘아 올리는 백엔드 프롬프트입니다.
+
+[FCM 푸시 알림 연동 - 2단계: Server 백엔드 API & 발송 로직 구현]
+
+1. server/requirements.txt에 `firebase-admin` 패키지를 추가해줘.
+
+2. server/main.py 또는 관련 모듈에서, 서버 기동 시 `D:\Health_UT_INFO-main\server\firebase-adminsdk.json` 인증 파일을 사용해 firebase_admin 앱을 초기화하도록 해줘.
+
+3. 공지사항 정보를 저장하는 MongoDB 'notices' 컬렉션을 선언하고, 아래 API들을 구현해줘.
+   - GET `/api/notices/latest`: Client 앱이 켜질 때 최신 공지내용 1건을 조회해갈 수 있는 API.
+   - POST `/api/notices`: Admin 앱이 공지를 등록하는 API.
+
+4. POST `/api/notices` API가 호출되어 새 공지사항이 성공적으로 저장되면, 즉시 Firebase Admin SDK의 `messaging.send` 기능을 이용해 'notices' 토픽(`topic="notices"`)으로 푸시 메시지를 즉시 전송하는 함수를 통합해줘.
+   - 푸시 제목: 공지사항 제목
+   - 푸시 내용: 공지사항 내용 요약
+
+
+
+3단계: Client 앱 4단계에 공지사항 카드 UI 붙이기
+[FCM 푸시 알림 연동 - 3단계: Client 4단계 공지사항 카드 및 읽음 처리 UI 구현]
+
+1. client/lib/screens/home_screen.dart 파일의 4단계(운동 선택) 화면에 "공지사항 카드" UI를 구현해줘. 위치는 가이드 영상 카드 바로 아래야.
+
+2. 4단계 진입 시, 서버의 `GET /api/notices/latest`를 호출하여 최신 공지를 로드해줘.
+
+3. 사용자가 아직 읽지 않은 공지인 경우(SharedPreferences에 저장된 공지 ID와 대조):
+   - 공지사항 카드를 은은하게 깜빡이게(Fade 또는 Color Blink) 효과를 주어 주목하게 유도하고, 카드 우측에 [새소식 📢] 배지를 띄워줘.
+
+4. 공지 카드를 누르면 다이어로그 모달 팝업으로 상세 내용(제목 및 공지 본문)을 보여줘.
+
+5. 팝업이 열려 공지를 읽는 순간 해당 공지 ID를 SharedPreferences에 세이브하여 읽음 완료 처리하고 카드의 깜빡임 효과 및 [새소식] 배지를 즉시 제거(setState)해줘.
+
+4단계: Admin 앱에 공지사항 작성 및 전송 기능 추가하기
+
+[FCM 푸시 알림 연동 - 4단계: Admin 앱 공지 등록 화면 개발]
+
+1. admin/ 폴더 내부의 Flutter 프로젝트를 확인하고, 공지사항을 등록할 수 있는 단일 관리자 뷰를 구현해줘.
+
+2. 화면 구성 요소:
+   - 공지사항 제목 입력 필드
+   - 공지사항 상세 내용 입력 필드 (여러 줄 입력 가능한 TextField)
+   - [공지사항 무선 발송하기 🚀] 큰 버튼
+
+3. 버튼 클릭 시:
+   - 제목과 내용 유효성 검사 (비어있으면 경고 메시지)
+   - 서버의 POST `/api/notices` API를 비동기로 호출
+   - 정상 전송 완료 시 "공지사항이 푸시 알림과 함께 정상 발송되었습니다!" SnackBar 노출 및 입력 필드 초기화
+
+4. 전체적인 테마 디자인은 Client 앱과 일관성을 갖춘 고급스러운 다크/글래스모피즘 테마를 적용해줘.
+
+
