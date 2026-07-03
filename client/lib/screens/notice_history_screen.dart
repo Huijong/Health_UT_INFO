@@ -21,6 +21,7 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
   
   late List<String> _readIds;
   late List<String> _deletedIds;
+  bool _isNewestFirst = true;
 
   @override
   void initState() {
@@ -248,6 +249,13 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
     // 삭제(숨김) 처리되지 않은 공지만 필터링
     final visibleNotices = _notices.where((n) => !_deletedIds.contains(n['_id'])).toList();
 
+    // 날짜별 정렬 적용
+    visibleNotices.sort((a, b) {
+      final aDate = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(0);
+      final bDate = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(0);
+      return _isNewestFirst ? bDate.compareTo(aDate) : aDate.compareTo(bDate);
+    });
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -289,6 +297,28 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
                       ),
                     ),
                     const Spacer(),
+                    // 정렬 단축키
+                    IconButton(
+                      icon: Icon(
+                        _isNewestFirst ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                        color: const Color(0xFF3DFFC1),
+                        size: 20,
+                      ),
+                      tooltip: _isNewestFirst ? '최신순 (누르면 오래된순)' : '오래된순 (누르면 최신순)',
+                      onPressed: () {
+                        setState(() {
+                          _isNewestFirst = !_isNewestFirst;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(_isNewestFirst ? '최신순으로 정렬되었습니다. ⬇️' : '오래된순으로 정렬되었습니다. ⬆️'),
+                            duration: const Duration(milliseconds: 800),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      },
+                    ),
                     IconButton(
                       icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
                       onPressed: _fetchNotices,

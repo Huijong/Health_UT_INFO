@@ -1223,13 +1223,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '검증을 위해 테스트를 수행한 운동 대상을 골라주세요.',
+          '공지 및 가이드 안내',
           style: TextStyle(
             fontSize: 13,
             color: const Color(0xFFE2E2E2).withOpacity(0.7),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         AnimatedBuilder(
           animation: _guidePulseController!,
           builder: (context, child) {
@@ -1373,7 +1373,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             ),
           ),
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
+        Text(
+          '검증을 위해 테스트를 수행한 운동 대상을 골라주세요.',
+          style: TextStyle(
+            fontSize: 13,
+            color: const Color(0xFFE2E2E2).withOpacity(0.7),
+          ),
+        ),
+        const SizedBox(height: 12),
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
