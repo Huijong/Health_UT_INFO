@@ -362,6 +362,7 @@ async def get_dashboard(request: Request):
         </style>
         <script>
             let allData = [];
+            let currentFilteredData = [];
             
             // 정렬 상태
             let sortColumn = 'received_at';
@@ -396,6 +397,38 @@ async def get_dashboard(request: Request):
             function copyToClipboard(text) {
                 navigator.clipboard.writeText(text);
                 alert("Quick Share 링크가 클립보드에 복사되었습니다!");
+            }
+
+            function exportToJSON() {
+                if (currentFilteredData.length === 0) {
+                    alert("추출할 데이터가 없습니다.");
+                    return;
+                }
+                
+                const exportData = currentFilteredData.map(item => ({
+                    tester_name: item.tester_name || "",
+                    received_at: item.received_at || "",
+                    watch: item.watch || "",
+                    share_link: item.share_link || ""
+                }));
+
+                const jsonString = JSON.stringify(exportData, null, 2);
+                const blob = new Blob([jsonString], { type: "application/json;charset=utf-8;" });
+                
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const dateStr = `${year}${month}${day}`;
+                
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `health_records_export_${dateStr}.json`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             }
 
             // 테이블 헤더 정렬 토글
@@ -551,6 +584,7 @@ async def get_dashboard(request: Request):
                 });
 
                 // 3. UI 렌더링
+                currentFilteredData = data;
                 renderTable(data);
                 updateSortIndicators();
             }
@@ -638,6 +672,7 @@ async def get_dashboard(request: Request):
                 <h1>HealthPort Lab</h1>
                 <div class="controls-row">
                     <button class="reset-filters-btn" onclick="resetAllFilters()">필터 모두 초기화</button>
+                    <button class="export-btn" onclick="exportToJSON()" style="background-color: #10B981; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">대시보드 데이터 JSON 추출 📥</button>
                     <button class="refresh-btn" onclick="fetchEmails()">데이터 새로고침</button>
                 </div>
             </header>
