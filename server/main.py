@@ -61,6 +61,70 @@ class NoticeCreate(BaseModel):
     title: str
     content: str
 
+class DevicePing(BaseModel):
+    tester_name: str
+    watch: str
+    os_version: str
+
+class NoticeAck(BaseModel):
+    tester_name: str
+
+@app.post("/api/devices/ping")
+async def device_ping(ping: DevicePing):
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+        
+        device_dict = {
+            "tester_name": ping.tester_name,
+            "watch": ping.watch,
+            "os_version": ping.os_version,
+            "last_active_at": datetime.utcnow()
+        }
+        
+        await db["devices"].update_one(
+            {"tester_name": ping.tester_name},
+            {"$set": device_dict},
+            upsert=True
+        )
+        return JSONResponse(content={"status": "success", "message": "Ping received"})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.get("/api/devices")
+async def get_devices():
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+        cursor = db["devices"].find({}).sort("last_active_at", -1)
+        devices = await cursor.to_list(length=100)
+        for d in devices:
+            d["_id"] = str(d["_id"])
+            if isinstance(d.get("last_active_at"), datetime):
+                d["last_active_at"] = d["last_active_at"].isoformat()
+        return JSONResponse(content={"status": "success", "data": devices})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/api/notices/{notice_id}/ack")
+async def notice_ack(notice_id: str, ack: NoticeAck):
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+        from bson import ObjectId
+        try:
+            obj_id = ObjectId(notice_id)
+        except Exception:
+            return JSONResponse(content={"status": "error", "message": "Invalid notice_id format"}, status_code=400)
+            
+        await db["notices"].update_one(
+            {"_id": obj_id},
+            {"$addToSet": {"received_users": ack.tester_name}}
+        )
+        return JSONResponse(content={"status": "success", "message": "ACK recorded"})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
 @app.get("/api/notices")
 async def get_all_notices():
     try:
@@ -72,6 +136,8 @@ async def get_all_notices():
             notice["_id"] = str(notice["_id"])
             if isinstance(notice.get("created_at"), datetime):
                 notice["created_at"] = notice["created_at"].isoformat()
+            if "received_users" not in notice:
+                notice["received_users"] = []
         return JSONResponse(content={"status": "success", "data": notices})
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
@@ -86,6 +152,8 @@ async def get_latest_notice():
             notice["_id"] = str(notice["_id"])
             if isinstance(notice.get("created_at"), datetime):
                 notice["created_at"] = notice["created_at"].isoformat()
+            if "received_users" not in notice:
+                notice["received_users"] = []
             return JSONResponse(content={"status": "success", "data": notice})
         return JSONResponse(content={"status": "success", "data": None})
     except Exception as e:
@@ -100,7 +168,8 @@ async def create_notice(notice: NoticeCreate):
         notice_dict = {
             "title": notice.title,
             "content": notice.content,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.utcnow(),
+            "received_users": []
         }
         
         result = await db["notices"].insert_one(notice_dict)
