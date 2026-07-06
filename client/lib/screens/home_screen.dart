@@ -160,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   Map<String, dynamic>? _latestNotice;
   bool _isNoticeBlinking = false;
   AnimationController? _noticePulseController;
+  bool _pendingNoticeHistory = false;
 
   // 현재 위저드 단계 (1 ~ 6)
   int _currentStep = 1;
@@ -282,17 +283,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       }
     });
 
-    // 백그라운드 상태에서 푸시 알림을 탭하여 앱을 열었을 때 공지사항 즉시 갱신
+    // 백그라운드 상태에서 푸시 알림을 탭하여 앱을 열었을 때 공지사항 즉시 갱신 및 히스토리 이동
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint("[FCM] Notification tapped from background. Reloading notices.");
+      debugPrint("[FCM] Notification tapped from background. Reloading notices & navigating to history.");
       _fetchLatestNotice();
+      _navigateToNoticeHistory();
     });
 
-    // 앱이 완전히 종료된 상태에서 푸시 알림을 탭하여 앱을 시작했을 때 공지사항 즉시 갱신
+    // 앱이 완전히 종료된 상태에서 푸시 알림을 탭하여 앱을 시작했을 때 공지사항 즉시 갱신 및 히스토리 이동
     FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
       if (message != null) {
-        debugPrint("[FCM] App launched from terminated state via notification. Reloading notices.");
+        debugPrint("[FCM] App launched from terminated state via notification. Reloading notices & navigating to history.");
         _fetchLatestNotice();
+        _navigateToNoticeHistory();
       }
     });
 
@@ -306,6 +309,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
     // 최신 공지사항 로드
     _fetchLatestNotice();
+
+    // 펜딩된 히스토리 이동 요청 처리
+    if (_pendingNoticeHistory) {
+      _navigateToNoticeHistory();
+    }
+  }
+
+  void _navigateToNoticeHistory() {
+    if (!mounted) return;
+    if (_prefs == null) {
+      _pendingNoticeHistory = true;
+      return;
+    }
+    _pendingNoticeHistory = false;
+    
+    // 이미 히스토리 화면이 위에 열려있는지 여부를 체크하지 않고 단순히 push하면 다중으로 쌓일 수 있으므로 안전하게 push합니다.
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NoticeHistoryScreen(prefs: _prefs!),
+      ),
+    ).then((_) => _fetchLatestNotice());
   }
 
   void _reloadPrefs() {
