@@ -173,17 +173,30 @@ class _AdminNoticeScreenState extends State<AdminNoticeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 헤더 타이틀 영역
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.admin_panel_settings_rounded, color: Color(0xFF3DFFC1), size: 32),
-                        SizedBox(width: 12),
-                        Text(
+                        const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFF3DFFC1), size: 32),
+                        const SizedBox(width: 12),
+                        const Text(
                           'HealthPort Admin',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.people_alt_rounded, color: Color(0xFF3DFFC1), size: 28),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const TesterStatusScreen(),
+                              ),
+                            );
+                          },
+                          tooltip: '테스터 모니터링',
                         ),
                       ],
                     ),
@@ -320,6 +333,378 @@ class _AdminNoticeScreenState extends State<AdminNoticeScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class TesterStatusScreen extends StatefulWidget {
+  const TesterStatusScreen({super.key});
+
+  @override
+  State<TesterStatusScreen> createState() => _TesterStatusScreenState();
+}
+
+class _TesterStatusScreenState extends State<TesterStatusScreen> {
+  List<dynamic> _devices = [];
+  List<dynamic> _notices = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // 1. 디바이스 접속 상태 가져오기
+      final devRes = await http.get(Uri.parse('https://health-port.work/api/devices'));
+      // 2. 공지 리스트 및 ACK 수신 상태 가져오기
+      final noticeRes = await http.get(Uri.parse('https://health-port.work/api/notices'));
+
+      if (devRes.statusCode == 200 && noticeRes.statusCode == 200) {
+        final devDecoded = json.decode(utf8.decode(devRes.bodyBytes));
+        final noticeDecoded = json.decode(utf8.decode(noticeRes.bodyBytes));
+
+        if (devDecoded['status'] == 'success' && noticeDecoded['status'] == 'success') {
+          setState(() {
+            _devices = devDecoded['data'] as List<dynamic>;
+            _notices = noticeDecoded['data'] as List<dynamic>;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+      setState(() {
+        _errorMessage = '데이터 로드 실패';
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = '서버 연결 중 네트워크 에러: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _getRelativeTime(String isoString) {
+    try {
+      final dateTime = DateTime.parse(isoString).toLocal();
+      final difference = DateTime.now().difference(dateTime);
+      if (difference.inMinutes < 1) {
+        return '방금 전';
+      } else if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}분 전';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours}시간 전';
+      } else {
+        return '${difference.inDays}일 전';
+      }
+    } catch (_) {
+      return isoString;
+    }
+  }
+
+  bool _isActive(String isoString) {
+    try {
+      final dateTime = DateTime.parse(isoString).toLocal();
+      final difference = DateTime.now().difference(dateTime);
+      return difference.inMinutes < 10; // 10분 이내 신호 도달 시 Active
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('테스터 모니터링 대시보드'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(
+                icon: Icon(Icons.phonelink_setup_rounded),
+                text: '단말 접속 현황',
+              ),
+              Tab(
+                icon: Icon(Icons.mark_email_read_rounded),
+                text: '공지 수신율 확인',
+              ),
+            ],
+            indicatorColor: Color(0xFF3DFFC1),
+            labelColor: Color(0xFF3DFFC1),
+            unselectedLabelColor: Colors.white60,
+          ),
+          backgroundColor: const Color(0xFF1429A0).withOpacity(0.9),
+          elevation: 4,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: _isLoading ? null : _fetchData,
+              tooltip: '새로고침',
+            )
+          ],
+        ),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF1429A0),
+                Color(0xFF0A0F24),
+                Color(0xFF05060C),
+              ],
+              stops: [0.0, 0.6, 1.0],
+            ),
+          ),
+          child: _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+                  ),
+                )
+              : _errorMessage != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
+                          const SizedBox(height: 16),
+                          Text(_errorMessage!, style: const TextStyle(color: Colors.white70)),
+                          const SizedBox(height: 24),
+                          ElevatedButton(
+                            onPressed: _fetchData,
+                            child: const Text('다시 시도'),
+                          )
+                        ],
+                      ),
+                    )
+                  : TabBarView(
+                      children: [
+                        _buildDeviceTab(),
+                        _buildNoticeTab(),
+                      ],
+                    ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeviceTab() {
+    if (_devices.isEmpty) {
+      return const Center(
+        child: Text(
+          '등록된 테스터 단말이 없습니다.',
+          style: TextStyle(color: Colors.white70, fontSize: 16, fontStyle: FontStyle.italic),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _devices.length,
+      itemBuilder: (context, index) {
+        final dev = _devices[index];
+        final name = dev['tester_name'] ?? '이름없음';
+        final watch = dev['watch'] ?? '미지정';
+        final os = dev['os_version'] ?? '알 수 없음';
+        final lastActive = dev['last_active_at'] ?? '';
+        final active = lastActive.isNotEmpty && _isActive(lastActive);
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          color: Colors.white.withOpacity(0.04),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.white.withOpacity(0.08), width: 1),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                // 접속등 표시
+                Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: active ? const Color(0xFF10B981) : Colors.grey,
+                    shape: BoxShape.circle,
+                    boxShadow: active
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFF10B981).withOpacity(0.5),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            )
+                          ]
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '착용 워치: $watch',
+                        style: const TextStyle(fontSize: 13, color: Colors.white70),
+                      ),
+                      Text(
+                        '단말 환경: $os',
+                        style: const TextStyle(fontSize: 12, color: Colors.white60),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      active ? '접속 중' : '오프라인',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: active ? const Color(0xFF10B981) : Colors.white54,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      lastActive.isNotEmpty ? _getRelativeTime(lastActive) : '신호 없음',
+                      style: const TextStyle(fontSize: 11, color: Colors.white38),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNoticeTab() {
+    if (_notices.isEmpty) {
+      return const Center(
+        child: Text(
+          '발송된 공지사항이 없습니다.',
+          style: TextStyle(color: Colors.white70, fontSize: 16, fontStyle: FontStyle.italic),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _notices.length,
+      itemBuilder: (context, index) {
+        final notice = _notices[index];
+        final title = notice['title'] ?? '제목없음';
+        final content = notice['content'] ?? '';
+        final receivedList = List<String>.from(notice['received_users'] ?? []);
+        final createdAt = notice['created_at'] ?? '';
+
+        // 기기 목록 대조하여 수신자 수 계산
+        final totalCount = _devices.length;
+        final receiveCount = receivedList.length;
+        final rate = totalCount > 0 ? (receiveCount / totalCount * 100).toStringAsFixed(0) : '0';
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          color: Colors.white.withOpacity(0.04),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.white.withOpacity(0.08), width: 1),
+          ),
+          child: ExpansionTile(
+            title: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            subtitle: Text(
+              '발송: ${createdAt.isNotEmpty ? _getRelativeTime(createdAt) : ''}  |  수신율: $receiveCount/$totalCount ($rate%)',
+              style: const TextStyle(fontSize: 12, color: Colors.white60),
+            ),
+            childrenPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            iconColor: const Color(0xFF3DFFC1),
+            collapsedIconColor: Colors.white54,
+            children: [
+              Container(
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  content,
+                  style: const TextStyle(fontSize: 13, color: Colors.white70),
+                ),
+              ),
+              const Divider(color: Colors.white12),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Text(
+                  '기기별 수신(정독) 상세 결과',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF3DFFC1)),
+                ),
+              ),
+              if (_devices.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text('수신 여부를 대조할 단말 정보가 없습니다.', style: TextStyle(fontSize: 12, color: Colors.white30)),
+                )
+              else
+                ..._devices.map((dev) {
+                  final String testerName = dev['tester_name'] ?? '';
+                  final isReceived = receivedList.contains(testerName);
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isReceived ? Icons.check_circle_rounded : Icons.cancel_outlined,
+                          color: isReceived ? const Color(0xFF10B981) : Colors.white24,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          testerName,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isReceived ? Colors.white : Colors.white38,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          isReceived ? '수신 완료' : '미수신',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isReceived ? const Color(0xFF10B981) : Colors.white24,
+                            fontWeight: isReceived ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
     );
   }
 }

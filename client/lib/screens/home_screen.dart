@@ -256,6 +256,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         // 공지사항 푸시 수신 시 실시간으로 공지 카드도 갱신
         _fetchLatestNotice();
 
+        final noticeId = message.data['notice_id'] as String?;
+        final testerName = _prefs?.name.trim() ?? '';
+        if (noticeId != null && testerName.isNotEmpty) {
+          _sendNoticeAck(noticeId, testerName);
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -288,6 +294,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       debugPrint("[FCM] Notification tapped from background. Reloading notices & navigating to history.");
       _fetchLatestNotice();
       _navigateToNoticeHistory();
+
+      final noticeId = message.data['notice_id'] as String?;
+      final testerName = _prefs?.name.trim() ?? '';
+      if (noticeId != null && testerName.isNotEmpty) {
+        _sendNoticeAck(noticeId, testerName);
+      }
     });
 
     // 앱이 완전히 종료된 상태에서 푸시 알림을 탭하여 앱을 시작했을 때 공지사항 즉시 갱신 및 히스토리 이동
@@ -296,6 +308,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         debugPrint("[FCM] App launched from terminated state via notification. Reloading notices & navigating to history.");
         _fetchLatestNotice();
         _navigateToNoticeHistory();
+
+        final noticeId = message.data['notice_id'] as String?;
+        final testerName = _prefs?.name.trim() ?? '';
+        if (noticeId != null && testerName.isNotEmpty) {
+          _sendNoticeAck(noticeId, testerName);
+        }
       }
     });
 
@@ -309,6 +327,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
     // 최신 공지사항 로드
     _fetchLatestNotice();
+
+    // 기기 접속 핑 전송
+    _sendDevicePing();
 
     // 펜딩된 히스토리 이동 요청 처리
     if (_pendingNoticeHistory) {
@@ -331,6 +352,46 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         builder: (context) => NoticeHistoryScreen(prefs: _prefs!),
       ),
     ).then((_) => _fetchLatestNotice());
+  }
+
+  Future<void> _sendDevicePing() async {
+    if (!mounted || _prefs == null || _session == null) return;
+    final testerName = _prefs!.name.trim();
+    if (testerName.isEmpty) return;
+
+    try {
+      final watchName = _selectedWatch == '직접입력'
+          ? _customWatchCtrl.text.trim()
+          : _selectedWatch;
+      final url = Uri.parse('${AppConfig.apiUrl}/api/devices/ping');
+      await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'tester_name': testerName,
+          'watch': watchName.isEmpty ? '미지정' : watchName,
+          'os_version': 'Android ${_session!.androidVersion} (Model: ${_session!.deviceModel})',
+        }),
+      );
+      debugPrint("[PING] Device ping sent successfully for $testerName");
+    } catch (e) {
+      debugPrint("[PING] Failed to send device ping: $e");
+    }
+  }
+
+  Future<void> _sendNoticeAck(String noticeId, String testerName) async {
+    if (noticeId.isEmpty || testerName.isEmpty) return;
+    try {
+      final url = Uri.parse('${AppConfig.apiUrl}/api/notices/$noticeId/ack');
+      await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'tester_name': testerName}),
+      );
+      debugPrint("[ACK] Notice ACK sent successfully for $testerName on notice $noticeId");
+    } catch (e) {
+      debugPrint("[ACK] Failed to send notice ACK: $e");
+    }
   }
 
   void _reloadPrefs() {
@@ -1077,6 +1138,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       }
     } catch (e) {
       debugPrint("Failed to fetch latest notice: $e");
+    } finally {
+      _sendDevicePing();
     }
   }
 

@@ -75,6 +75,11 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
       widget.prefs.saveReadNoticeIds(_readIds);
     }
 
+    final testerName = widget.prefs.name.trim();
+    if (testerName.isNotEmpty) {
+      _sendNoticeAck(noticeId, testerName);
+    }
+
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -468,5 +473,19 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _sendNoticeAck(String noticeId, String testerName) async {
+    try {
+      final url = Uri.parse('${AppConfig.apiUrl}/api/notices/$noticeId/ack');
+      await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'tester_name': testerName}),
+      );
+      debugPrint("[ACK] Notice ACK sent successfully for $testerName on notice $noticeId");
+    } catch (e) {
+      debugPrint("[ACK] Failed to send notice ACK: $e");
+    }
   }
 }
