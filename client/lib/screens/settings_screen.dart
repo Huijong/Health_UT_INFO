@@ -1,9 +1,14 @@
 import 'dart:ui';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:client/services/prefs_service.dart';
 import 'package:client/screens/home_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dio/dio.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:client/config/app_config.dart';
 
 ThemeData getSettingsTheme(BuildContext context) {
   return ThemeData.dark().copyWith(
@@ -140,8 +145,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
+                      _buildSectionHeader('테스터 프로필 정보'),
+                      const SizedBox(height: 8),
                       _buildMenuCard(
-                        title: '1. 테스터 프로필 설정',
+                        title: '테스터 프로필 설정',
                         subtitle: '이름, 키, 몸무게 정보를 수정합니다.',
                         icon: Icons.person_rounded,
                         onTap: () async {
@@ -166,7 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 16),
                       _buildMenuCard(
-                        title: '2. 착용 워치 설정',
+                        title: '착용 워치 설정',
                         subtitle: '테스트 시 착용하는 갤럭시 워치 모델을 선택합니다.',
                         icon: Icons.watch_rounded,
                         onTap: () async {
@@ -189,7 +196,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 16),
                       _buildMenuCard(
-                        title: '3. 착용 스트랩 설정',
+                        title: '착용 스트랩 설정',
                         subtitle: '테스트 시 사용하는 스트랩 종류를 선택합니다.',
                         icon: Icons.style_rounded,
                         onTap: () async {
@@ -208,6 +215,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               _customStrap = result['customStrap'];
                             });
                           }
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      _buildSectionHeader('추가 애플리케이션 설치'),
+                      const SizedBox(height: 8),
+                      _buildMenuCard(
+                        title: 'Cola Manager 설치',
+                        subtitle: 'Cola Manager(APK) 최신버전을 스마트폰에 다운로드하고 설치합니다.',
+                        icon: Icons.install_mobile_rounded,
+                        onTap: () {
+                          _downloadAndInstallApk();
                         },
                       ),
                     ],
@@ -240,6 +258,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _downloadAndInstallApk() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const DownloadDialog();
+      },
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, top: 8, bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: const Color(0xFFE2E2E2).withOpacity(0.7),
         ),
       ),
     );
@@ -912,4 +954,138 @@ class InstantPageRoute<T> extends PageRouteBuilder<T> {
           pageBuilder: (context, animation, secondaryAnimation) => page,
           transitionsBuilder: (context, animation, secondaryAnimation, child) => child,
         );
+}
+
+class DownloadDialog extends StatefulWidget {
+  const DownloadDialog({super.key});
+
+  @override
+  State<DownloadDialog> createState() => _DownloadDialogState();
+}
+
+class _DownloadDialogState extends State<DownloadDialog> {
+  double _progress = 0.0;
+  String _progressText = '준비 중...';
+  final CancelToken _cancelToken = CancelToken();
+
+  @override
+  void initState() {
+    super.initState();
+    _startDownload();
+  }
+
+  @override
+  void dispose() {
+    _cancelToken.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startDownload() async {
+    try {
+      final dio = Dio();
+      final tempDir = await getTemporaryDirectory();
+      final savePath = '${tempDir.path}/GPT_com_sec_cola_release_1_2_5_phone.apk';
+
+      // Ensure directory exists
+      final file = File(savePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      final url = '${AppConfig.apiUrl}/static/apks/GPT_com_sec_cola_release_1_2_5_phone.apk';
+
+      await dio.download(
+        url,
+        savePath,
+        cancelToken: _cancelToken,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            final double p = received / total;
+            final double receivedMb = received / (1024 * 1024);
+            final double totalMb = total / (1024 * 1024);
+            setState(() {
+              _progress = p;
+              _progressText = '${receivedMb.toStringAsFixed(1)} MB / ${totalMb.toStringAsFixed(1)} MB (${(p * 100).toStringAsFixed(0)}%)';
+            });
+          } else {
+            setState(() {
+              _progressText = '다운로드 중... (${(received / (1024 * 1024)).toStringAsFixed(1)} MB)';
+            });
+          }
+        },
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close dialog
+
+      // Open the downloaded file to install
+      final result = await OpenFilex.open(savePath);
+      debugPrint('[APK Install] Open file result: ${result.message}');
+      if (result.type != ResultType.done && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('설치 관리자를 실행할 수 없습니다: ${result.message}'),
+            backgroundColor: const Color(0xFFFF5252),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Close dialog
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        debugPrint('[APK Install] Download cancelled.');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('다운로드 실패: $e'),
+            backgroundColor: const Color(0xFFFF5252),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF1E2020),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.white.withOpacity(0.08), width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.downloading_rounded, color: Color(0xFF3DFFC1), size: 40),
+            const SizedBox(height: 16),
+            const Text(
+              '부속 도구 설치 파일 다운로드',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(
+              value: _progress,
+              backgroundColor: Colors.white.withOpacity(0.1),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2E5BFF)),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _progressText,
+              style: const TextStyle(fontSize: 13, color: Colors.white70),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () {
+                _cancelToken.cancel();
+                Navigator.pop(context);
+              },
+              child: const Text('취소', style: TextStyle(color: Colors.redAccent)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
