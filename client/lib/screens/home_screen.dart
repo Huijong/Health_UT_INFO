@@ -1328,6 +1328,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           '공지 및 가이드 안내',
           style: TextStyle(
             fontSize: 13,
+            fontWeight: FontWeight.bold,
             color: const Color(0xFFE2E2E2).withOpacity(0.7),
           ),
         ),
@@ -1480,6 +1481,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           '검증을 위해 테스트를 수행한 운동 대상을 골라주세요.',
           style: TextStyle(
             fontSize: 13,
+            fontWeight: FontWeight.bold,
             color: const Color(0xFFE2E2E2).withOpacity(0.7),
           ),
         ),

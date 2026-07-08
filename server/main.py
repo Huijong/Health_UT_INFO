@@ -23,6 +23,9 @@ async def lifespan(app: FastAPI):
     db_client = AsyncIOMotorClient(MONGO_URL)
     db = db_client[DB_NAME]
     
+    import os
+    os.makedirs("static/apks", exist_ok=True)
+
     # Firebase Admin SDK 초기화
     try:
         cred = credentials.Certificate("firebase-adminsdk.json")
@@ -45,6 +48,9 @@ async def lifespan(app: FastAPI):
         db_client.close()
 
 app = FastAPI(title="HealthPort Lab", lifespan=lifespan)
+
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/api/emails")
 async def get_emails():

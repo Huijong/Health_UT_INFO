@@ -242,7 +242,7 @@ class _AdminNoticeScreenState extends State<AdminNoticeScreen> {
                               TextFormField(
                                 controller: _titleCtrl,
                                 decoration: InputDecoration(
-                                  labelText: '공지 제목 *',
+                                  labelText: '공지 제목 입력',
                                   prefixIcon: const Icon(Icons.title_rounded, size: 20),
                                   filled: true,
                                   fillColor: Colors.white.withOpacity(0.03),
@@ -264,9 +264,10 @@ class _AdminNoticeScreenState extends State<AdminNoticeScreen> {
                                 controller: _contentCtrl,
                                 maxLines: 6,
                                 decoration: InputDecoration(
-                                  labelText: '공지 내용 *',
+                                  labelText: '공지 내용 입력',
+                                  alignLabelWithHint: true,
                                   prefixIcon: const Padding(
-                                    padding: EdgeInsets.only(bottom: 90.0),
+                                    padding: EdgeInsets.only(bottom: 120.0),
                                     child: Icon(Icons.description_rounded, size: 20),
                                   ),
                                   filled: true,
