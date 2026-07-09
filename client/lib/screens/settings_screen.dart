@@ -226,13 +226,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         icon: Icons.install_mobile_rounded,
                         onTap: () async {
                           final url = Uri.parse('${AppConfig.apiUrl}/static/apks/GPT_com_sec_cola_release_1_2_5_phone.apk?t=${DateTime.now().millisecondsSinceEpoch}');
-                          if (await canLaunchUrl(url)) {
-                            await launchUrl(url, mode: LaunchMode.externalApplication);
-                          } else {
-                            if (mounted) {
+                          try {
+                            final success = await launchUrl(url, mode: LaunchMode.externalApplication);
+                            if (!success && mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('설치 링크를 열 수 없습니다.'),
+                                  backgroundColor: Color(0xFFFF5252),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('설치 링크를 실행하는 동안 오류가 발생했습니다.'),
                                   backgroundColor: Color(0xFFFF5252),
                                 ),
                               );
