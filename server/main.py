@@ -10,6 +10,10 @@ import firebase_admin
 from firebase_admin import credentials, messaging
 from pydantic import BaseModel
 from datetime import datetime
+import mimetypes
+
+# APK MIME 타입 등록 (브라우저 다운로드 시 .zip으로 오인되는 것 방지)
+mimetypes.add_type("application/vnd.android.package-archive", ".apk")
 
 
 # MongoDB 비동기 연결 객체
@@ -48,6 +52,20 @@ async def lifespan(app: FastAPI):
         db_client.close()
 
 app = FastAPI(title="HealthPort Lab", lifespan=lifespan)
+
+from fastapi.responses import FileResponse
+import os
+
+@app.get("/static/apks/{filename}")
+async def download_apk(filename: str):
+    file_path = os.path.join("static", "apks", filename)
+    if not os.path.exists(file_path):
+        return JSONResponse(status_code=404, content={"message": "File not found"})
+    return FileResponse(
+        file_path,
+        media_type="application/vnd.android.package-archive",
+        filename=filename
+    )
 
 from fastapi.staticfiles import StaticFiles
 app.mount("/static", StaticFiles(directory="static"), name="static")
