@@ -224,28 +224,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: 'Cola Manager 설치',
                         subtitle: 'Cola Manager(APK) 최신버전을 스마트폰에 다운로드하고 설치합니다.',
                         icon: Icons.install_mobile_rounded,
-                        onTap: () async {
-                          final url = Uri.parse('${AppConfig.apiUrl}/static/apks/GPT_com_sec_cola_release_1_2_5_phone.apk?t=${DateTime.now().millisecondsSinceEpoch}');
-                          try {
-                            final success = await launchUrl(url, mode: LaunchMode.externalApplication);
-                            if (!success && mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('설치 링크를 열 수 없습니다.'),
-                                  backgroundColor: Color(0xFFFF5252),
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('설치 링크를 실행하는 동안 오류가 발생했습니다.'),
-                                  backgroundColor: Color(0xFFFF5252),
-                                ),
-                              );
-                            }
-                          }
+                        onTap: () {
+                          _downloadAndInstallApk();
                         },
                       ),
                     ],
