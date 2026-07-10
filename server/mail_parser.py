@@ -11,23 +11,23 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 
 def parse_email_body(body_text):
     # 정규식 패턴을 통한 데이터 추출
-    name_match = re.search(r"이름:\s*(.*)", body_text)
-    height_match = re.search(r"키:\s*(.*)", body_text)
-    weight_match = re.search(r"몸무게:\s*(.*)", body_text)
-    session_match = re.search(r"세션 ID:\s*(.*)", body_text)
-    model_match = re.search(r"기기 모델:\s*(.*)", body_text)
-    version_match = re.search(r"Android 버전:\s*(.*)", body_text)
+    name_match = re.search(r"이름[ \t]*:[ \t]*(.*)", body_text)
+    height_match = re.search(r"키[ \t]*:[ \t]*(.*)", body_text)
+    weight_match = re.search(r"몸무게[ \t]*:[ \t]*(.*)", body_text)
+    session_match = re.search(r"세션[ \t]*ID[ \t]*:[ \t]*(.*)", body_text)
+    model_match = re.search(r"기기[ \t]*모델[ \t]*:[ \t]*(.*)", body_text)
+    version_match = re.search(r"Android[ \t]*버전[ \t]*:[ \t]*(.*)", body_text)
     
-    watch_match = re.search(r"착용 워치:\s*(.*)", body_text)
-    strap_match = re.search(r"착용 스트랩:\s*(.*)", body_text)
-    exercise_match = re.search(r"선택 운동:\s*(.*)", body_text)
+    watch_match = re.search(r"착용[ \t]*워치[ \t]*:[ \t]*(.*)", body_text)
+    strap_match = re.search(r"착용[ \t]*스트랩[ \t]*:[ \t]*(.*)", body_text)
+    exercise_match = re.search(r"선택[ \t]*운동[ \t]*:[ \t]*(.*)", body_text)
     
-    position_match = re.search(r"착용 위치:\s*(.*)", body_text)
-    tightness_match = re.search(r"착용 정도:\s*(.*)", body_text)
-    competitor_match = re.search(r"동시착용 타사기기:\s*(.*)", body_text)
-    training_match = re.search(r"훈련 종류:\s*(.*)", body_text)
-    location_match = re.search(r"장소:\s*(.*)", body_text)
-    remarks_match = re.search(r"특이 사항:\s*(.*)", body_text)
+    position_match = re.search(r"착용[ \t]*위치[ \t]*:[ \t]*(.*)", body_text)
+    tightness_match = re.search(r"착용[ \t]*정도[ \t]*:[ \t]*(.*)", body_text)
+    competitor_match = re.search(r"동시착용[ \t]*타사기기[ \t]*:[ \t]*(.*)", body_text)
+    training_match = re.search(r"훈련[ \t]*종류[ \t]*:[ \t]*(.*)", body_text)
+    location_match = re.search(r"장소[ \t]*:[ \t]*(.*)", body_text)
+    remarks_match = re.search(r"특이[ \t]*사항[ \t]*:[ \t]*(.*)", body_text)
     
     # http로 시작하는 다운로드 링크 추출 (보통 가장 마지막 줄 부근)
     # 뒤쪽에서부터 매칭하거나 본문 아래쪽의 link를 정확하게 잡도록 함
