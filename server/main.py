@@ -675,7 +675,28 @@ async def get_dashboard(request: Request):
                     return 0;
                 });
 
-                       function linkify(text) {
+                // 3. UI 렌더링
+                currentFilteredData = data;
+                renderTable(data);
+                updateSortIndicators();
+            }
+
+            // 정렬 표시 갱신
+            function updateSortIndicators() {
+                const indicators = document.querySelectorAll('.sort-indicator');
+                indicators.forEach(ind => {
+                    ind.innerText = '↕';
+                    ind.classList.remove('active');
+                });
+
+                const currentInd = document.getElementById(`sort-icon-${sortColumn}`);
+                if (currentInd) {
+                    currentInd.innerText = (sortOrder === 'asc') ? '▲' : '▼';
+                    currentInd.classList.add('active');
+                }
+            }
+
+            function linkify(text) {
                 if (!text) return '<span style="color: #cbd5e1; font-style: italic;">없음</span>';
                 const urlRegex = /(https?:\/\/[^\s]+)/g;
                 return text.replace(urlRegex, function(url) {
