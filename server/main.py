@@ -498,12 +498,11 @@ async def get_dashboard(request: Request):
                     return;
                 }
                 
-                const exportData = currentFilteredData.map(item => ({
-                    tester_name: item.tester_name || "",
-                    received_at: item.received_at || "",
-                    watch: item.watch || "",
-                    share_link: item.share_link || ""
-                }));
+                const exportData = currentFilteredData.map(item => {
+                    const cleanItem = { ...item };
+                    delete cleanItem._id;
+                    return cleanItem;
+                });
 
                 const jsonString = JSON.stringify(exportData, null, 2);
                 const blob = new Blob([jsonString], { type: "application/json;charset=utf-8;" });
@@ -676,25 +675,12 @@ async def get_dashboard(request: Request):
                     return 0;
                 });
 
-                // 3. UI 렌더링
-                currentFilteredData = data;
-                renderTable(data);
-                updateSortIndicators();
-            }
-
-            // 정렬 표시 갱신
-            function updateSortIndicators() {
-                const indicators = document.querySelectorAll('.sort-indicator');
-                indicators.forEach(ind => {
-                    ind.innerText = '↕';
-                    ind.classList.remove('active');
+                       function linkify(text) {
+                if (!text) return '<span style="color: #cbd5e1; font-style: italic;">없음</span>';
+                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                return text.replace(urlRegex, function(url) {
+                    return `<a href="${url}" target="_blank" style="color: var(--primary); text-decoration: underline; word-break: break-all;">${url}</a>`;
                 });
-
-                const currentInd = document.getElementById(`sort-icon-${sortColumn}`);
-                if (currentInd) {
-                    currentInd.innerText = (sortOrder === 'asc') ? '▲' : '▼';
-                    currentInd.classList.add('active');
-                }
             }
 
             function renderTable(data) {
@@ -717,13 +703,14 @@ async def get_dashboard(request: Request):
                     const training = item.training_type || '-';
                     const location = item.location || '-';
                     const remarks = item.remarks || '';
-
+                    const remarksHtml = linkify(remarks);
+ 
                     // 단위 중복 방지 처리
                     let hStr = height;
                     if (hStr !== '-' && !hStr.toLowerCase().includes('cm')) hStr += ' cm';
                     let wStr = weight;
                     if (wStr !== '-' && !wStr.toLowerCase().includes('kg')) wStr += ' kg';
-
+ 
                     html += `
                         <tr>
                             <td style="color: var(--text-muted); font-size: 12.5px; white-space: nowrap;">${item.received_at}</td>
@@ -738,8 +725,8 @@ async def get_dashboard(request: Request):
                             <td style="white-space: nowrap;">${tightness}</td>
                             <td style="white-space: nowrap;">${competitor}</td>
                             <td style="white-space: nowrap;">${location}</td>
-                            <td style="max-width: 180px; font-size: 12px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${remarks}">
-                                ${remarks ? remarks : '<span style="color: #cbd5e1; font-style: italic;">없음</span>'}
+                            <td style="min-width: 200px; max-width: 350px; font-size: 12.5px; color: #475569; word-break: break-all;">
+                                ${remarksHtml}
                             </td>
                             <td style="white-space: nowrap;">
                                 ${item.share_link ? `
