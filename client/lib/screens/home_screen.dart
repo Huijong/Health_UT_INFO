@@ -135,6 +135,7 @@ const List<Map<String, dynamic>> kExerciseOptions = [
   {'name': '러닝머신 달리기', 'icon': Icons.directions_run_outlined},
   {'name': '하이킹', 'icon': Icons.terrain_rounded},
   {'name': '트레일 러닝', 'icon': Icons.forest_rounded},
+  {'name': '실외 자전거', 'icon': Icons.directions_bike_rounded},
   {'name': '실내 수영', 'icon': Icons.pool_rounded},
   {'name': '야외 수영', 'icon': Icons.water_rounded},
   {'name': '근력 운동', 'icon': Icons.fitness_center_rounded},
