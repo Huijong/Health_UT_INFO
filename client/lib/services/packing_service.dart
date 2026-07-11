@@ -36,7 +36,9 @@ class PackingService {
   }) async {
     // 세션 ID에서 날짜·시간 추출: "SH_20240627_143052_1234" → ["SH","20240627","143052","1234"]
     final idParts = session.sessionId.split('_');
-    final zipName = 'verification_${idParts[1]}_${idParts[2]}.zip';
+    final safeName = name.replaceAll(RegExp(r'[<>:"/\\|?*\s]'), '');
+    final safeExercise = exercise.replaceAll(RegExp(r'[<>:"/\\|?*\s]'), '');
+    final zipName = '${safeName}_${safeExercise}_${idParts[1]}_${idParts[2]}.zip';
     final docsDir = await getApplicationDocumentsDirectory();
     final zipPath = '${docsDir.path}/$zipName';
 

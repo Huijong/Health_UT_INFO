@@ -24,6 +24,13 @@ class FileService {
     return _fromLocalPath(path, AttachType.fit);
   }
 
+  // ── Garmin FIT 파일 선택 ─────────────────────────────────────────
+  /// Garmin Download 기본 경로(primary:Download/)로 바로 이동 후 선택
+  static Future<AttachedFile?> pickGarminFit() async {
+    final path = await _ch.invokeMethod<String?>('pickGarminFit');
+    return _fromLocalPath(path, AttachType.fit);
+  }
+
   // ── Cola.zip 선택 ─────────────────────────────────────────────
   /// COLA_FILE 경로(primary:Documents/COLA_FILE)로 바로 이동 후 zip 선택
   static Future<AttachedFile?> pickCola() async {
