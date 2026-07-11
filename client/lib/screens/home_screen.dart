@@ -647,6 +647,132 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
+  Future<void> _pickGarminFit() async {
+    final String? action = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassCard(
+            padding: const EdgeInsets.all(20),
+            radius: 20,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.open_in_new_rounded, color: Color(0xFF3DFFC1), size: 24),
+                    SizedBox(width: 8),
+                    Text(
+                      'Garmin Fit 파일 다운로드',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                    ),
+                  ],
+                ),
+                const Divider(color: Colors.white24, height: 20),
+                const SizedBox(height: 8),
+                const Text(
+                  '웹페이지에 접속하여 Fit 파일을 다운로드하시겠습니까?',
+                  style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.5),
+                ),
+                const SizedBox(height: 24),
+                // 가이드 영상 버튼 (상단에 단독 가로형 배치)
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF3DFFC1)),
+                      foregroundColor: const Color(0xFF3DFFC1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, 'video'),
+                    icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
+                    label: const Text('가이드 영상', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () => Navigator.pop(ctx, 'no'),
+                        child: const Text('아니오'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E5BFF),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () => Navigator.pop(ctx, 'yes'),
+                        child: const Text('예'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (action == null) return;
+
+    if (action == 'video') {
+      // Garmin 가이드 영상 재생 다이얼로그 호출
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => const _GuideVideoDialog(videoPath: 'assert/202607115.mp4'),
+      );
+      // 영상 종료 후 다시 다이얼로그 팝업 호출 (재귀)
+      _pickGarminFit();
+      return;
+    }
+
+    if (action == 'yes') {
+      await _launchUrl('https://connect.garmin.com/app/');
+    } else if (action == 'no') {
+      if (_fileBusy) return;
+      setState(() => _fileBusy = true);
+      try {
+        final f = await FileService.pickGarminFit();
+        if (f != null && mounted) {
+          final fileName = f.originalPath.split('/').last.split('\\').last;
+          if (!fileName.toLowerCase().endsWith('.zip')) {
+            _showFileError('Garmin FIT 파일', '선택한 파일이 .zip 파일이 아닙니다.');
+            return;
+          }
+          setState(() => _fitFiles.add(f));
+        }
+      } catch (e) {
+        _showFileError('Garmin FIT 파일', e);
+      } finally {
+        if (mounted) setState(() => _fileBusy = false);
+      }
+    }
+  }
+
   Future<void> _pickCola() async {
     if (_fileBusy) return;
     setState(() => _fileBusy = true);
@@ -1581,9 +1707,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           _buildAttachCard(
             icon: Icons.fitness_center_rounded,
             title: 'FIT 파일 추가',
-            hint: '삼성 헬스 → 다운로드/삼성 헬스/fit',
+            hint: 'Download/삼성 헬스/fit',
             busy: _fileBusy,
             onTap: _pickFit,
+            files: _fitFiles,
+          ),
+          const SizedBox(height: 10),
+
+          // Garmin FIT
+          _buildAttachCard(
+            icon: Icons.directions_bike_rounded,
+            title: 'Garmin FIT 파일 추가',
+            hint: 'Download/ (zip)',
+            busy: _fileBusy,
+            onTap: _pickGarminFit,
             files: _fitFiles,
           ),
           const SizedBox(height: 10),
@@ -2343,7 +2480,8 @@ class GlassCard extends StatelessWidget {
 }
 
 class _GuideVideoDialog extends StatefulWidget {
-  const _GuideVideoDialog();
+  final String videoPath;
+  const _GuideVideoDialog({this.videoPath = 'assert/Demo_7.mp4'});
 
   @override
   State<_GuideVideoDialog> createState() => _GuideVideoDialogState();
@@ -2366,9 +2504,9 @@ class _GuideVideoDialogState extends State<_GuideVideoDialog> {
       _errorMessage = null;
     });
 
-    // 기기 내부에 준비된 로컬 비디오 파일인 'assert/Demo_7.mp4' 에셋을 직접 읽어 무제한 데이터/인터넷 환경에 구애받지 않고 오프라인에서도 100% 정상 작동하도록 설정
+    // 기기 내부에 준비된 로컬 비디오 파일을 직접 읽어 무제한 데이터/인터넷 환경에 구애받지 않고 오프라인에서도 100% 정상 작동하도록 설정
     _controller = VideoPlayerController.asset(
-      'assert/Demo_7.mp4',
+      widget.videoPath,
     )..initialize().then((_) {
         if (!mounted) return;
         setState(() {

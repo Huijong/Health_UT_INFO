@@ -31,6 +31,7 @@ class FileChannelPlugin(
         private const val REQ_FIT  = 9001
         private const val REQ_COLA = 9002
         private const val REQ_LOG  = 9003
+        private const val REQ_GARMIN_FIT = 9004
         // Android 외부 저장소 Documents Provider authority
         private const val AUTHORITY = "com.android.externalstorage.documents"
     }
@@ -53,6 +54,12 @@ class FileChannelPlugin(
                         requestCode = REQ_FIT,
                         mimeType    = "*/*",            // .fit 은 공식 MIME 없음
                         docId       = "primary:Download/삼성 헬스/fit"
+                    )
+                    "pickGarminFit" -> openPicker(
+                        activity    = activity,
+                        requestCode = REQ_GARMIN_FIT,
+                        mimeType    = "application/zip",
+                        docId       = "primary:Download/"
                     )
                     "pickCola" -> openPicker(
                         activity    = activity,
@@ -89,7 +96,7 @@ class FileChannelPlugin(
      * 우리 요청 코드면 true 반환(처리 완료), 아니면 false 반환(상위로 위임).
      */
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-        if (requestCode != REQ_FIT && requestCode != REQ_COLA && requestCode != REQ_LOG) return false
+        if (requestCode != REQ_FIT && requestCode != REQ_COLA && requestCode != REQ_LOG && requestCode != REQ_GARMIN_FIT) return false
 
         val uri = if (resultCode == Activity.RESULT_OK) data?.data else null
         if (uri == null) {

@@ -79,6 +79,7 @@ flutter:
 
   assets:
     - assert/Demo_7.mp4
+    - assert/202607115.mp4
 
   # To add assets to your application, add an assets section, like this:
   # assets:
