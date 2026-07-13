@@ -188,6 +188,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   // 5단계 디테일 및 첨부파일
   final List<AttachedFile> _fitFiles = [];
+  final List<AttachedFile> _garminFiles = [];
   final List<AttachedFile> _colaFiles = [];
   final List<AttachedFile> _logFiles = [];
   final List<AttachedFile> _captureFiles = [];
@@ -580,7 +581,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         location: _locationCtrl.text.trim(),
         memo: memo,
         session: _session!,
-        fitFiles: _fitFiles,
+        fitFiles: [..._fitFiles, ..._garminFiles],
         colaFiles: _colaFiles,
         logFiles: _logFiles,
         captureFiles: _captureFiles,
@@ -616,6 +617,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     setState(() {
       _currentStep = (_prefs?.onboardingComplete ?? false) ? 4 : 1;
       _fitFiles.clear();
+      _garminFiles.clear();
       _colaFiles.clear();
       _logFiles.clear();
       _captureFiles.clear();
@@ -768,7 +770,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             _showFileError('Garmin FIT 파일', '선택한 파일이 .zip 파일이 아닙니다.');
             return;
           }
-          setState(() => _fitFiles.add(f));
+          setState(() => _garminFiles.add(f));
         }
       } catch (e) {
         _showFileError('Garmin FIT 파일', e);
@@ -1705,7 +1707,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   // ── Step 5: 파일 첨부 및 디테일 입력 ─────────────────────────────────
   Widget _buildStep5Details() {
-    final bool hasFiles = _fitFiles.isNotEmpty || _colaFiles.isNotEmpty || _logFiles.isNotEmpty || _captureFiles.isNotEmpty;
+    final bool hasFiles = _fitFiles.isNotEmpty || _garminFiles.isNotEmpty || _colaFiles.isNotEmpty || _logFiles.isNotEmpty || _captureFiles.isNotEmpty;
 
     return Form(
       key: _formKey5,
@@ -1753,7 +1755,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             hint: 'Download/ (zip)',
             busy: _fileBusy,
             onTap: _pickGarminFit,
-            files: _fitFiles,
+            files: _garminFiles,
           ),
           const SizedBox(height: 10),
 
