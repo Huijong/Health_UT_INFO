@@ -13,6 +13,8 @@ class EmailService {
     required String testerName,
     required String deviceModel,
     required String androidVersion,
+    required String appVersion,
+    required String shealthVersion,
     required String height,
     required String weight,
     required String watch,
@@ -51,6 +53,8 @@ class EmailService {
 - 세션 ID: $sessionId
 - 기기 모델: $deviceModel
 - Android 버전: $androidVersion
+- 앱 버전: $appVersion
+- 삼성 헬스 버전: $shealthVersion
 - 동의 여부: Y
 - 동의 일시: $consentDate
 

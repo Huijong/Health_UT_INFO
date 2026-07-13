@@ -63,6 +63,7 @@ class PackingService {
         'model': session.deviceModel,
         'android': session.androidVersion,
         'app_version': session.appVersion,
+        'shealth_version': session.shealthVersion,
       },
       'memo': memo,
       'files': [
@@ -175,6 +176,7 @@ class PackingService {
     sb.writeln('기기 모델  : ${session.deviceModel}');
     sb.writeln('Android    : ${session.androidVersion}');
     sb.writeln('앱 버전    : ${session.appVersion}');
+    sb.writeln('삼성 헬스  : ${session.shealthVersion}');
     sb.writeln();
 
     sb.writeln('[ 첨부 파일 ]');

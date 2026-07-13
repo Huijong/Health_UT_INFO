@@ -497,6 +497,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         testerName: _nameCtrl.text.trim(),
         deviceModel: _session?.deviceModel ?? 'Unknown',
         androidVersion: _session?.androidVersion ?? 'Unknown',
+        appVersion: _session?.appVersion ?? AppConfig.appVersion,
+        shealthVersion: _session?.shealthVersion ?? '알 수 없음',
         height: _heightCtrl.text.trim(),
         weight: _weightCtrl.text.trim(),
         watch: watchName,
