@@ -24,6 +24,7 @@ class EmailService {
     required String trainingType,
     required String location,
     required String remarks,
+    required String consentDate,
   }) async {
     final sender = AppConfig.emailSender;
     final password = AppConfig.emailAppPassword;
@@ -50,6 +51,8 @@ class EmailService {
 - 세션 ID: $sessionId
 - 기기 모델: $deviceModel
 - Android 버전: $androidVersion
+- 동의 여부: Y
+- 동의 일시: $consentDate
 
 ■ 워치 & 스트랩 정보
 - 착용 워치: $watch

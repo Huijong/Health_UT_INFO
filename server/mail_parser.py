@@ -29,6 +29,9 @@ def parse_email_body(body_text):
     location_match = re.search(r"장소[ \t]*:[ \t]*(.*)", body_text)
     remarks_match = re.search(r"특이[ \t]*사항[ \t]*:[ \t]*(.*)", body_text)
     
+    consent_given_match = re.search(r"동의[ \t]*여부[ \t]*:[ \t]*(.*)", body_text)
+    consent_date_match = re.search(r"동의[ \t]*일시[ \t]*:[ \t]*(.*)", body_text)
+    
     # http로 시작하는 다운로드 링크 추출 (보통 가장 마지막 줄 부근)
     # 뒤쪽에서부터 매칭하거나 본문 아래쪽의 link를 정확하게 잡도록 함
     link_match = re.search(r"Quick Share\)\s*\n(https?://[^\s\r\n]+)", body_text)
@@ -47,11 +50,13 @@ def parse_email_body(body_text):
         "exercise": exercise_match.group(1).strip() if exercise_match else "알 수 없음",
         "wearing_position": position_match.group(1).strip() if position_match else "알 수 없음",
         "wearing_tightness": tightness_match.group(1).strip() if tightness_match else "알 수 없음",
-        "competitor_watch": competitor_match.group(1).strip() if competitor_match else "알 수 없음",
+        "competitor_watch": competitor_watch.group(1).strip() if competitor_watch else "알 수 없음",
         "training_type": training_match.group(1).strip() if training_match else "알 수 없음",
         "location": location_match.group(1).strip() if location_match else "알 수 없음",
         "remarks": remarks_match.group(1).strip() if remarks_match else "",
         "share_link": link_match.group(1).strip() if link_match else "",
+        "consent_given": consent_given_match.group(1).strip() if consent_given_match else "N",
+        "consent_date": consent_date_match.group(1).strip() if consent_date_match else "",
     }
 
 def fetch_and_parse_emails():

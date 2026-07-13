@@ -707,7 +707,7 @@ async def get_dashboard(request: Request):
             function renderTable(data) {
                 const tbody = document.getElementById('table-body');
                 if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="14" class="no-data">조건에 맞는 수집 내역이 없습니다.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="15" class="no-data">조건에 맞는 수집 내역이 없습니다.</td></tr>`;
                     return;
                 }
                 
@@ -725,6 +725,12 @@ async def get_dashboard(request: Request):
                     const location = item.location || '-';
                     const remarks = item.remarks || '';
                     const remarksHtml = linkify(remarks);
+                    
+                    const consentGiven = item.consent_given || 'N';
+                    const consentDate = item.consent_date || '';
+                    const consentHtml = consentGiven === 'Y' 
+                        ? `<span class="badge" style="background-color: rgba(16, 185, 129, 0.1); color: #10B981; font-weight: bold; white-space: nowrap;" title="동의 일시: ${consentDate}">동의 (Y)</span>` 
+                        : `<span class="badge" style="background-color: rgba(239, 68, 68, 0.1); color: #EF4444; font-weight: bold; white-space: nowrap;">미동의 (N)</span>`;
  
                     // 단위 중복 방지 처리
                     let hStr = height;
@@ -736,6 +742,7 @@ async def get_dashboard(request: Request):
                         <tr>
                             <td style="color: var(--text-muted); font-size: 12.5px; white-space: nowrap;">${item.received_at}</td>
                             <td><span style="font-size: 13.5px; white-space: nowrap;">${item.tester_name}</span></td>
+                            <td>${consentHtml}</td>
                             <td style="white-space: nowrap;">${hStr}</td>
                             <td style="white-space: nowrap;">${wStr}</td>
                             <td><span class="badge" style="background-color: #E8EBF5; color: #1429A0; white-space: nowrap;">${watch}</span></td>
@@ -823,6 +830,7 @@ async def get_dashboard(request: Request):
                         <tr>
                             <th class="sortable" onclick="handleSort('received_at')">수신 일시 <span class="sort-indicator" id="sort-icon-received_at">▼</span></th>
                             <th class="sortable" onclick="handleSort('tester_name')">이름 <span class="sort-indicator" id="sort-icon-tester_name">↕</span></th>
+                            <th class="sortable" onclick="handleSort('consent_given')">동의 여부 <span class="sort-indicator" id="sort-icon-consent_given">↕</span></th>
                             <th class="sortable" onclick="handleSort('height')">키 <span class="sort-indicator" id="sort-icon-height">↕</span></th>
                             <th class="sortable" onclick="handleSort('weight')">몸무게 <span class="sort-indicator" id="sort-icon-weight">↕</span></th>
                             <th class="sortable" onclick="handleSort('watch')">착용 워치 <span class="sort-indicator" id="sort-icon-watch">↕</span></th>
@@ -839,7 +847,7 @@ async def get_dashboard(request: Request):
                     </thead>
                     <tbody id="table-body">
                         <tr>
-                            <td colspan="14" style="text-align: center; padding: 50px; color: var(--text-muted);">데이터를 불러오는 중입니다...</td>
+                            <td colspan="15" style="text-align: center; padding: 50px; color: var(--text-muted);">데이터를 불러오는 중입니다...</td>
                         </tr>
                     </tbody>
                 </table>

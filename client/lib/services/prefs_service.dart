@@ -13,6 +13,8 @@ class PrefsService {
   static const _keyHasWatchedGuide = 'has_watched_guide';
   static const _keyLastReadNoticeId = 'last_read_notice_id';
   static const _keyReadNoticeIds = 'read_notice_ids';
+  static const _keyConsentGiven = 'consent_given';
+  static const _keyConsentDate = 'consent_date';
   static const _keyDeletedNoticeIds = 'deleted_notice_ids';
 
   final SharedPreferences _prefs;
@@ -44,6 +46,8 @@ class PrefsService {
   String get lastReadNoticeId => _prefs.getString(_keyLastReadNoticeId) ?? '';
   List<String> get readNoticeIds => _prefs.getStringList(_keyReadNoticeIds) ?? [];
   List<String> get deletedNoticeIds => _prefs.getStringList(_keyDeletedNoticeIds) ?? [];
+  bool get consentGiven => _prefs.getBool(_keyConsentGiven) ?? false;
+  String get consentDate => _prefs.getString(_keyConsentDate) ?? '';
 
   Future<void> saveName(String value) => _prefs.setString(_keyName, value);
   Future<void> saveHeight(double value) => _prefs.setDouble(_keyHeight, value);
@@ -57,4 +61,6 @@ class PrefsService {
   Future<void> saveLastReadNoticeId(String value) => _prefs.setString(_keyLastReadNoticeId, value);
   Future<void> saveReadNoticeIds(List<String> values) => _prefs.setStringList(_keyReadNoticeIds, values);
   Future<void> saveDeletedNoticeIds(List<String> values) => _prefs.setStringList(_keyDeletedNoticeIds, values);
+  Future<void> saveConsentGiven(bool value) => _prefs.setBool(_keyConsentGiven, value);
+  Future<void> saveConsentDate(String value) => _prefs.setString(_keyConsentDate, value);
 }
