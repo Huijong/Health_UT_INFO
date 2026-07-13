@@ -225,7 +225,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         subtitle: 'Cola Manager(APK) 최신버전을 스마트폰에 다운로드하고 설치합니다.',
                         icon: Icons.install_mobile_rounded,
                         onTap: () {
-                          _downloadAndInstallApk();
+                          _downloadAndInstallApk(
+                            defaultFileName: 'GPT_com_sec_cola_release_1_2_5_phone.apk',
+                            defaultUrlPath: '/static/apks/GPT_com_sec_cola_release_1_2_5_phone.apk',
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMenuCard(
+                        title: 'HealthPort 업데이트',
+                        subtitle: 'HealthPort(APK) 최신버전을 스마트폰에 다운로드하고 설치합니다.',
+                        icon: Icons.system_update_rounded,
+                        onTap: () {
+                          _downloadAndInstallApk(
+                            latestApkApiUrl: '${AppConfig.apiUrl}/api/apks/latest-healthport',
+                            defaultFileName: 'HealthPort_${AppConfig.appVersion}.apk',
+                            defaultUrlPath: '/static/apks/HealthPort_${AppConfig.appVersion}.apk',
+                          );
                         },
                       ),
                       const SizedBox(height: 24),
@@ -271,12 +287,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _downloadAndInstallApk() {
+  void _downloadAndInstallApk({
+    String? latestApkApiUrl,
+    required String defaultFileName,
+    required String defaultUrlPath,
+  }) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return const DownloadDialog();
+        return DownloadDialog(
+          latestApkApiUrl: latestApkApiUrl,
+          defaultFileName: defaultFileName,
+          defaultUrlPath: defaultUrlPath,
+        );
       },
     );
   }
@@ -1008,7 +1032,16 @@ class InstantPageRoute<T> extends PageRouteBuilder<T> {
 }
 
 class DownloadDialog extends StatefulWidget {
-  const DownloadDialog({super.key});
+  final String? latestApkApiUrl;
+  final String defaultFileName;
+  final String defaultUrlPath;
+
+  const DownloadDialog({
+    super.key,
+    this.latestApkApiUrl,
+    required this.defaultFileName,
+    required this.defaultUrlPath,
+  });
 
   @override
   State<DownloadDialog> createState() => _DownloadDialogState();
@@ -1034,8 +1067,25 @@ class _DownloadDialogState extends State<DownloadDialog> {
   Future<void> _startDownload() async {
     try {
       final dio = Dio();
+      String fileName = widget.defaultFileName;
+      String urlPath = widget.defaultUrlPath;
+
+      if (widget.latestApkApiUrl != null) {
+        setState(() {
+          _progressText = '최신 업데이트 정보 조회 중...';
+        });
+        final response = await dio.get(widget.latestApkApiUrl!);
+        if (response.statusCode == 200 && response.data != null) {
+          final data = response.data;
+          if (data['status'] == 'success') {
+            fileName = data['filename'];
+            urlPath = data['url'];
+          }
+        }
+      }
+
       final tempDir = await getTemporaryDirectory();
-      final savePath = '${tempDir.path}/GPT_com_sec_cola_release_1_2_5_phone.apk';
+      final savePath = '${tempDir.path}/$fileName';
 
       // Ensure directory exists
       final file = File(savePath);
@@ -1043,10 +1093,12 @@ class _DownloadDialogState extends State<DownloadDialog> {
         await file.delete();
       }
 
-      final url = '${AppConfig.apiUrl}/static/apks/GPT_com_sec_cola_release_1_2_5_phone.apk';
+      final fullUrl = urlPath.startsWith('http')
+          ? urlPath
+          : '${AppConfig.apiUrl}$urlPath';
 
       await dio.download(
-        url,
+        fullUrl,
         savePath,
         cancelToken: _cancelToken,
         onReceiveProgress: (received, total) {

@@ -38,7 +38,8 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
     });
 
     try {
-      final response = await http.get(Uri.parse('${AppConfig.apiUrl}/api/notices'));
+      final testerName = widget.prefs.name;
+      final response = await http.get(Uri.parse('${AppConfig.apiUrl}/api/notices?tester_name=${Uri.encodeComponent(testerName)}'));
       if (response.statusCode == 200) {
         final decoded = json.decode(utf8.decode(response.bodyBytes));
         if (decoded['status'] == 'success') {

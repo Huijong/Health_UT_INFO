@@ -334,6 +334,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     // 최신 공지사항 로드
     _fetchLatestNotice();
 
+    // 개인 알림 토픽 구독
+    _updateNotificationTopic(prefs.name);
+
     // 기기 접속 핑 전송
     _sendDevicePing();
 
@@ -358,6 +361,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         builder: (context) => NoticeHistoryScreen(prefs: _prefs!),
       ),
     ).then((_) => _fetchLatestNotice());
+  }
+
+  String _nameToHex(String name) {
+    return utf8.encode(name).map((e) => e.toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  String _lastSubscribedTopic = '';
+
+  Future<void> _updateNotificationTopic(String newName) async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+      // 1. 기존 구독 해제
+      if (_lastSubscribedTopic.isNotEmpty) {
+        await messaging.unsubscribeFromTopic(_lastSubscribedTopic);
+        debugPrint("Unsubscribed from old topic: $_lastSubscribedTopic");
+      } else {
+        final oldSavedName = _prefs?.name ?? '';
+        if (oldSavedName.isNotEmpty && oldSavedName != newName) {
+          final oldTopic = 'tester_${_nameToHex(oldSavedName)}';
+          await messaging.unsubscribeFromTopic(oldTopic);
+          debugPrint("Unsubscribed from fallback old topic: $oldTopic");
+        }
+      }
+      // 2. 신규 구독
+      if (newName.isNotEmpty) {
+        final newTopic = 'tester_${_nameToHex(newName)}';
+        await messaging.subscribeToTopic(newTopic);
+        _lastSubscribedTopic = newTopic;
+        debugPrint("Subscribed to new topic: $newTopic");
+      }
+    } catch (e) {
+      debugPrint("Failed to update FCM topic: $e");
+    }
   }
 
   Future<void> _sendDevicePing() async {
@@ -402,6 +438,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   void _reloadPrefs() {
     if (_prefs == null) return;
+    _updateNotificationTopic(_prefs!.name);
     setState(() {
       _nameCtrl.text = _prefs!.name;
       final h = _prefs!.height;
@@ -1257,7 +1294,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   Future<void> _fetchLatestNotice() async {
     try {
-      final response = await http.get(Uri.parse('${AppConfig.apiUrl}/api/notices'));
+      final testerName = _prefs?.name ?? '';
+      final response = await http.get(Uri.parse('${AppConfig.apiUrl}/api/notices?tester_name=${Uri.encodeComponent(testerName)}'));
       if (response.statusCode == 200) {
         final decoded = json.decode(utf8.decode(response.bodyBytes));
         if (decoded['status'] == 'success' && decoded['data'] != null) {
@@ -2427,6 +2465,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   if (_currentStep == 1) {
                     if (!_formKey1.currentState!.validate()) return;
                     _prefs?.saveName(_nameCtrl.text.trim());
+                    _updateNotificationTopic(_nameCtrl.text.trim());
                     _prefs?.saveHeight(double.tryParse(_heightCtrl.text) ?? 0.0);
                     _prefs?.saveWeight(double.tryParse(_weightCtrl.text) ?? 0.0);
                   } else if (_currentStep == 2) {
