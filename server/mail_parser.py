@@ -50,7 +50,7 @@ def parse_email_body(body_text):
         "exercise": exercise_match.group(1).strip() if exercise_match else "알 수 없음",
         "wearing_position": position_match.group(1).strip() if position_match else "알 수 없음",
         "wearing_tightness": tightness_match.group(1).strip() if tightness_match else "알 수 없음",
-        "competitor_watch": competitor_watch.group(1).strip() if competitor_watch else "알 수 없음",
+        "competitor_watch": competitor_match.group(1).strip() if competitor_match else "알 수 없음",
         "training_type": training_match.group(1).strip() if training_match else "알 수 없음",
         "location": location_match.group(1).strip() if location_match else "알 수 없음",
         "remarks": remarks_match.group(1).strip() if remarks_match else "",
