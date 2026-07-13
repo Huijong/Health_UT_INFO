@@ -1040,7 +1040,7 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
                                   const SizedBox(height: 2),
                                   Text(
                                     'HealthPort ${item['app_version'] ?? '알 수 없음'}',
-                                    style: const TextStyle(fontSize: 12, color: Color(0xFF3DFFC1), fontWeight: FontWeight.w500),
+                                    style: const TextStyle(fontSize: 12, color: Colors.white70),
                                   ),
                                 ],
                               ),

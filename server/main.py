@@ -740,14 +740,12 @@ async def get_dashboard(request: Request):
             function renderTable(data) {
                 const tbody = document.getElementById('table-body');
                 if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="17" class="no-data">조건에 맞는 수집 내역이 없습니다.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="14" class="no-data">조건에 맞는 수집 내역이 없습니다.</td></tr>`;
                     return;
                 }
                 
                 let html = '';
                 data.forEach(item => {
-                    const height = item.height || '-';
-                    const weight = item.weight || '-';
                     const watch = item.watch || '알 수 없음';
                     const strap = item.strap || '알 수 없음';
                     const exercise = item.exercise || '알 수 없음';
@@ -767,22 +765,12 @@ async def get_dashboard(request: Request):
  
                     const appVersion = item.app_version || '-';
                     const shealthVersion = item.shealth_version || '-';
-
-                    // 단위 중복 방지 처리
-                    let hStr = height;
-                    if (hStr !== '-' && !hStr.toLowerCase().includes('cm')) hStr += ' cm';
-                    let wStr = weight;
-                    if (wStr !== '-' && !wStr.toLowerCase().includes('kg')) wStr += ' kg';
  
                     html += `
                         <tr>
                             <td style="color: var(--text-muted); font-size: 12.5px; white-space: nowrap;">${item.received_at}</td>
                             <td><span style="font-size: 13.5px; white-space: nowrap;">${item.tester_name}</span></td>
                             <td>${consentHtml}</td>
-                            <td><span style="font-size: 13px; color: #475569; white-space: nowrap;">${appVersion}</span></td>
-                            <td><span style="font-size: 13px; color: #475569; white-space: nowrap;">${shealthVersion}</span></td>
-                            <td style="white-space: nowrap;">${hStr}</td>
-                            <td style="white-space: nowrap;">${wStr}</td>
                             <td><span class="badge" style="background-color: #E8EBF5; color: #1429A0; white-space: nowrap;">${watch}</span></td>
                             <td style="white-space: nowrap;">${strap}</td>
                             <td><span style="color: #10B981; white-space: nowrap;">${exercise}</span></td>
@@ -794,6 +782,7 @@ async def get_dashboard(request: Request):
                             <td style="min-width: 200px; max-width: 350px; font-size: 12.5px; color: #475569; word-break: break-all;">
                                 ${remarksHtml}
                             </td>
+                            <td><span style="font-size: 13px; color: #475569; white-space: nowrap;">${appVersion} / ${shealthVersion}</span></td>
                             <td style="white-space: nowrap;">
                                 ${item.share_link ? `
                                     <a href="${item.share_link}" target="_blank" class="link-btn">다운로드</a>
@@ -869,10 +858,6 @@ async def get_dashboard(request: Request):
                             <th class="sortable" onclick="handleSort('received_at')">수신 일시 <span class="sort-indicator" id="sort-icon-received_at">▼</span></th>
                             <th class="sortable" onclick="handleSort('tester_name')">이름 <span class="sort-indicator" id="sort-icon-tester_name">↕</span></th>
                             <th class="sortable" onclick="handleSort('consent_given')">동의 여부 <span class="sort-indicator" id="sort-icon-consent_given">↕</span></th>
-                            <th class="sortable" onclick="handleSort('app_version')">앱 버전 <span class="sort-indicator" id="sort-icon-app_version">↕</span></th>
-                            <th class="sortable" onclick="handleSort('shealth_version')">삼성 헬스 <span class="sort-indicator" id="sort-icon-shealth_version">↕</span></th>
-                            <th class="sortable" onclick="handleSort('height')">키 <span class="sort-indicator" id="sort-icon-height">↕</span></th>
-                            <th class="sortable" onclick="handleSort('weight')">몸무게 <span class="sort-indicator" id="sort-icon-weight">↕</span></th>
                             <th class="sortable" onclick="handleSort('watch')">착용 워치 <span class="sort-indicator" id="sort-icon-watch">↕</span></th>
                             <th class="sortable" onclick="handleSort('strap')">착용 스트랩 <span class="sort-indicator" id="sort-icon-strap">↕</span></th>
                             <th class="sortable" onclick="handleSort('exercise')">운동 종류 <span class="sort-indicator" id="sort-icon-exercise">↕</span></th>
@@ -882,12 +867,13 @@ async def get_dashboard(request: Request):
                             <th class="sortable" onclick="handleSort('competitor_watch')">동시착용 모델 <span class="sort-indicator" id="sort-icon-competitor_watch">↕</span></th>
                             <th class="sortable" onclick="handleSort('location')">운동 장소 <span class="sort-indicator" id="sort-icon-location">↕</span></th>
                             <th>특이 사항</th>
+                            <th class="sortable" onclick="handleSort('app_version')">버전 <span class="sort-indicator" id="sort-icon-app_version">↕</span></th>
                             <th>Quick Share</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
                         <tr>
-                            <td colspan="17" style="text-align: center; padding: 50px; color: var(--text-muted);">데이터를 불러오는 중입니다...</td>
+                            <td colspan="14" style="text-align: center; padding: 50px; color: var(--text-muted);">데이터를 불러오는 중입니다...</td>
                         </tr>
                     </tbody>
                 </table>
