@@ -348,8 +348,12 @@ class TesterStatusScreen extends StatefulWidget {
 class _TesterStatusScreenState extends State<TesterStatusScreen> {
   List<dynamic> _devices = [];
   List<dynamic> _notices = [];
+  List<dynamic> _testerStatus = [];
   bool _isLoading = true;
   String? _errorMessage;
+
+  String _searchQuery = '';
+  String _sortBy = 'recent';
 
   @override
   void initState() {
@@ -368,22 +372,28 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
       final devRes = await http.get(Uri.parse('https://health-port.work/api/devices'));
       // 2. 공지 리스트 및 ACK 수신 상태 가져오기
       final noticeRes = await http.get(Uri.parse('https://health-port.work/api/notices'));
+      // 3. 테스터 데이터 수신 현황 가져오기
+      final statusRes = await http.get(Uri.parse('https://health-port.work/api/devices?summary=true'));
 
-      if (devRes.statusCode == 200 && noticeRes.statusCode == 200) {
+      if (devRes.statusCode == 200 && noticeRes.statusCode == 200 && statusRes.statusCode == 200) {
         final devDecoded = json.decode(utf8.decode(devRes.bodyBytes));
         final noticeDecoded = json.decode(utf8.decode(noticeRes.bodyBytes));
+        final statusDecoded = json.decode(utf8.decode(statusRes.bodyBytes));
 
-        if (devDecoded['status'] == 'success' && noticeDecoded['status'] == 'success') {
+        if (devDecoded['status'] == 'success' && 
+            noticeDecoded['status'] == 'success' &&
+            statusDecoded['status'] == 'success') {
           setState(() {
             _devices = devDecoded['data'] as List<dynamic>;
             _notices = noticeDecoded['data'] as List<dynamic>;
+            _testerStatus = statusDecoded['data'] as List<dynamic>;
             _isLoading = false;
           });
           return;
         }
       }
       setState(() {
-        _errorMessage = '데이터 로드 실패';
+        _errorMessage = '데이터 로드 실패 (상태 코드 - 접속: ${devRes.statusCode}, 공지: ${noticeRes.statusCode}, 수신: ${statusRes.statusCode})';
         _isLoading = false;
       });
     } catch (e) {
@@ -425,7 +435,7 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('테스터 모니터링 대시보드'),
@@ -438,6 +448,10 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
               Tab(
                 icon: Icon(Icons.mark_email_read_rounded),
                 text: '공지 수신율 확인',
+              ),
+              Tab(
+                icon: Icon(Icons.storage_rounded),
+                text: '데이터 수신 현황',
               ),
             ],
             indicatorColor: Color(0xFF3DFFC1),
@@ -493,6 +507,7 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
                       children: [
                         _buildDeviceTab(),
                         _buildNoticeTab(),
+                        _buildTesterStatusTab(),
                       ],
                     ),
         ),
@@ -706,6 +721,340 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
           ),
         );
       },
+    );
+  }
+
+  // --- New Methods for Data Reception Status Tab ---
+  Color _getStatusColor(String? lastReceivedAt) {
+    if (lastReceivedAt == null || lastReceivedAt.isEmpty) {
+      return const Color(0xFFEF4444); // Red
+    }
+    try {
+      final parsedDate = DateTime.parse(lastReceivedAt);
+      final difference = DateTime.now().difference(parsedDate);
+
+      if (difference.inDays < 2) {
+        return const Color(0xFF10B981); // Green
+      } else if (difference.inDays < 7) {
+        return const Color(0xFFFBBF24); // Yellow
+      } else {
+        return const Color(0xFFEF4444); // Red
+      }
+    } catch (_) {
+      return const Color(0xFFEF4444);
+    }
+  }
+
+  String _getStatusText(String? lastReceivedAt) {
+    if (lastReceivedAt == null || lastReceivedAt.isEmpty) {
+      return '수신 기록 없음 (이탈 위험 🔴)';
+    }
+    try {
+      final parsedDate = DateTime.parse(lastReceivedAt);
+      final difference = DateTime.now().difference(parsedDate);
+
+      if (difference.inDays < 2) {
+        return '활성 상태 🟢';
+      } else if (difference.inDays < 7) {
+        return '활동 뜸함 🟡';
+      } else {
+        return '장기 미활동 (이탈 위험 🔴)';
+      }
+    } catch (_) {
+      return '형식 오류';
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Color(0xFFFF5252)),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: const Color(0xFF2C1010),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Future<void> _sendNudge(String testerName) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://health-port.work/api/notices'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'title': '[독려] $testerName님 테스트 참여 안내 📢',
+          'content': '$testerName님, 최근 전송된 삼성 헬스 검증 데이터가 확인되지 않아 알림을 드립니다. 단말 연결 및 테스트 업로드를 다시 한번 확인해 주세요! 🚀',
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(utf8.decode(response.bodyBytes));
+        if (decoded['status'] == 'success') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: Color(0xFF3DFFC1), size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '$testerName님께 수집 독려 푸시 알림이 발송되었습니다! 📢',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: const Color(0xFF0F3A30),
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFF3DFFC1), width: 1.5),
+                ),
+                elevation: 8,
+              ),
+            );
+          }
+          _fetchData();
+        } else {
+          _showError(decoded['message'] ?? '독려 알림 발송에 실패했습니다.');
+        }
+      } else {
+        _showError('서버 연결 실패 (Status Code: ${response.statusCode})');
+      }
+    } catch (e) {
+      _showError('독려 알림 발송 중 에러가 발생했습니다: $e');
+    }
+  }
+
+  void _showNudgeConfirmDialog(String testerName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0A0F24),
+        title: Text(
+          '$testerName님께 독려 알림 발송',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        content: Text(
+          '해당 테스터에게 무선 수집 참여 독려 푸시 알림을 발송하시겠습니까?\n\n이 알림은 모든 사용자의 공지 히스토리에도 등록됩니다.',
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E5BFF),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _sendNudge(testerName);
+            },
+            child: const Text('발송'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTesterStatusTab() {
+    if (_testerStatus.isEmpty) {
+      return const Center(
+        child: Text(
+          '수집된 데이터가 없습니다.',
+          style: TextStyle(color: Colors.white70, fontSize: 16, fontStyle: FontStyle.italic),
+        ),
+      );
+    }
+
+    final filtered = _testerStatus.where((item) {
+      final name = (item['tester_name'] ?? '').toString().toLowerCase();
+      return name.contains(_searchQuery.toLowerCase());
+    }).toList();
+
+    if (_sortBy == 'recent') {
+      filtered.sort((a, b) {
+        final aTime = a['last_received_at'] ?? '';
+        final bTime = b['last_received_at'] ?? '';
+        return bTime.compareTo(aTime);
+      });
+    } else {
+      filtered.sort((a, b) {
+        final aCount = a['total_count'] ?? 0;
+        final bCount = b['total_count'] ?? 0;
+        return bCount.compareTo(aCount);
+      });
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: TextField(
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: '테스터 검색...',
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 14),
+                      prefixIcon: Icon(Icons.search_rounded, color: Colors.white.withOpacity(0.4), size: 20),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _sortBy,
+                    dropdownColor: const Color(0xFF0A0F24),
+                    icon: const Icon(Icons.sort_rounded, color: Color(0xFF3DFFC1), size: 20),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'recent',
+                        child: Text('최근 수신일 순', style: TextStyle(color: Colors.white, fontSize: 13)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'count',
+                        child: Text('누적 건수 순', style: TextStyle(color: Colors.white, fontSize: 13)),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _sortBy = val;
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? const Center(
+                  child: Text(
+                    '일치하는 테스터가 없습니다.',
+                    style: TextStyle(color: Colors.white38, fontSize: 14, fontStyle: FontStyle.italic),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final item = filtered[index];
+                    final name = item['tester_name'] ?? '알 수 없음';
+                    final count = item['total_count'] ?? 0;
+                    final lastTime = item['last_received_at'] ?? '';
+                    final statusColor = _getStatusColor(lastTime);
+                    final statusText = _getStatusText(lastTime);
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      color: Colors.white.withOpacity(0.04),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.white.withOpacity(0.08), width: 1),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: statusColor,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: statusColor.withOpacity(0.4),
+                                    blurRadius: 6,
+                                    spreadRadius: 1,
+                                  )
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '누적 제출: $count건  |  $statusText',
+                                    style: const TextStyle(fontSize: 13, color: Colors.white70),
+                                  ),
+                                  Text(
+                                    '마지막 전송: ${lastTime.isNotEmpty ? _getRelativeTime(lastTime) : "없음"} (${lastTime.isNotEmpty ? lastTime : "기록 없음"})',
+                                    style: const TextStyle(fontSize: 12, color: Colors.white60),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.notification_add_rounded, color: Color(0xFF3DFFC1), size: 24),
+                              onPressed: () {
+                                _showNudgeConfirmDialog(name);
+                              },
+                              tooltip: '독려 푸시 전송',
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

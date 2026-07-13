@@ -1494,72 +1494,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
         ),
         const SizedBox(height: 12),
-        AnimatedBuilder(
-          animation: _guidePulseController!,
-          builder: (context, child) {
-            final double val = _guidePulseController?.value ?? 0.0;
-            final Color pulseColor = Color.lerp(
-              const Color(0xFF2E5BFF),
-              const Color(0xFF3DFFC1),
-              val,
-            )!;
-
-            return Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: _hasWatchedGuide
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: pulseColor.withOpacity(0.3 * val),
-                          blurRadius: 10 + (8 * val),
-                          spreadRadius: 1 + (2 * val),
-                        )
-                      ],
-              ),
-              child: child,
-            );
-          },
-          child: InkWell(
-            onTap: _showGuideVideo,
-            borderRadius: BorderRadius.circular(16),
-            child: GlassCard(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              radius: 16,
-              child: Row(
-                children: [
-                  const Icon(Icons.play_circle_outline_rounded, color: Color(0xFF3DFFC1), size: 26),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      '가이드 영상 시청하기 📺',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  if (!_hasWatchedGuide)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3DFFC1).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF3DFFC1), width: 1),
-                      ),
-                      child: const Text(
-                        '필독',
-                        style: TextStyle(fontSize: 10, color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
         if (_latestNotice != null) ...[
-          const SizedBox(height: 12),
           AnimatedBuilder(
             animation: _noticePulseController!,
             builder: (context, child) {
@@ -1636,7 +1571,72 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               ),
             ),
           ),
+          const SizedBox(height: 12),
         ],
+        AnimatedBuilder(
+          animation: _guidePulseController!,
+          builder: (context, child) {
+            final double val = _guidePulseController?.value ?? 0.0;
+            final Color pulseColor = Color.lerp(
+              const Color(0xFF2E5BFF),
+              const Color(0xFF3DFFC1),
+              val,
+            )!;
+
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: _hasWatchedGuide
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: pulseColor.withOpacity(0.3 * val),
+                          blurRadius: 10 + (8 * val),
+                          spreadRadius: 1 + (2 * val),
+                        )
+                      ],
+              ),
+              child: child,
+            );
+          },
+          child: InkWell(
+            onTap: _showGuideVideo,
+            borderRadius: BorderRadius.circular(16),
+            child: GlassCard(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              radius: 16,
+              child: Row(
+                children: [
+                  const Icon(Icons.play_circle_outline_rounded, color: Color(0xFF3DFFC1), size: 26),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      '가이드 영상 시청하기 📺',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  if (!_hasWatchedGuide)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3DFFC1).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF3DFFC1), width: 1),
+                      ),
+                      child: const Text(
+                        '필독',
+                        style: TextStyle(fontSize: 10, color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 24),
         Text(
           '검증을 위해 테스트를 수행한 운동 대상을 골라주세요.',

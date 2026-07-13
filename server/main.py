@@ -116,10 +116,36 @@ async def device_ping(ping: DevicePing):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/devices")
-async def get_devices():
+async def get_devices(summary: bool = False):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+            
+        if summary:
+            pipeline = [
+                {
+                    "$group": {
+                        "_id": "$tester_name",
+                        "total_count": { "$sum": 1 },
+                        "last_received_at": { "$max": "$received_at" }
+                    }
+                },
+                {
+                    "$project": {
+                        "tester_name": "$_id",
+                        "total_count": 1,
+                        "last_received_at": 1,
+                        "_id": 0
+                    }
+                },
+                {
+                    "$sort": { "last_received_at": -1 }
+                }
+            ]
+            cursor = db["verification_emails"].aggregate(pipeline)
+            result = await cursor.to_list(length=200)
+            return JSONResponse(content={"status": "success", "data": result})
+
         cursor = db["devices"].find({}).sort("last_active_at", -1)
         devices = await cursor.to_list(length=100)
         for d in devices:
@@ -220,6 +246,8 @@ async def create_notice(notice: NoticeCreate):
         return JSONResponse(content={"status": "success", "data": {"id": notice_id}})
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+
 
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard(request: Request):
