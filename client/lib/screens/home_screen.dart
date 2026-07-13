@@ -163,6 +163,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   AnimationController? _noticePulseController;
   bool _pendingNoticeHistory = false;
 
+  // 동의서 관련 상태 변수
+  bool _agreePersonal = false;
+  bool _agreeLocation = false;
+
   // 현재 위저드 단계 (1 ~ 6)
   int _currentStep = 1;
 
@@ -503,6 +507,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         trainingType: tType,
         location: _locationCtrl.text.trim(),
         remarks: _memoCtrl.text.trim(),
+        consentDate: _prefs?.consentDate ?? '',
       );
 
       if (mounted) {
@@ -856,8 +861,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       );
     }
 
-    return Theme(
-      data: ThemeData.dark().copyWith(
+    final mainTheme = ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0C0F0F),
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF2E5BFF),
@@ -887,7 +891,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
           labelStyle: TextStyle(color: const Color(0xFFE2E2E2).withOpacity(0.7)),
         ),
-      ),
+      );
+
+    if (_prefs != null && !_prefs!.consentGiven) {
+      return Theme(
+        data: mainTheme,
+        child: Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1429A0),
+                  Color(0xFF0A0F24),
+                  Color(0xFF05060C),
+                ],
+                stops: [0.0, 0.6, 1.0],
+              ),
+            ),
+            child: SafeArea(
+              child: _buildConsentView(),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Theme(
+      data: mainTheme,
       child: PopScope(
         canPop: false,
         onPopInvoked: (didPop) {
@@ -2438,6 +2470,137 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     final num = double.tryParse(v.trim());
     if (num == null || num <= 0) return '올바른 숫자를 입력해 주세요';
     return null;
+  }
+
+  Widget _buildConsentView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 20),
+          const Center(
+            child: Icon(Icons.security_rounded, color: Color(0xFF3DFFC1), size: 48),
+          ),
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              'HealthPort 서비스 동의',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              '서비스 이용을 위해 아래 동의가 필요합니다.',
+              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.6)),
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // 1. 개인정보 & 민감정보 동의서
+          const Text(
+            '개인정보 및 민감정보 수집·이용 동의 (필수)',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 120,
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            child: const SingleChildScrollView(
+              child: Text(
+                '1. 수집 및 이용 목적: 피트니스 알고리즘 분석, 연구개발(R&D) 및 제품 검증\n'
+                '2. 수집 항목: 이름, 키, 몸무게, 기기 정보, 운동 데이터(심박수 등 신체 기능 정보)\n'
+                '3. 보유 및 이용 기간: 검증 목적 달성 시 또는 테스터의 파기 요청 시까지\n'
+                '4. 동의 거부 권리: 동의를 거부할 수 있으나, 거부 시 HealthPort 앱을 통한 검증 참여가 불가합니다.',
+                style: TextStyle(fontSize: 12, color: Colors.white54, height: 1.5),
+              ),
+            ),
+          ),
+          CheckboxListTile(
+            title: const Text('위 개인정보 및 민감정보 수집·이용에 동의합니다.', style: TextStyle(fontSize: 12, color: Colors.white70)),
+            value: _agreePersonal,
+            activeColor: const Color(0xFF2E5BFF),
+            checkColor: Colors.white,
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            onChanged: (val) {
+              setState(() => _agreePersonal = val ?? false);
+            },
+          ),
+          const SizedBox(height: 24),
+
+          // 2. 개인위치정보 동의서
+          const Text(
+            '개인위치정보 수집·이용 동의 (필수)',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 120,
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            child: const SingleChildScrollView(
+              child: Text(
+                '1. 수집 및 이용 목적: 실외 운동 검증 시 정밀 위치 경로 분석 및 검증 데이터 패키징\n'
+                '2. 수집 항목: GPS 위도, 경도 좌표 정보 및 이동 경로\n'
+                '3. 보유 및 이용 기간: 피트니스 데이터 정밀 분석 즉시 파기 및 R&D 연구 완료 시 파기\n'
+                '4. 동의 거부 권리: 동의를 거부할 수 있으나, 거부 시 실외 운동 데이터 검증 및 앱 서비스 제공이 불가능합니다.',
+                style: TextStyle(fontSize: 12, color: Colors.white54, height: 1.5),
+              ),
+            ),
+          ),
+          CheckboxListTile(
+            title: const Text('위 개인위치정보 수집·이용에 동의합니다.', style: TextStyle(fontSize: 12, color: Colors.white70)),
+            value: _agreeLocation,
+            activeColor: const Color(0xFF2E5BFF),
+            checkColor: Colors.white,
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            onChanged: (val) {
+              setState(() => _agreeLocation = val ?? false);
+            },
+          ),
+          const SizedBox(height: 40),
+
+          // 동의 완료 버튼
+          ElevatedButton(
+            onPressed: (_agreePersonal && _agreeLocation)
+                ? () async {
+                    if (_prefs == null) return;
+                    final nowStr = DateTime.now().toString().substring(0, 19); // YYYY-MM-DD HH:MM:SS
+                    await _prefs!.saveConsentGiven(true);
+                    await _prefs!.saveConsentDate(nowStr);
+                    setState(() {});
+                  }
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3DFFC1),
+              foregroundColor: Colors.black,
+              disabledBackgroundColor: Colors.white.withOpacity(0.12),
+              disabledForegroundColor: Colors.white38,
+              minimumSize: const Size.fromHeight(54),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: const Text(
+              '동의하고 시작하기',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
