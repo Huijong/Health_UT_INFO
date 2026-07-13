@@ -46,4 +46,10 @@ class AppConfig {
     'API_URL',
     defaultValue: 'https://health-port.work',
   );
+
+  /// HealthPort 앱 버전
+  static const appVersion = String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: '1.012',
+  );
 }

@@ -228,6 +228,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           _downloadAndInstallApk();
                         },
                       ),
+                      const SizedBox(height: 24),
+                      _buildSectionHeader('HealthPort 버전'),
+                      const SizedBox(height: 8),
+                      _buildVersionCard(
+                        title: 'HealthPort 버전',
+                        subtitle: 'HealthPort ${AppConfig.appVersion}',
+                        icon: Icons.info_outline_rounded,
+                      ),
                     ],
                   ),
                 ),
@@ -331,6 +339,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withOpacity(0.4), size: 16),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVersionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+  }) {
+    return _GlassCard(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
+              ),
+              child: Icon(icon, color: const Color(0xFF3DFFC1), size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.6)),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

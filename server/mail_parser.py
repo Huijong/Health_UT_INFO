@@ -17,6 +17,8 @@ def parse_email_body(body_text):
     session_match = re.search(r"세션[ \t]*ID[ \t]*:[ \t]*(.*)", body_text)
     model_match = re.search(r"기기[ \t]*모델[ \t]*:[ \t]*(.*)", body_text)
     version_match = re.search(r"Android[ \t]*버전[ \t]*:[ \t]*(.*)", body_text)
+    app_version_match = re.search(r"앱[ \t]*버전[ \t]*:[ \t]*(.*)", body_text)
+    shealth_version_match = re.search(r"삼성[ \t]*헬스[ \t]*버전[ \t]*:[ \t]*(.*)", body_text)
     
     watch_match = re.search(r"착용[ \t]*워치[ \t]*:[ \t]*(.*)", body_text)
     strap_match = re.search(r"착용[ \t]*스트랩[ \t]*:[ \t]*(.*)", body_text)
@@ -45,6 +47,8 @@ def parse_email_body(body_text):
         "session_id": session_match.group(1).strip() if session_match else "알 수 없음",
         "device_model": model_match.group(1).strip() if model_match else "알 수 없음",
         "android_version": version_match.group(1).strip() if version_match else "알 수 없음",
+        "app_version": app_version_match.group(1).strip() if app_version_match else "알 수 없음",
+        "shealth_version": shealth_version_match.group(1).strip() if shealth_version_match else "알 수 없음",
         "watch": watch_match.group(1).strip() if watch_match else "알 수 없음",
         "strap": strap_match.group(1).strip() if strap_match else "알 수 없음",
         "exercise": exercise_match.group(1).strip() if exercise_match else "알 수 없음",
