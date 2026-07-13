@@ -59,6 +59,7 @@ def parse_email_body(body_text):
         "consent_date": consent_date_match.group(1).strip() if consent_date_match else "",
     }
 
+
 def fetch_and_parse_emails():
     if not EMAIL_PASSWORD or EMAIL_PASSWORD == "your_receiver_app_password":
         logging.warning("수신인 Gmail 앱 비밀번호가 설정되지 않아 메일 확인을 건너뜁니다.")
