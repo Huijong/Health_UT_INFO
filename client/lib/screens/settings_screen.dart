@@ -201,7 +201,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       _buildMenuCard(
                         title: '테스터 프로필 설정',
-                        subtitle: '이름, 키, 몸무게 정보를 수정합니다.',
+                        subtitle: '닉네임 정보를 수정합니다.',
                         icon: Icons.person_rounded,
                         onTap: () async {
                           final result = await Navigator.push(

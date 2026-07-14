@@ -559,6 +559,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           _emailSending = false;
           _emailSent = true;
         });
+
+        // 1초 뒤에 새로운 검증 시작하기 버튼 동작처럼 초기화 후 운동 선택(4단계) 화면으로 이동
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('데이터 제출이 완료되었습니다. 새로운 검증을 시작합니다.'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+            _resetVerification();
+          }
+        });
       }
     } catch (e) {
       if (mounted) {
