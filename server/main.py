@@ -185,7 +185,24 @@ async def get_devices(summary: bool = False, latest_apk: bool = False):
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
-
+@app.delete("/api/emails/{email_id}")
+async def delete_email_record(email_id: str):
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+        from bson import ObjectId
+        try:
+            obj_id = ObjectId(email_id)
+        except Exception:
+            return JSONResponse(content={"status": "error", "message": "Invalid ID format"}, status_code=400)
+        
+        result = await db["verification_emails"].delete_one({"_id": obj_id})
+        if result.deleted_count == 1:
+            return JSONResponse(content={"status": "success", "message": "Record deleted successfully"})
+        else:
+            return JSONResponse(content={"status": "error", "message": "Record not found"}, status_code=404)
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.post("/api/notices/{notice_id}/ack")
 async def notice_ack(notice_id: str, ack: NoticeAck):
@@ -521,6 +538,19 @@ async def get_dashboard(request: Request):
             .copy-btn:hover {
                 color: #0E1E7A;
             }
+            .delete-record-btn {
+                background: none;
+                border: none;
+                color: #EF4444;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 600;
+                margin-left: 10px;
+                text-decoration: underline;
+            }
+            .delete-record-btn:hover {
+                color: #B91C1C;
+            }
             .no-data {
                 text-align: center;
                 padding: 50px;
@@ -831,11 +861,32 @@ async def get_dashboard(request: Request):
                                     <a href="${item.share_link}" target="_blank" class="link-btn">다운로드</a>
                                     <button class="copy-btn" onclick="copyToClipboard('${item.share_link}')">복사</button>
                                 ` : '<span style="color: var(--text-muted);">링크 없음</span>'}
+                                <button class="delete-record-btn" onclick="deleteRecord('${item._id}')">삭제</button>
                             </td>
                         </tr>
                     `;
                 });
                 tbody.innerHTML = html;
+            }
+
+            async function deleteRecord(id) {
+                if (!confirm(`정말로 이 수집 내역을 삭제하시겠습니까?\n데이터베이스에서도 영구 삭제되며 복구할 수 없습니다.`)) {
+                    return;
+                }
+                try {
+                    const response = await fetch(`/api/emails/${id}`, {
+                        method: 'DELETE'
+                    });
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        alert("내역이 정상적으로 삭제되었습니다.");
+                        fetchEmails(); // 데이터 새로고침
+                    } else {
+                        alert("삭제 실패: " + result.message);
+                    }
+                } catch (e) {
+                    alert("에러 발생: " + e);
+                }
             }
 
             window.onload = () => {
