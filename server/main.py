@@ -28,6 +28,28 @@ async def lifespan(app: FastAPI):
     db_client = AsyncIOMotorClient(MONGO_URL)
     db = db_client[DB_NAME]
     
+    # Startup migration: populate points_transactions from existing verification_emails if empty
+    try:
+        cnt = await db["points_transactions"].count_documents({})
+        if cnt == 0:
+            print("[INFO] Migrating existing verification_emails to points_transactions...")
+            cursor = db["verification_emails"].find({})
+            async for email in cursor:
+                received_at = email.get("received_at")
+                if not received_at:
+                    received_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+                month = received_at[:7]
+                await db["points_transactions"].insert_one({
+                    "tester_name": email.get("tester_name"),
+                    "points": 1,
+                    "memo": "자동 적립 (이메일 수집)",
+                    "month": month,
+                    "created_at": received_at
+                })
+            print("[INFO] Points migration completed successfully.")
+    except Exception as me:
+        print(f"[ERROR] Points migration failed: {me}")
+    
     import os
     os.makedirs("static/apks", exist_ok=True)
 
@@ -95,6 +117,12 @@ class DevicePing(BaseModel):
 class NoticeAck(BaseModel):
     tester_name: str
 
+class PointCreate(BaseModel):
+    tester_name: str
+    points: int
+    memo: str
+    month: str
+
 @app.post("/api/devices/ping")
 async def device_ping(ping: DevicePing):
     try:
@@ -117,12 +145,40 @@ async def device_ping(ping: DevicePing):
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
+@app.post("/api/devices")
+async def create_point_adjustment_alt(pc: PointCreate):
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+        
+        created_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        
+        await db["points_transactions"].insert_one({
+            "tester_name": pc.tester_name,
+            "points": pc.points,
+            "memo": pc.memo,
+            "month": pc.month,
+            "created_at": created_at
+        })
+        return JSONResponse(content={"status": "success", "message": "Points transaction added successfully"})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
 @app.get("/api/devices")
-async def get_devices(summary: bool = False, latest_apk: bool = False, rankings: bool = False, month: Optional[str] = None, tester_name: Optional[str] = None):
+async def get_devices(summary: bool = False, latest_apk: bool = False, rankings: bool = False, points_history: bool = False, month: Optional[str] = None, tester_name: Optional[str] = None):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
             
+        if points_history:
+            if not tester_name:
+                return JSONResponse(content={"status": "error", "message": "tester_name is required for points history"}, status_code=400)
+            cursor = db["points_transactions"].find({"tester_name": tester_name}).sort("created_at", -1)
+            history = await cursor.to_list(length=1000)
+            for h in history:
+                h["_id"] = str(h["_id"])
+            return JSONResponse(content={"status": "success", "data": history})
+
         if rankings:
             if not month:
                 month = datetime.utcnow().strftime("%Y-%m")
@@ -138,11 +194,21 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
 
             async def get_monthly_counts(target_month):
                 pipeline = [
-                    {"$match": {"received_at": {"$regex": f"^{target_month}"}}},
-                    {"$group": {"_id": "$tester_name", "count": {"$sum": 1}}},
-                    {"$sort": {"count": -1}}
+                    {"$match": {"month": target_month}},
+                    {
+                        "$group": {
+                            "_id": "$tester_name",
+                            "points": {"$sum": "$points"},
+                            "submissions": {
+                                "$sum": {
+                                    "$cond": [{"$eq": ["$memo", "자동 적립 (이메일 수집)"]}, 1, 0]
+                                }
+                            }
+                        }
+                    },
+                    {"$sort": {"points": -1}}
                 ]
-                cursor = db["verification_emails"].aggregate(pipeline)
+                cursor = db["points_transactions"].aggregate(pipeline)
                 return await cursor.to_list(length=1000)
 
             curr_data = await get_monthly_counts(month)
@@ -152,8 +218,8 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
                 ranks = {}
                 for i, item in enumerate(data_list):
                     name = item["_id"]
-                    cnt = item["count"]
-                    if i > 0 and cnt == data_list[i-1]["count"]:
+                    cnt = item["points"]
+                    if i > 0 and cnt == data_list[i-1]["points"]:
                         ranks[name] = ranks[data_list[i-1]["_id"]]
                     else:
                         ranks[name] = i + 1
@@ -165,7 +231,8 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
             rankings_list = []
             for item in curr_data:
                 name = item["_id"]
-                count = item["count"]
+                points = item["points"]
+                submissions = item["submissions"]
                 rank = curr_ranks[name]
                 
                 if name in prev_ranks:
@@ -181,34 +248,37 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
 
                 rankings_list.append({
                     "tester_name": name,
-                    "count": count,
+                    "points": points,
+                    "submissions": submissions,
                     "rank": rank,
                     "change": change
                 })
 
             total_testers = len(rankings_list)
-            total_submissions = sum(item["count"] for item in curr_data)
-            avg_submissions = round(total_submissions / total_testers, 1) if total_testers > 0 else 0.0
+            total_points = sum(item["points"] for item in curr_data)
+            avg_points = round(total_points / total_testers, 1) if total_testers > 0 else 0.0
 
             my_rank = None
-            my_count = 0
+            my_points = 0
+            my_submissions = 0
             next_rank_info = None
 
             if tester_name:
                 for idx, r in enumerate(rankings_list):
                     if r["tester_name"] == tester_name:
                         my_rank = r["rank"]
-                        my_count = r["count"]
+                        my_points = r["points"]
+                        my_submissions = r["submissions"]
                         
                         target_idx = idx - 1
                         while target_idx >= 0:
                             above = rankings_list[target_idx]
-                            if above["count"] > my_count:
+                            if above["points"] > my_points:
                                 next_rank_info = {
                                     "tester_name": above["tester_name"],
                                     "rank": above["rank"],
-                                    "count": above["count"],
-                                    "diff": above["count"] - my_count
+                                    "points": above["points"],
+                                    "diff": above["points"] - my_points
                                 }
                                 break
                             target_idx -= 1
@@ -220,9 +290,10 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
                     "rankings": rankings_list,
                     "meta": {
                         "total_testers": total_testers,
-                        "avg_submissions": avg_submissions,
+                        "avg_submissions": avg_points,
                         "my_rank": my_rank,
-                        "my_count": my_count,
+                        "my_count": my_points,
+                        "my_submissions": my_submissions,
                         "next_rank": next_rank_info
                     }
                 }
@@ -306,6 +377,39 @@ async def delete_email_record(email_id: str):
             return JSONResponse(content={"status": "success", "message": "Record deleted successfully"})
         else:
             return JSONResponse(content={"status": "error", "message": "Record not found"}, status_code=404)
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/api/points")
+async def create_point_adjustment(pc: PointCreate):
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+        
+        created_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        
+        await db["points_transactions"].insert_one({
+            "tester_name": pc.tester_name,
+            "points": pc.points,
+            "memo": pc.memo,
+            "month": pc.month,
+            "created_at": created_at
+        })
+        return JSONResponse(content={"status": "success", "message": "Points transaction added successfully"})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.get("/api/points/{tester_name}/history")
+async def get_tester_points_history(tester_name: str):
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+            
+        cursor = db["points_transactions"].find({"tester_name": tester_name}).sort("created_at", -1)
+        history = await cursor.to_list(length=1000)
+        for h in history:
+            h["_id"] = str(h["_id"])
+        return JSONResponse(content={"status": "success", "data": history})
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
