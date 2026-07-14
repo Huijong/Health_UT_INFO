@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     db_client = AsyncIOMotorClient(MONGO_URL)
     db = db_client[DB_NAME]
     
-    # Startup migration: populate points_transactions from existing verification_emails if empty
+    # Startup migration & cleanup: link points_transactions to verification_emails
     try:
         cnt = await db["points_transactions"].count_documents({})
         if cnt == 0:
@@ -44,11 +44,33 @@ async def lifespan(app: FastAPI):
                     "points": 1,
                     "memo": "자동 적립 (이메일 수집)",
                     "month": month,
-                    "created_at": received_at
+                    "created_at": received_at,
+                    "email_id": email["_id"]
                 })
             print("[INFO] Points migration completed successfully.")
+        else:
+            # Cleanup orphans & link missing email_ids
+            print("[INFO] Running points_transactions cleanup & linking...")
+            cursor = db["points_transactions"].find({"memo": "자동 적립 (이메일 수집)"})
+            async for trans in cursor:
+                email_id = trans.get("email_id")
+                if not email_id:
+                    # Find matching email by tester_name and created_at
+                    email_doc = await db["verification_emails"].find_one({
+                        "tester_name": trans["tester_name"],
+                        "received_at": trans["created_at"]
+                    })
+                    if email_doc:
+                        await db["points_transactions"].update_one(
+                            {"_id": trans["_id"]},
+                            {"$set": {"email_id": email_doc["_id"]}}
+                        )
+                    else:
+                        # Orphan points transaction! Delete it!
+                        await db["points_transactions"].delete_one({"_id": trans["_id"]})
+            print("[INFO] Points cleanup & linking completed.")
     except Exception as me:
-        print(f"[ERROR] Points migration failed: {me}")
+        print(f"[ERROR] Points migration/cleanup failed: {me}")
     
     import os
     os.makedirs("static/apks", exist_ok=True)
@@ -118,10 +140,12 @@ class NoticeAck(BaseModel):
     tester_name: str
 
 class PointCreate(BaseModel):
-    tester_name: str
-    points: int
-    memo: str
-    month: str
+    tester_name: Optional[str] = None
+    points: Optional[int] = None
+    memo: Optional[str] = None
+    month: Optional[str] = None
+    old_name: Optional[str] = None
+    new_name: Optional[str] = None
 
 @app.post("/api/devices/ping")
 async def device_ping(ping: DevicePing):
@@ -146,11 +170,29 @@ async def device_ping(ping: DevicePing):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.post("/api/devices")
-async def create_point_adjustment_alt(pc: PointCreate):
+async def create_point_adjustment_alt(pc: PointCreate, rename: bool = False):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
         
+        if rename:
+            if not pc.old_name or not pc.new_name:
+                return JSONResponse(content={"status": "error", "message": "old_name and new_name are required for rename"}, status_code=400)
+            
+            old_name = pc.old_name.strip()
+            new_name = pc.new_name.strip()
+            
+            # 1. Update devices
+            await db["devices"].update_many({"tester_name": old_name}, {"$set": {"tester_name": new_name}})
+            
+            # 2. Update points_transactions
+            await db["points_transactions"].update_many({"tester_name": old_name}, {"$set": {"tester_name": new_name}})
+            
+            # 3. Update verification_emails
+            await db["verification_emails"].update_many({"tester_name": old_name}, {"$set": {"tester_name": new_name}})
+            
+            return JSONResponse(content={"status": "success", "message": "Nickname renamed successfully"})
+            
         created_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         
         await db["points_transactions"].insert_one({
@@ -165,11 +207,15 @@ async def create_point_adjustment_alt(pc: PointCreate):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/devices")
-async def get_devices(summary: bool = False, latest_apk: bool = False, rankings: bool = False, points_history: bool = False, month: Optional[str] = None, tester_name: Optional[str] = None):
+async def get_devices(summary: bool = False, latest_apk: bool = False, rankings: bool = False, points_history: bool = False, check_nickname: Optional[str] = None, month: Optional[str] = None, tester_name: Optional[str] = None):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
             
+        if check_nickname:
+            device = await db["devices"].find_one({"tester_name": check_nickname.strip()})
+            return JSONResponse(content={"status": "success", "exists": device is not None})
+
         if points_history:
             if not tester_name:
                 return JSONResponse(content={"status": "error", "message": "tester_name is required for points history"}, status_code=400)
@@ -374,6 +420,8 @@ async def delete_email_record(email_id: str):
         
         result = await db["verification_emails"].delete_one({"_id": obj_id})
         if result.deleted_count == 1:
+            # Also delete points transaction associated with this email_id
+            await db["points_transactions"].delete_one({"email_id": obj_id})
             return JSONResponse(content={"status": "success", "message": "Record deleted successfully"})
         else:
             return JSONResponse(content={"status": "error", "message": "Record not found"}, status_code=404)
@@ -1115,11 +1163,10 @@ async def get_dashboard(request: Request):
                 </div>
             </header>
 
-            <!-- 상단 통합 필터 보드 카드 -->
             <div class="filter-board">
                 <div class="filter-item" id="filter-tester-name">
-                    <label>테스터 명 검색</label>
-                    <input type="text" id="input-tester-name" placeholder="이름 입력..." oninput="handleTextFilter(this.value)">
+                    <label>테스터 닉네임 검색</label>
+                    <input type="text" id="input-tester-name" placeholder="닉네임 입력..." oninput="handleTextFilter(this.value)">
                 </div>
                 <div class="filter-item" id="filter-watch">
                     <label>착용 워치</label>
@@ -1159,7 +1206,7 @@ async def get_dashboard(request: Request):
                     <thead>
                         <tr>
                             <th class="sortable" onclick="handleSort('received_at')">수신 일시 <span class="sort-indicator" id="sort-icon-received_at">▼</span></th>
-                            <th class="sortable" onclick="handleSort('tester_name')">이름 <span class="sort-indicator" id="sort-icon-tester_name">↕</span></th>
+                            <th class="sortable" onclick="handleSort('tester_name')">닉네임 <span class="sort-indicator" id="sort-icon-tester_name">↕</span></th>
                             <th class="sortable" onclick="handleSort('consent_given')">동의 여부 <span class="sort-indicator" id="sort-icon-consent_given">↕</span></th>
                             <th class="sortable" onclick="handleSort('watch')">착용 워치 <span class="sort-indicator" id="sort-icon-watch">↕</span></th>
                             <th class="sortable" onclick="handleSort('strap')">착용 스트랩 <span class="sort-indicator" id="sort-icon-strap">↕</span></th>

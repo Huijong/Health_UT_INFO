@@ -82,6 +82,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _saveAll() async {
+    final oldName = widget.prefs.name.trim();
+    final newName = _name.trim();
+
+    if (newName.isNotEmpty && oldName.isNotEmpty && oldName != newName) {
+      try {
+        final dio = Dio();
+        final response = await dio.post(
+          '${AppConfig.apiUrl}/api/devices',
+          queryParameters: {'rename': 'true'},
+          data: {
+            'old_name': oldName,
+            'new_name': newName,
+          },
+        );
+        debugPrint('[Rename] Server response: ${response.data}');
+      } catch (e) {
+        debugPrint('[Rename] Failed to rename nickname on server: $e');
+      }
+    }
+
     await widget.prefs.saveName(_name);
     await widget.prefs.saveHeight(_height ?? 0.0);
     await widget.prefs.saveWeight(_weight ?? 0.0);
