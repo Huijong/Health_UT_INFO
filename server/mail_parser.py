@@ -141,11 +141,23 @@ def fetch_and_parse_emails():
             
             if parsed_data["share_link"]:
                 try:
-                    # DB 저장 (session_id 고유값 보장으로 중복 삽입 자동 차단)
                     collection.insert_one(parsed_data)
                     logging.info(f"성공적으로 DB 저장: {parsed_data['tester_name']} ({parsed_data['session_id']})")
-                except Exception:
-                    logging.info(f"이미 존재하는 세션이거나 저장 오류 건너뜀: {parsed_data['session_id']}")
+                    try:
+                        points_col = db["points_transactions"]
+                        month_str = parsed_data["received_at"][:7] # YYYY-MM
+                        points_col.insert_one({
+                            "tester_name": parsed_data["tester_name"],
+                            "points": 1,
+                            "memo": "자동 적립 (이메일 수집)",
+                            "month": month_str,
+                            "created_at": parsed_data["received_at"]
+                        })
+                        logging.info(f"포인트 1점 자동 적립 완료: {parsed_data['tester_name']}")
+                    except Exception as pe:
+                        logging.error(f"포인트 자동 적립 실패: {pe}")
+                except Exception as e:
+                    logging.info(f"이미 존재하는 세션이거나 저장 오류 건너뜀: {parsed_data['session_id']}, 에러: {e}")
             
             # 메일을 읽음(Seen) 상태로 업데이트
             mail.store(m_id, "+FLAGS", "\\Seen")

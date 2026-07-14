@@ -269,10 +269,10 @@ class _RankingScreenState extends State<RankingScreen> {
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
               child: Column(
                 children: [
-                  const Text('평균 제출', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                  const Text('평균 포인트', style: TextStyle(color: Colors.white60, fontSize: 12)),
                   const SizedBox(height: 6),
                   Text(
-                    '$avgSubmissions건',
+                    '$avgSubmissions포인트',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -291,6 +291,7 @@ class _RankingScreenState extends State<RankingScreen> {
   Widget _buildMyRankHighlightCard() {
     final myRank = _meta['my_rank'];
     final myCount = _meta['my_count'] ?? 0;
+    final mySubmissions = _meta['my_submissions'] ?? 0;
     final nextRank = _meta['next_rank'];
 
     final myName = widget.prefs.name.trim();
@@ -320,7 +321,7 @@ class _RankingScreenState extends State<RankingScreen> {
       else if (aboveRank == 3) targetMedal = '🥉';
 
       final rankName = targetMedal.isNotEmpty ? '$targetMedal $aboveRank위' : '$aboveRank위';
-      motivationText = '$myName님은 현재 공동 $myRank위입니다. $rankName ($aboveName님)까지 앞으로 단 $diff건 남았습니다! 조금만 더 힘내세요! 🔥';
+      motivationText = '$myName님은 현재 공동 $myRank위입니다. $rankName ($aboveName님)까지 앞으로 단 $diff포인트 남았습니다! 조금만 더 힘내세요! 🔥';
     } else {
       motivationText = '첫 제출을 완료하셨네요! 상위 랭킹을 향해 조금 더 도전해 보세요! 🚀';
     }
@@ -376,7 +377,7 @@ class _RankingScreenState extends State<RankingScreen> {
                     border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
                   ),
                   child: Text(
-                    '$myCount포인트',
+                    '$myCount포인트 ($mySubmissions건)',
                     style: const TextStyle(
                       color: Color(0xFF3DFFC1),
                       fontWeight: FontWeight.bold,
@@ -405,7 +406,8 @@ class _RankingScreenState extends State<RankingScreen> {
 
   Widget _buildRankingItem(dynamic item, int index) {
     final name = item['tester_name'] ?? '알 수 없음';
-    final count = item['count'] ?? 0;
+    final points = item['points'] ?? 0;
+    final submissions = item['submissions'] ?? 0;
     final rank = item['rank'] ?? (index + 1);
     final change = item['change'] ?? '0';
 
@@ -498,7 +500,7 @@ class _RankingScreenState extends State<RankingScreen> {
               ),
             ),
             Text(
-              '$count건 $count포인트',
+              '$submissions건 $points포인트',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isMe ? FontWeight.bold : FontWeight.normal,

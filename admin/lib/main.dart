@@ -438,7 +438,7 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('테스터 모니터링 대시보드'),
+          title: const Text('테스터 모니터링'),
           bottom: const TabBar(
             tabs: [
               Tab(
@@ -543,72 +543,96 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: Colors.white.withOpacity(0.08), width: 1),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                // 접속등 표시
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: active ? const Color(0xFF10B981) : Colors.grey,
-                    shape: BoxShape.circle,
-                    boxShadow: active
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFF10B981).withOpacity(0.5),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            )
-                          ]
-                        : null,
-                  ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PointHistoryScreen(testerName: name),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  // 접속등 표시
+                  Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: active ? const Color(0xFF10B981) : Colors.grey,
+                      shape: BoxShape.circle,
+                      boxShadow: active
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF10B981).withOpacity(0.5),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              )
+                            ]
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '착용 워치: $watch',
+                          style: const TextStyle(fontSize: 13, color: Colors.white70),
+                        ),
+                        Text(
+                          '단말 환경: $os',
+                          style: const TextStyle(fontSize: 12, color: Colors.white60),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 18,
+                        active ? '접속 중' : '오프라인',
+                        style: TextStyle(
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: active ? const Color(0xFF10B981) : Colors.white54,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
-                        '착용 워치: $watch',
-                        style: const TextStyle(fontSize: 13, color: Colors.white70),
+                        lastActive.isNotEmpty ? _getRelativeTime(lastActive) : '신호 없음',
+                        style: const TextStyle(fontSize: 11, color: Colors.white38),
                       ),
-                      Text(
-                        '단말 환경: $os',
-                        style: const TextStyle(fontSize: 12, color: Colors.white60),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed: () => _showPointAdjustmentDialog(context, name),
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 14),
+                        label: const Text('포인트', style: TextStyle(fontSize: 11)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E5BFF),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(64, 28),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      active ? '접속 중' : '오프라인',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: active ? const Color(0xFF10B981) : Colors.white54,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      lastActive.isNotEmpty ? _getRelativeTime(lastActive) : '신호 없음',
-                      style: const TextStyle(fontSize: 11, color: Colors.white38),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -1130,6 +1154,355 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
                 ),
         ),
       ],
+    );
+  }
+  void _showPointAdjustmentDialog(BuildContext context, String testerName) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        int points = 1;
+        final memoCtrl = TextEditingController(text: '관리자 가산');
+        final monthStr = DateTime.now().toString().substring(0, 7); // YYYY-MM
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E2020),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.white.withOpacity(0.08)),
+              ),
+              title: Text(
+                '$testerName님 포인트 가감',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '포인트 설정',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          setDialogState(() {
+                            points--;
+                          });
+                        },
+                        icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.redAccent, size: 28),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        points >= 0 ? '+$points' : '$points',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: points > 0
+                              ? const Color(0xFF3DFFC1)
+                              : (points < 0 ? Colors.redAccent : Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
+                        onPressed: () {
+                          setDialogState(() {
+                            points++;
+                          });
+                        },
+                        icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF3DFFC1), size: 28),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () => setDialogState(() => points += 5),
+                        child: const Text('+5', style: TextStyle(color: Color(0xFF3DFFC1))),
+                      ),
+                      TextButton(
+                        onPressed: () => setDialogState(() => points += 1),
+                        child: const Text('+1', style: TextStyle(color: Color(0xFF3DFFC1))),
+                      ),
+                      TextButton(
+                        onPressed: () => setDialogState(() => points -= 1),
+                        child: const Text('-1', style: TextStyle(color: Colors.redAccent)),
+                      ),
+                      TextButton(
+                        onPressed: () => setDialogState(() => points -= 5),
+                        child: const Text('-5', style: TextStyle(color: Colors.redAccent)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: memoCtrl,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: '사유(메모)를 입력하세요',
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.04),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('취소', style: TextStyle(color: Colors.white60)),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      final response = await http.post(
+                        Uri.parse('https://health-port.work/api/devices'),
+                        headers: {'Content-Type': 'application/json'},
+                        body: jsonEncode({
+                          'tester_name': testerName,
+                          'points': points,
+                          'memo': memoCtrl.text.trim(),
+                          'month': monthStr,
+                        }),
+                      );
+                      if (response.statusCode == 200) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('포인트가 정상적으로 반영되었습니다.'),
+                            backgroundColor: Color(0xFF10B981),
+                          ),
+                        );
+                        _fetchData(); // 데이터 새로고침
+                      } else {
+                        throw Exception('서버 에러');
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('실패했습니다: $e'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E5BFF),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('확인'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class PointHistoryScreen extends StatefulWidget {
+  final String testerName;
+
+  const PointHistoryScreen({super.key, required this.testerName});
+
+  @override
+  State<PointHistoryScreen> createState() => _PointHistoryScreenState();
+}
+
+class _PointHistoryScreenState extends State<PointHistoryScreen> {
+  bool _isLoading = true;
+  List<dynamic> _history = [];
+  int _totalPoints = 0;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHistory();
+  }
+
+  Future<void> _fetchHistory() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await http.get(
+        Uri.parse('https://health-port.work/api/devices?points_history=true&tester_name=${Uri.encodeComponent(widget.testerName)}'),
+      );
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['status'] == 'success') {
+          final data = decoded['data'] ?? [];
+          int total = 0;
+          for (var item in data) {
+            total += (item['points'] as num).toInt();
+          }
+          setState(() {
+            _history = data;
+            _totalPoints = total;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+      throw Exception('응답 코드: ${response.statusCode}');
+    } catch (e) {
+      setState(() {
+        _errorMessage = '히스토리를 불러올 수 없습니다.\n$e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${widget.testerName}님 포인트 이력'),
+        backgroundColor: const Color(0xFF1429A0),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1429A0),
+              Color(0xFF0A0F24),
+              Color(0xFF05060C),
+            ],
+            stops: [0.0, 0.6, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          child: _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+                  ),
+                )
+              : _errorMessage != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _fetchHistory,
+                            child: const Text('다시 시도'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Card(
+                            color: Colors.white.withOpacity(0.06),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(color: Colors.white.withOpacity(0.08)),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    '누적 포인트',
+                                    style: TextStyle(fontSize: 16, color: Colors.white70, fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    '$_totalPoints 포인트',
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF3DFFC1),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: _history.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    '포인트 이력이 없습니다.',
+                                    style: TextStyle(color: Colors.white38),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  itemCount: _history.length,
+                                  itemBuilder: (context, index) {
+                                    final item = _history[index];
+                                    final pts = (item['points'] as num).toInt();
+                                    final memo = item['memo'] ?? '';
+                                    final date = item['created_at'] ?? '';
+                                    final isPositive = pts > 0;
+
+                                    return Card(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      color: Colors.white.withOpacity(0.03),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                                      ),
+                                      child: ListTile(
+                                        title: Text(
+                                          memo,
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                        ),
+                                        subtitle: Padding(
+                                          padding: const EdgeInsets.only(top: 4.0),
+                                          child: Text(
+                                            date,
+                                            style: const TextStyle(color: Colors.white38, fontSize: 12),
+                                          ),
+                                        ),
+                                        trailing: Text(
+                                          isPositive ? '+$pts' : '$pts',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: isPositive ? const Color(0xFF3DFFC1) : Colors.redAccent,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+        ),
+      ),
     );
   }
 }
