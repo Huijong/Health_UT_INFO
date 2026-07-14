@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:client/services/prefs_service.dart';
 import 'package:client/screens/home_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -527,13 +529,39 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     super.dispose();
   }
 
-  void _onSave() {
+  void _onSave() async {
     if (_formKey.currentState!.validate()) {
-      Navigator.pop(context, {
-        'name': _nameCtrl.text.trim(),
-        'height': double.tryParse(_heightCtrl.text),
-        'weight': double.tryParse(_weightCtrl.text),
-      });
+      final nickname = _nameCtrl.text.trim();
+      if (nickname != widget.initialName) {
+        try {
+          final url = Uri.parse('${AppConfig.apiUrl}/api/devices?check_nickname=${Uri.encodeComponent(nickname)}');
+          final response = await http.get(url);
+          if (response.statusCode == 200) {
+            final res = jsonDecode(response.body);
+            if (res['status'] == 'success' && res['exists'] == true) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('이미 등록된 닉네임입니다. 다른 닉네임을 입력해 주세요.'),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('닉네임 중복 검사 실패: $e');
+        }
+      }
+      
+      if (mounted) {
+        Navigator.pop(context, {
+          'name': nickname,
+          'height': double.tryParse(_heightCtrl.text) ?? 0.0,
+          'weight': double.tryParse(_weightCtrl.text) ?? 0.0,
+        });
+      }
     }
   }
 
@@ -601,51 +629,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                '테스터 인적 사항',
+                                '닉네임 수정',
                                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 16),
                               TextFormField(
                                 controller: _nameCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: '이름',
+                                  labelText: '닉네임',
                                   prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
                                 ),
-                                validator: (v) => (v == null || v.trim().isEmpty) ? '이름을 입력해주세요' : null,
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _heightCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                ],
-                                decoration: const InputDecoration(
-                                  labelText: '키 (cm)',
-                                  prefixIcon: Icon(Icons.height_rounded, size: 20),
-                                ),
-                                validator: (v) {
-                                  if (v == null || v.trim().isEmpty) return '키를 입력해주세요';
-                                  if (double.tryParse(v) == null) return '올바른 숫자를 입력해주세요';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _weightCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                ],
-                                decoration: const InputDecoration(
-                                  labelText: '몸무게 (kg)',
-                                  prefixIcon: Icon(Icons.monitor_weight_outlined, size: 20),
-                                ),
-                                validator: (v) {
-                                  if (v == null || v.trim().isEmpty) return '몸무게를 입력해주세요';
-                                  if (double.tryParse(v) == null) return '올바른 숫자를 입력해주세요';
-                                  return null;
-                                },
+                                validator: (v) => (v == null || v.trim().isEmpty) ? '닉네임을 입력해주세요' : null,
                               ),
                             ],
                           ),
