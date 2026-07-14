@@ -60,6 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late String _customWatch;
   late String _strap;
   late String _customStrap;
+  bool _hasUpdate = false;
 
   @override
   void initState() {
@@ -74,6 +75,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (_watch.isEmpty) _watch = kWatchOptions.first;
     if (_strap.isEmpty) _strap = kStrapOptions.first['name']!;
+    
+    _checkForUpdate();
   }
 
   Future<void> _saveAll() async {
@@ -87,6 +90,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) {
       Navigator.pop(context, true);
     }
+  }
+
+  Future<void> _checkForUpdate() async {
+    try {
+      final dio = Dio();
+      final response = await dio.get('${AppConfig.apiUrl}/api/devices?latest_apk=true');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data['status'] == 'success') {
+          final filename = data['filename'] as String;
+          final regExp = RegExp(r'HealthPort_([0-9\.]+)\.apk');
+          final match = regExp.firstMatch(filename);
+          if (match != null) {
+            final serverVersion = match.group(1)!;
+            final localVersion = AppConfig.appVersion;
+            if (_isVersionNewer(localVersion, serverVersion)) {
+              if (mounted) {
+                setState(() {
+                  _hasUpdate = true;
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[Update Check] Failed to check for update: $e');
+    }
+  }
+
+  bool _isVersionNewer(String current, String latest) {
+    try {
+      final currentParts = current.split('.').map(int.parse).toList();
+      final latestParts = latest.split('.').map(int.parse).toList();
+      final length = currentParts.length > latestParts.length 
+          ? currentParts.length 
+          : latestParts.length;
+      for (int i = 0; i < length; i++) {
+        final currentVal = i < currentParts.length ? currentParts[i] : 0;
+        final latestVal = i < latestParts.length ? latestParts[i] : 0;
+        if (latestVal > currentVal) return true;
+        if (currentVal > latestVal) return false;
+      }
+    } catch (_) {
+      return current != latest;
+    }
+    return false;
   }
 
   @override
@@ -236,9 +286,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: 'HealthPort 업데이트',
                         subtitle: 'HealthPort(APK) 최신버전을 스마트폰에 다운로드하고 설치합니다.',
                         icon: Icons.system_update_rounded,
+                        showBadge: _hasUpdate,
                         onTap: () {
                           _downloadAndInstallApk(
-                            latestApkApiUrl: '${AppConfig.apiUrl}/api/apks/latest-healthport',
+                            latestApkApiUrl: '${AppConfig.apiUrl}/api/devices?latest_apk=true',
                             defaultFileName: 'HealthPort_${AppConfig.appVersion}.apk',
                             defaultUrlPath: '/static/apks/HealthPort_${AppConfig.appVersion}.apk',
                           );
@@ -324,6 +375,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String subtitle,
     required IconData icon,
     required VoidCallback onTap,
+    bool showBadge = false,
   }) {
     return _GlassCard(
       child: InkWell(
@@ -348,9 +400,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        if (showBadge) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF5252),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'N',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(

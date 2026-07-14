@@ -118,10 +118,32 @@ async def device_ping(ping: DevicePing):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/devices")
-async def get_devices(summary: bool = False):
+async def get_devices(summary: bool = False, latest_apk: bool = False):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+            
+        if latest_apk:
+            import os
+            import glob
+            apk_dir = os.path.join(os.path.dirname(__file__), "static", "apks")
+            if not os.path.exists(apk_dir):
+                return JSONResponse(content={"status": "error", "message": "APK directory not found"}, status_code=404)
+            
+            search_pattern = os.path.join(apk_dir, "HealthPort*.apk")
+            apk_files = glob.glob(search_pattern)
+            if not apk_files:
+                return JSONResponse(content={"status": "error", "message": "No HealthPort APK found"}, status_code=404)
+            
+            apk_files.sort()
+            latest_apk_path = apk_files[-1]
+            latest_filename = os.path.basename(latest_apk_path)
+            
+            return JSONResponse(content={
+                "status": "success", 
+                "filename": latest_filename, 
+                "url": f"/static/apks/{latest_filename}"
+            })
             
         if summary:
             pipeline = [
@@ -163,31 +185,7 @@ async def get_devices(summary: bool = False):
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
-@app.get("/api/apks/latest-healthport")
-async def get_latest_healthport_apk():
-    try:
-        import os
-        import glob
-        apk_dir = os.path.join(os.path.dirname(__file__), "static", "apks")
-        if not os.path.exists(apk_dir):
-            return JSONResponse(content={"status": "error", "message": "APK directory not found"}, status_code=404)
-        
-        search_pattern = os.path.join(apk_dir, "HealthPort*.apk")
-        apk_files = glob.glob(search_pattern)
-        if not apk_files:
-            return JSONResponse(content={"status": "error", "message": "No HealthPort APK found"}, status_code=404)
-        
-        apk_files.sort()
-        latest_apk_path = apk_files[-1]
-        latest_filename = os.path.basename(latest_apk_path)
-        
-        return JSONResponse(content={
-            "status": "success", 
-            "filename": latest_filename, 
-            "url": f"/static/apks/{latest_filename}"
-        })
-    except Exception as e:
-        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
 
 @app.post("/api/notices/{notice_id}/ack")
 async def notice_ack(notice_id: str, ack: NoticeAck):
