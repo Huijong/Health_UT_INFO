@@ -118,11 +118,116 @@ async def device_ping(ping: DevicePing):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/devices")
-async def get_devices(summary: bool = False, latest_apk: bool = False):
+async def get_devices(summary: bool = False, latest_apk: bool = False, rankings: bool = False, month: Optional[str] = None, tester_name: Optional[str] = None):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
             
+        if rankings:
+            if not month:
+                month = datetime.utcnow().strftime("%Y-%m")
+            
+            try:
+                curr_yr, curr_mon = map(int, month.split("-"))
+                if curr_mon == 1:
+                    prev_month = f"{curr_yr - 1}-12"
+                else:
+                    prev_month = f"{curr_yr}-{str(curr_mon - 1).zfill(2)}"
+            except Exception:
+                return JSONResponse(content={"status": "error", "message": "Invalid month format. Use YYYY-MM"}, status_code=400)
+
+            async def get_monthly_counts(target_month):
+                pipeline = [
+                    {"$match": {"received_at": {"$regex": f"^{target_month}"}}},
+                    {"$group": {"_id": "$tester_name", "count": {"$sum": 1}}},
+                    {"$sort": {"count": -1}}
+                ]
+                cursor = db["verification_emails"].aggregate(pipeline)
+                return await cursor.to_list(length=1000)
+
+            curr_data = await get_monthly_counts(month)
+            prev_data = await get_monthly_counts(prev_month)
+
+            def assign_ranks(data_list):
+                ranks = {}
+                for i, item in enumerate(data_list):
+                    name = item["_id"]
+                    cnt = item["count"]
+                    if i > 0 and cnt == data_list[i-1]["count"]:
+                        ranks[name] = ranks[data_list[i-1]["_id"]]
+                    else:
+                        ranks[name] = i + 1
+                return ranks
+
+            curr_ranks = assign_ranks(curr_data)
+            prev_ranks = assign_ranks(prev_data)
+
+            rankings_list = []
+            for item in curr_data:
+                name = item["_id"]
+                count = item["count"]
+                rank = curr_ranks[name]
+                
+                if name in prev_ranks:
+                    diff = prev_ranks[name] - rank
+                    if diff > 0:
+                        change = f"+{diff}"
+                    elif diff < 0:
+                        change = str(diff)
+                    else:
+                        change = "0"
+                else:
+                    change = "new"
+
+                rankings_list.append({
+                    "tester_name": name,
+                    "count": count,
+                    "rank": rank,
+                    "change": change
+                })
+
+            total_testers = len(rankings_list)
+            total_submissions = sum(item["count"] for item in curr_data)
+            avg_submissions = round(total_submissions / total_testers, 1) if total_testers > 0 else 0.0
+
+            my_rank = None
+            my_count = 0
+            next_rank_info = None
+
+            if tester_name:
+                for idx, r in enumerate(rankings_list):
+                    if r["tester_name"] == tester_name:
+                        my_rank = r["rank"]
+                        my_count = r["count"]
+                        
+                        target_idx = idx - 1
+                        while target_idx >= 0:
+                            above = rankings_list[target_idx]
+                            if above["count"] > my_count:
+                                next_rank_info = {
+                                    "tester_name": above["tester_name"],
+                                    "rank": above["rank"],
+                                    "count": above["count"],
+                                    "diff": above["count"] - my_count
+                                }
+                                break
+                            target_idx -= 1
+                        break
+
+            return JSONResponse(content={
+                "status": "success",
+                "data": {
+                    "rankings": rankings_list,
+                    "meta": {
+                        "total_testers": total_testers,
+                        "avg_submissions": avg_submissions,
+                        "my_rank": my_rank,
+                        "my_count": my_count,
+                        "next_rank": next_rank_info
+                    }
+                }
+            })
+
         if latest_apk:
             import os
             import glob
