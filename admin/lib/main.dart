@@ -783,14 +783,15 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
     );
   }
 
-  Future<void> _sendNudge(String testerName) async {
+  Future<void> _sendNudge(String testerName, {required String title, required String content}) async {
     try {
       final response = await http.post(
         Uri.parse('https://health-port.work/api/notices'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
-          'title': '[독려] $testerName님 테스트 참여 안내 📢',
-          'content': '$testerName님, 최근 전송된 삼성 헬스 검증 데이터가 확인되지 않아 알림을 드립니다. 단말 연결 및 테스트 업로드를 다시 한번 확인해 주세요! 🚀',
+          'title': title,
+          'content': content,
+          'target_tester': testerName,
         }),
       );
 
@@ -806,7 +807,7 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        '$testerName님께 수집 독려 푸시 알림이 발송되었습니다! 📢',
+                        '$testerName님께 알림 푸시 메시지가 발송되었습니다! 📢',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -829,28 +830,88 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
           }
           _fetchData();
         } else {
-          _showError(decoded['message'] ?? '독려 알림 발송에 실패했습니다.');
+          _showError(decoded['message'] ?? '알림 발송에 실패했습니다.');
         }
       } else {
         _showError('서버 연결 실패 (Status Code: ${response.statusCode})');
       }
     } catch (e) {
-      _showError('독려 알림 발송 중 에러가 발생했습니다: $e');
+      _showError('알림 발송 중 에러가 발생했습니다: $e');
     }
   }
 
   void _showNudgeConfirmDialog(String testerName) {
+    final titleCtrl = TextEditingController(text: '[확인 요청] ${testerName}님 안내 📢');
+    final contentCtrl = TextEditingController(
+      text: '${testerName}님, 최근 전송된 삼성 헬스 검증 데이터가 확인되지 않아 알림을 드립니다. 단말 연결 및 테스트 업로드를 다시 한번 확인해 주세요! 🚀'
+    );
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF0A0F24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.white.withOpacity(0.12), width: 1.5),
+        ),
         title: Text(
-          '$testerName님께 독려 알림 발송',
+          '$testerName님께 개별 메시지 발송',
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
-        content: Text(
-          '해당 테스터에게 무선 수집 참여 독려 푸시 알림을 발송하시겠습니까?\n\n이 알림은 모든 사용자의 공지 히스토리에도 등록됩니다.',
-          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '알림 제목',
+                style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: titleCtrl,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.04),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFF2E5BFF), width: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '알림 내용',
+                style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: contentCtrl,
+                maxLines: 4,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.04),
+                  contentPadding: const EdgeInsets.all(12),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFF2E5BFF), width: 1.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -861,10 +922,19 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2E5BFF),
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () {
+              final title = titleCtrl.text.trim();
+              final content = contentCtrl.text.trim();
+              if (title.isEmpty || content.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('제목과 내용을 모두 입력해 주세요.')),
+                );
+                return;
+              }
               Navigator.pop(ctx);
-              _sendNudge(testerName);
+              _sendNudge(testerName, title: title, content: content);
             },
             child: const Text('발송'),
           ),

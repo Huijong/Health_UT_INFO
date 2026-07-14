@@ -60,6 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late String _customWatch;
   late String _strap;
   late String _customStrap;
+  bool _hasUpdate = false;
 
   @override
   void initState() {
@@ -74,6 +75,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (_watch.isEmpty) _watch = kWatchOptions.first;
     if (_strap.isEmpty) _strap = kStrapOptions.first['name']!;
+    
+    _checkForUpdate();
   }
 
   Future<void> _saveAll() async {
@@ -87,6 +90,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) {
       Navigator.pop(context, true);
     }
+  }
+
+  Future<void> _checkForUpdate() async {
+    try {
+      final dio = Dio();
+      final response = await dio.get('${AppConfig.apiUrl}/api/devices?latest_apk=true');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data['status'] == 'success') {
+          final filename = data['filename'] as String;
+          final regExp = RegExp(r'HealthPort_([0-9\.]+)\.apk');
+          final match = regExp.firstMatch(filename);
+          if (match != null) {
+            final serverVersion = match.group(1)!;
+            final localVersion = AppConfig.appVersion;
+            if (_isVersionNewer(localVersion, serverVersion)) {
+              if (mounted) {
+                setState(() {
+                  _hasUpdate = true;
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[Update Check] Failed to check for update: $e');
+    }
+  }
+
+  bool _isVersionNewer(String current, String latest) {
+    try {
+      final currentParts = current.split('.').map(int.parse).toList();
+      final latestParts = latest.split('.').map(int.parse).toList();
+      final length = currentParts.length > latestParts.length 
+          ? currentParts.length 
+          : latestParts.length;
+      for (int i = 0; i < length; i++) {
+        final currentVal = i < currentParts.length ? currentParts[i] : 0;
+        final latestVal = i < latestParts.length ? latestParts[i] : 0;
+        if (latestVal > currentVal) return true;
+        if (currentVal > latestVal) return false;
+      }
+    } catch (_) {
+      return current != latest;
+    }
+    return false;
   }
 
   @override
@@ -225,7 +275,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         subtitle: 'Cola Manager(APK) 최신버전을 스마트폰에 다운로드하고 설치합니다.',
                         icon: Icons.install_mobile_rounded,
                         onTap: () {
-                          _downloadAndInstallApk();
+                          _downloadAndInstallApk(
+                            defaultFileName: 'GPT_com_sec_cola_release_1_2_5_phone.apk',
+                            defaultUrlPath: '/static/apks/GPT_com_sec_cola_release_1_2_5_phone.apk',
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMenuCard(
+                        title: 'HealthPort 업데이트',
+                        subtitle: 'HealthPort(APK) 최신버전을 스마트폰에 다운로드하고 설치합니다.',
+                        icon: Icons.system_update_rounded,
+                        showBadge: _hasUpdate,
+                        onTap: () {
+                          _downloadAndInstallApk(
+                            latestApkApiUrl: '${AppConfig.apiUrl}/api/devices?latest_apk=true',
+                            defaultFileName: 'HealthPort_${AppConfig.appVersion}.apk',
+                            defaultUrlPath: '/static/apks/HealthPort_${AppConfig.appVersion}.apk',
+                          );
                         },
                       ),
                       const SizedBox(height: 24),
@@ -271,12 +338,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _downloadAndInstallApk() {
+  void _downloadAndInstallApk({
+    String? latestApkApiUrl,
+    required String defaultFileName,
+    required String defaultUrlPath,
+  }) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return const DownloadDialog();
+        return DownloadDialog(
+          latestApkApiUrl: latestApkApiUrl,
+          defaultFileName: defaultFileName,
+          defaultUrlPath: defaultUrlPath,
+        );
       },
     );
   }
@@ -300,6 +375,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String subtitle,
     required IconData icon,
     required VoidCallback onTap,
+    bool showBadge = false,
   }) {
     return _GlassCard(
       child: InkWell(
@@ -324,9 +400,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        if (showBadge) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF5252),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'N',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1008,7 +1106,16 @@ class InstantPageRoute<T> extends PageRouteBuilder<T> {
 }
 
 class DownloadDialog extends StatefulWidget {
-  const DownloadDialog({super.key});
+  final String? latestApkApiUrl;
+  final String defaultFileName;
+  final String defaultUrlPath;
+
+  const DownloadDialog({
+    super.key,
+    this.latestApkApiUrl,
+    required this.defaultFileName,
+    required this.defaultUrlPath,
+  });
 
   @override
   State<DownloadDialog> createState() => _DownloadDialogState();
@@ -1034,8 +1141,25 @@ class _DownloadDialogState extends State<DownloadDialog> {
   Future<void> _startDownload() async {
     try {
       final dio = Dio();
+      String fileName = widget.defaultFileName;
+      String urlPath = widget.defaultUrlPath;
+
+      if (widget.latestApkApiUrl != null) {
+        setState(() {
+          _progressText = '최신 업데이트 정보 조회 중...';
+        });
+        final response = await dio.get(widget.latestApkApiUrl!);
+        if (response.statusCode == 200 && response.data != null) {
+          final data = response.data;
+          if (data['status'] == 'success') {
+            fileName = data['filename'];
+            urlPath = data['url'];
+          }
+        }
+      }
+
       final tempDir = await getTemporaryDirectory();
-      final savePath = '${tempDir.path}/GPT_com_sec_cola_release_1_2_5_phone.apk';
+      final savePath = '${tempDir.path}/$fileName';
 
       // Ensure directory exists
       final file = File(savePath);
@@ -1043,10 +1167,12 @@ class _DownloadDialogState extends State<DownloadDialog> {
         await file.delete();
       }
 
-      final url = '${AppConfig.apiUrl}/static/apks/GPT_com_sec_cola_release_1_2_5_phone.apk';
+      final fullUrl = urlPath.startsWith('http')
+          ? urlPath
+          : '${AppConfig.apiUrl}$urlPath';
 
       await dio.download(
-        url,
+        fullUrl,
         savePath,
         cancelToken: _cancelToken,
         onReceiveProgress: (received, total) {

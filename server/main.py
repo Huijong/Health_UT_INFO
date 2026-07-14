@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
+from typing import Optional
 from contextlib import asynccontextmanager
 import threading
 import uvicorn
@@ -84,6 +85,7 @@ async def get_emails():
 class NoticeCreate(BaseModel):
     title: str
     content: str
+    target_tester: Optional[str] = None
 
 class DevicePing(BaseModel):
     tester_name: str
@@ -116,10 +118,32 @@ async def device_ping(ping: DevicePing):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/devices")
-async def get_devices(summary: bool = False):
+async def get_devices(summary: bool = False, latest_apk: bool = False):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+            
+        if latest_apk:
+            import os
+            import glob
+            apk_dir = os.path.join(os.path.dirname(__file__), "static", "apks")
+            if not os.path.exists(apk_dir):
+                return JSONResponse(content={"status": "error", "message": "APK directory not found"}, status_code=404)
+            
+            search_pattern = os.path.join(apk_dir, "HealthPort*.apk")
+            apk_files = glob.glob(search_pattern)
+            if not apk_files:
+                return JSONResponse(content={"status": "error", "message": "No HealthPort APK found"}, status_code=404)
+            
+            apk_files.sort()
+            latest_apk_path = apk_files[-1]
+            latest_filename = os.path.basename(latest_apk_path)
+            
+            return JSONResponse(content={
+                "status": "success", 
+                "filename": latest_filename, 
+                "url": f"/static/apks/{latest_filename}"
+            })
             
         if summary:
             pipeline = [
@@ -161,6 +185,8 @@ async def get_devices(summary: bool = False):
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
+
+
 @app.post("/api/notices/{notice_id}/ack")
 async def notice_ack(notice_id: str, ack: NoticeAck):
     try:
@@ -181,11 +207,21 @@ async def notice_ack(notice_id: str, ack: NoticeAck):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/notices")
-async def get_all_notices():
+async def get_all_notices(tester_name: Optional[str] = None):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
-        cursor = db["notices"].find({}).sort("created_at", -1)
+            
+        query = {
+            "$or": [
+                {"target_tester": None},
+                {"target_tester": {"$exists": False}}
+            ]
+        }
+        if tester_name:
+            query["$or"].append({"target_tester": tester_name})
+
+        cursor = db["notices"].find(query).sort("created_at", -1)
         notices = await cursor.to_list(length=100)
         for notice in notices:
             notice["_id"] = str(notice["_id"])
@@ -226,25 +262,32 @@ async def create_notice(notice: NoticeCreate):
             "created_at": datetime.utcnow(),
             "received_users": []
         }
+        if notice.target_tester:
+            notice_dict["target_tester"] = notice.target_tester
         
         result = await db["notices"].insert_one(notice_dict)
         notice_id = str(result.inserted_id)
         
         # 실시간 FCM 토픽 푸시 알림 발송
         try:
+            if notice.target_tester:
+                topic = f"tester_{notice.target_tester.encode('utf-8').hex()}"
+            else:
+                topic = "notices"
+
             message = messaging.Message(
                 notification=messaging.Notification(
                     title=notice.title,
                     body=notice.content[:100] + ("..." if len(notice.content) > 100 else ""),
                 ),
-                topic="notices",
+                topic=topic,
                 data={
                     "notice_id": notice_id,
                     "title": notice.title,
                 }
             )
             response = messaging.send(message)
-            print(f"[INFO] FCM 푸시 메시지 전송 성공: {response}")
+            print(f"[INFO] FCM 푸시 메시지 전송 성공 (Topic: {topic}): {response}")
         except Exception as fcm_err:
             print(f"[WARNING] FCM 푸시 발송 실패 (DB 저장은 완료됨): {fcm_err}")
             
