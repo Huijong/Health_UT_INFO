@@ -590,8 +590,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       });
 
       final name = _nameCtrl.text.trim();
-      final height = double.parse(_heightCtrl.text.trim());
-      final weight = double.parse(_weightCtrl.text.trim());
+      final height = double.tryParse(_heightCtrl.text.trim()) ?? 0.0;
+      final weight = double.tryParse(_weightCtrl.text.trim()) ?? 0.0;
       final watchName = _selectedWatch == '직접입력'
           ? _customWatchCtrl.text.trim()
           : _selectedWatch;
@@ -1179,7 +1179,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '정밀한 피트니스 분석을 위해 테스터님의 신체 스펙을 입력해 주세요.',
+            'HealthPort 서비스 이용을 위한 테스터님의 닉네임을 입력해 주세요.',
             style: TextStyle(
               fontSize: 13,
               color: const Color(0xFFE2E2E2).withOpacity(0.7),
@@ -1193,30 +1193,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 TextFormField(
                   controller: _nameCtrl,
                   decoration: const InputDecoration(
-                    labelText: '이름 *',
+                    labelText: '닉네임 *',
+                    hintText: '예) 기안84',
                     prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? '이름을 입력해 주세요' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _heightCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: '키 (cm) *',
-                    prefixIcon: Icon(Icons.height_rounded, size: 20),
-                  ),
-                  validator: _validatePositiveNumber,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _weightCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: '몸무게 (kg) *',
-                    prefixIcon: Icon(Icons.monitor_weight_outlined, size: 20),
-                  ),
-                  validator: _validatePositiveNumber,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? '닉네임을 입력해 주세요' : null,
                 ),
               ],
             ),
@@ -2465,14 +2446,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           Expanded(
             flex: 2,
             child: ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (isStep5) {
                   _onSend();
                 } else if (canNext) {
                   if (_currentStep == 1) {
                     if (!_formKey1.currentState!.validate()) return;
-                    _prefs?.saveName(_nameCtrl.text.trim());
-                    _updateNotificationTopic(_nameCtrl.text.trim());
+                    
+                    final nickname = _nameCtrl.text.trim();
+                    try {
+                      final url = Uri.parse('${AppConfig.apiUrl}/api/devices?check_nickname=${Uri.encodeComponent(nickname)}');
+                      final response = await http.get(url);
+                      if (response.statusCode == 200) {
+                        final res = jsonDecode(response.body);
+                        if (res['status'] == 'success' && res['exists'] == true) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('이미 등록된 닉네임입니다. 다른 닉네임을 입력해 주세요.'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                      }
+                    } catch (e) {
+                      debugPrint('닉네임 중복 검사 실패: $e');
+                    }
+
+                    _prefs?.saveName(nickname);
+                    _updateNotificationTopic(nickname);
                     _prefs?.saveHeight(double.tryParse(_heightCtrl.text) ?? 0.0);
                     _prefs?.saveWeight(double.tryParse(_weightCtrl.text) ?? 0.0);
                   } else if (_currentStep == 2) {
@@ -2565,10 +2569,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             ),
             child: const SingleChildScrollView(
               child: Text(
-                '1. 수집 및 이용 목적: 피트니스 알고리즘 분석, 연구개발(R&D) 및 제품 검증\n'
-                '2. 수집 항목: 이름, 키, 몸무게, 기기 정보, 운동 데이터(심박수 등 신체 기능 정보)\n'
-                '3. 보유 및 이용 기간: 검증 목적 달성 시 또는 테스터의 파기 요청 시까지\n'
-                '4. 동의 거부 권리: 동의를 거부할 수 있으나, 거부 시 HealthPort 앱을 통한 검증 참여가 불가합니다.',
+                '1. 개인정보 수집·이용 동의 (필수)\n'
+                '[HealthPort] 서비스 제공을 위한 개인정보 수집∙이용에 대한 안내입니다.\n\n'
+                '[HealthPort] 은(는) 개인의 운동(달리기, 실외자전거, 트레일 러닝 등) 기록 및 분석 서비스를 제공하며, 이를 위해 아래와 같이 개인정보를 수집∙이용합니다.\n\n'
+                '• 이름 (또는 닉네임): 회원 식별 및 서비스 이용 (보유기간: 회원 탈퇴 시까지)\n'
+                '• 위치정보 (GPS): 운동 경로, 거리, 속도 기록 및 분석 (보유기간: 회원 탈퇴 시까지)\n\n'
+                '※ 위 필수항목 수집·이용에 대한 동의를 거부하실 수 있으나, 이 경우 [HealthPort] 서비스의 핵심 기능 이용이 제한됩니다.\n\n'
+                '2. 민감정보 수집·이용 동의 (필수)\n'
+                '[HealthPort] 서비스는 운동 강도 분석 등 개인 맞춤형 서비스 제공을 위해 아래와 같이 민감정보를 수집∙이용합니다.\n\n'
+                '• 심박수: 운동 중 건강 상태 모니터링 및 운동 강도 분석 (보유기간: 회원 탈퇴 시까지)\n\n'
+                '※ 민감정보는 「개인정보 보호법」에 따라 별도의 동의를 받아야 하며, 동의를 거부하실 경우 운동 강도 분석 등 일부 맞춤형 기능 이용이 제한될 수 있습니다.',
                 style: TextStyle(fontSize: 12, color: Colors.white54, height: 1.5),
               ),
             ),
@@ -2586,9 +2596,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
           const SizedBox(height: 24),
 
-          // 2. 개인위치정보 동의서
+          // 2. 개인정보 처리방침 동의서
           const Text(
-            '개인위치정보 수집·이용 동의 (필수)',
+            '개인정보 처리방침 (필수)',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70),
           ),
           const SizedBox(height: 8),
@@ -2603,16 +2613,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             ),
             child: const SingleChildScrollView(
               child: Text(
-                '1. 수집 및 이용 목적: 실외 운동 검증 시 정밀 위치 경로 분석 및 검증 데이터 패키징\n'
-                '2. 수집 항목: GPS 위도, 경도 좌표 정보 및 이동 경로\n'
-                '3. 보유 및 이용 기간: 피트니스 데이터 정밀 분석 즉시 파기 및 R&D 연구 완료 시 파기\n'
-                '4. 동의 거부 권리: 동의를 거부할 수 있으나, 거부 시 실외 운동 데이터 검증 및 앱 서비스 제공이 불가능합니다.',
+                '[HealthPort] 개인정보 처리방침\n\n'
+                '제1조 (개인정보의 처리 목적)\n'
+                '회사는 다음의 목적을 위하여 개인정보를 처리합니다. 처리하고 있는 개인정보는 다음의 목적 이외의 용도로는 이용되지 않으며, 이용 목적이 변경되는 경우에는 「개인정보 보호법」 제18조에 따라 별도의 동의를 받는 등 필요한 조치를 이행할 예정입니다.\n'
+                '- 서비스 제공: 운동 기록(경로, 거리, 속도, 심박수 등) 저장, 통계, 분석 데이터 제공 등 서비스 제공과 관련된 목적으로 개인정보를 처리합니다.\n'
+                '- 회원 관리: 회원제 서비스 이용에 따른 본인 확인, 개인 식별, 불량회원의 부정 이용 방지와 비인가 사용 방지, 분쟁 조정을 위한 기록 보존 등을 목적으로 개인정보를 처리합니다.\n\n'
+                '제2조 (처리하는 개인정보의 항목 및 보유 기간)\n'
+                '회사는 법령에 따른 개인정보 보유·이용기간 또는 정보주체로부터 개인정보를 수집 시에 동의받은 개인정보 보유·이용기간 내에서 개인정보를 처리·보유합니다.\n'
+                '- 수집항목: 이름(또는 닉네임), 위치정보(GPS), 심박수\n'
+                '- 보유기간: 회원 탈퇴 시까지. (단, 관계 법령 위반에 따른 수사·조사 등이 진행 중인 경우에는 해당 수사·조사 종료 시까지)\n\n'
+                '제3조 (개인정보의 제3자 제공)\n'
+                '회사는 정보주체의 개인정보를 제1조(개인정보의 처리 목적)에서 명시한 범위 내에서만 처리하며, 원칙적으로 정보주체의 동의 없이 외부에 제공하지 않습니다.\n\n'
+                '제4조 (개인정보처리의 위탁)\n'
+                '회사는 원활한 개인정보 업무처리를 위하여 다음과 같이 개인정보 처리업무를 위탁할 수 있습니다.\n'
+                '- 위탁받는 자 (수탁자): 자체 서버\n'
+                '- 위탁하는 업무의 내용: 서비스 제공을 위한 데이터 저장 및 시스템 운영\n\n'
+                '제5조 (정보주체와 법정대리인의 권리·의무 및 그 행사방법)\n'
+                '이용자는 개인정보주체로서 언제든지 개인정보 열람, 정정, 삭제, 처리정지 요구 등의 권리를 행사할 수 있습니다.\n\n'
+                '제6조 (개인정보의 파기)\n'
+                '회사는 개인정보 보유기간의 경과, 처리목적 달성 등 개인정보가 불필요하게 되었을 때에는 지체없이 해당 개인정보를 파기합니다.\n\n'
+                '제7조 (개인정보의 안전성 확보 조치)\n'
+                '회사는 개인정보의 안전성 확보를 위해 기술적/관리적 및 물리적 조치를 하고 있습니다.\n\n'
+                '제8조 (개인정보 보호책임자)\n'
+                '- 성명: 유희종\n'
+                '- 직책: 과장\n'
+                '- 연락처: yhj2222@gmail.com\n\n'
+                '부칙\n'
+                '이 개인정보 처리방침은 2026년 7월 14일부터 적용됩니다.',
                 style: TextStyle(fontSize: 12, color: Colors.white54, height: 1.5),
               ),
             ),
           ),
           CheckboxListTile(
-            title: const Text('위 개인위치정보 수집·이용에 동의합니다.', style: TextStyle(fontSize: 12, color: Colors.white70)),
+            title: const Text('위 개인정보 처리방침에 동의합니다.', style: TextStyle(fontSize: 12, color: Colors.white70)),
             value: _agreeLocation,
             activeColor: const Color(0xFF2E5BFF),
             checkColor: Colors.white,
