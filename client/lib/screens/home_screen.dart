@@ -17,6 +17,7 @@ import '../widgets/attached_file_tile.dart';
 import 'settings_screen.dart';
 import 'location_picker_screen.dart';
 import 'notice_history_screen.dart';
+import 'ranking_screen.dart';
 import 'package:video_player/video_player.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -169,6 +170,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   // 현재 위저드 단계 (1 ~ 6)
   int _currentStep = 1;
+
+  // 현재 하단 탭 인덱스 (0: 홈, 1: 명예의 전당)
+  int _currentTab = 0;
 
   // 1단계 컨트롤러
   final _nameCtrl = TextEditingController();
@@ -994,16 +998,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 children: [
                   _buildHeader(),
                   Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      child: _buildCurrentStepView(),
-                    ),
+                    child: _currentStep == 4 && _currentTab == 1
+                        ? RankingScreen(prefs: _prefs!)
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            child: _buildCurrentStepView(),
+                          ),
                   ),
                   if (_currentStep < 6 && _currentStep != 4) _buildFooterButtons(),
                 ],
               ),
             ),
           ),
+          bottomNavigationBar: _currentStep == 4 ? _buildBottomNavigationBar() : null,
         ),
       ),
     );
@@ -2643,6 +2650,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      currentIndex: _currentTab,
+      onTap: (index) {
+        setState(() {
+          _currentTab = index;
+        });
+      },
+      backgroundColor: const Color(0xFF1E2020),
+      selectedItemColor: const Color(0xFF3DFFC1),
+      unselectedItemColor: Colors.white38,
+      showSelectedLabels: true,
+      showUnselectedLabels: true,
+      selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+      unselectedLabelStyle: const TextStyle(fontSize: 11),
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home_rounded),
+          label: '홈',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.emoji_events_rounded),
+          label: '명예의 전당',
+        ),
+      ],
     );
   }
 }
