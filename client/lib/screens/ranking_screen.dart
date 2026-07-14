@@ -31,12 +31,17 @@ class _RankingScreenState extends State<RankingScreen> {
   }
 
   List<String> _getRecentMonths() {
+    final start = DateTime(2026, 7, 1);
     final now = DateTime.now();
+    if (now.isBefore(start)) {
+      return ['2026-07'];
+    }
     final list = <String>[];
-    for (int i = 0; i < 6; i++) {
-      final d = DateTime(now.year, now.month - i, 1);
-      final mStr = "${d.year}-${d.month.toString().padLeft(2, '0')}";
+    var temp = DateTime(now.year, now.month, 1);
+    while (temp.isAfter(start) || temp.isAtSameMomentAs(start)) {
+      final mStr = "${temp.year}-${temp.month.toString().padLeft(2, '0')}";
       list.add(mStr);
+      temp = DateTime(temp.year, temp.month - 1, 1);
     }
     return list;
   }
@@ -493,7 +498,7 @@ class _RankingScreenState extends State<RankingScreen> {
               ),
             ),
             Text(
-              '$count건',
+              '$count건 $count포인트',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
