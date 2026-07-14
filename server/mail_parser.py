@@ -42,8 +42,6 @@ def parse_email_body(body_text):
     
     return {
         "tester_name": name_match.group(1).strip() if name_match else "알 수 없음",
-        "height": height_match.group(1).strip() if height_match else "알 수 없음",
-        "weight": weight_match.group(1).strip() if weight_match else "알 수 없음",
         "session_id": session_match.group(1).strip() if session_match else "알 수 없음",
         "device_model": model_match.group(1).strip() if model_match else "알 수 없음",
         "android_version": version_match.group(1).strip() if version_match else "알 수 없음",
@@ -151,9 +149,10 @@ def fetch_and_parse_emails():
                             "points": 1,
                             "memo": "자동 적립 (이메일 수집)",
                             "month": month_str,
-                            "created_at": parsed_data["received_at"]
+                            "created_at": parsed_data["received_at"],
+                            "email_id": parsed_data["_id"]
                         })
-                        logging.info(f"포인트 1점 자동 적립 완료: {parsed_data['tester_name']}")
+                        logging.info(f"포인트 1점 자동 적립 완료: {parsed_data['tester_name']} (email_id: {parsed_data['_id']})")
                     except Exception as pe:
                         logging.error(f"포인트 자동 적립 실패: {pe}")
                 except Exception as e:
