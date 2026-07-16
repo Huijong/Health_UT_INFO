@@ -1022,8 +1022,8 @@ async def get_dashboard(request: Request):
                     let valA = a[sortColumn];
                     let valB = b[sortColumn];
 
-                    // 수치형 특수 정렬 처리 (키, 몸무게)
-                    if (sortColumn === 'height' || sortColumn === 'weight') {
+                    // 수치형 특수 정렬 처리 (키, 몸무게, 거리)
+                    if (sortColumn === 'height' || sortColumn === 'weight' || sortColumn === 'distance') {
                         let numA = parseFloat((valA || '0').replace(/[^0-9.]/g, '')) || 0;
                         let numB = parseFloat((valB || '0').replace(/[^0-9.]/g, '')) || 0;
                         return sortOrder === 'asc' ? numA - numB : numB - numA;
@@ -1070,7 +1070,7 @@ async def get_dashboard(request: Request):
             function renderTable(data) {
                 const tbody = document.getElementById('table-body');
                 if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="14" class="no-data">조건에 맞는 수집 내역이 없습니다.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="15" class="no-data">조건에 맞는 수집 내역이 없습니다.</td></tr>`;
                     return;
                 }
                 
@@ -1083,6 +1083,7 @@ async def get_dashboard(request: Request):
                     const tightness = item.wearing_tightness || '-';
                     const competitor = item.competitor_watch || '-';
                     const training = item.training_type || '-';
+                    const distance = item.distance || '-';
                     const location = item.location || '-';
                     const remarks = item.remarks || '';
                     const remarksHtml = linkify(remarks);
@@ -1105,6 +1106,7 @@ async def get_dashboard(request: Request):
                             <td style="white-space: nowrap;">${strap}</td>
                             <td><span style="color: #10B981; white-space: nowrap;">${exercise}</span></td>
                             <td style="white-space: nowrap;">${training}</td>
+                            <td style="white-space: nowrap;">${distance}</td>
                             <td style="white-space: nowrap;">${position}</td>
                             <td style="white-space: nowrap;">${tightness}</td>
                             <td style="white-space: nowrap;">${competitor}</td>
@@ -1212,6 +1214,7 @@ async def get_dashboard(request: Request):
                             <th class="sortable" onclick="handleSort('strap')">착용 스트랩 <span class="sort-indicator" id="sort-icon-strap">↕</span></th>
                             <th class="sortable" onclick="handleSort('exercise')">운동 종류 <span class="sort-indicator" id="sort-icon-exercise">↕</span></th>
                             <th class="sortable" onclick="handleSort('training_type')">훈련 종류 <span class="sort-indicator" id="sort-icon-training_type">↕</span></th>
+                            <th class="sortable" onclick="handleSort('distance')">거리 (km) <span class="sort-indicator" id="sort-icon-distance">↕</span></th>
                             <th class="sortable" onclick="handleSort('wearing_position')">착용 위치 <span class="sort-indicator" id="sort-icon-wearing_position">↕</span></th>
                             <th class="sortable" onclick="handleSort('wearing_tightness')">착용 정도 <span class="sort-indicator" id="sort-icon-wearing_tightness">↕</span></th>
                             <th class="sortable" onclick="handleSort('competitor_watch')">동시착용 모델 <span class="sort-indicator" id="sort-icon-competitor_watch">↕</span></th>

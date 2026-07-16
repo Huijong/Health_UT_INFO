@@ -24,6 +24,7 @@ class EmailService {
     required String wearingTightness,
     required String competitorWatch,
     required String trainingType,
+    required String distance,
     required String location,
     required String remarks,
     required String consentDate,
@@ -68,6 +69,7 @@ class EmailService {
 - 착용 정도: $wearingTightness
 - 동시착용 타사기기: $competitorWatch
 - 훈련 종류: $trainingType
+- 훈련 거리: $distance km
 - 장소: $location
 ${remarks.isNotEmpty ? '- 특이 사항: $remarks\n' : ''}
 ■ 수집 데이터 링크 (Quick Share)

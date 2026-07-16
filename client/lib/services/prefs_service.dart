@@ -48,6 +48,7 @@ class PrefsService {
   List<String> get deletedNoticeIds => _prefs.getStringList(_keyDeletedNoticeIds) ?? [];
   bool get consentGiven => _prefs.getBool(_keyConsentGiven) ?? false;
   String get consentDate => _prefs.getString(_keyConsentDate) ?? '';
+  String get lastDismissedUpdateVersion => _prefs.getString('last_dismissed_update_version') ?? '';
 
   Future<void> saveName(String value) => _prefs.setString(_keyName, value);
   Future<void> saveHeight(double value) => _prefs.setDouble(_keyHeight, value);
@@ -63,4 +64,5 @@ class PrefsService {
   Future<void> saveDeletedNoticeIds(List<String> values) => _prefs.setStringList(_keyDeletedNoticeIds, values);
   Future<void> saveConsentGiven(bool value) => _prefs.setBool(_keyConsentGiven, value);
   Future<void> saveConsentDate(String value) => _prefs.setString(_keyConsentDate, value);
+  Future<void> saveLastDismissedUpdateVersion(String value) => _prefs.setString('last_dismissed_update_version', value);
 }

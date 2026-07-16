@@ -26,6 +26,7 @@ class PackingService {
     required String wearingTightness,
     required String competitorWatch,
     required String trainingType,
+    required String distance,
     required String location,
     required String memo,
     required DeviceSession session,
@@ -57,6 +58,7 @@ class PackingService {
         'wearing_tightness': wearingTightness,
         'competitor_watch': competitorWatch,
         'training_type': trainingType,
+        'distance': distance,
         'location': location,
       },
       'device': {
@@ -87,6 +89,7 @@ class PackingService {
       wearingTightness: wearingTightness,
       competitorWatch: competitorWatch,
       trainingType: trainingType,
+      distance: distance,
       location: location,
       memo: memo,
       session: session,
@@ -136,6 +139,7 @@ class PackingService {
     required String wearingTightness,
     required String competitorWatch,
     required String trainingType,
+    required String distance,
     required String location,
     required String memo,
     required DeviceSession session,
@@ -168,6 +172,7 @@ class PackingService {
     sb.writeln('착용 정도  : $wearingTightness');
     sb.writeln('동시착용 타사기기: $competitorWatch');
     sb.writeln('훈련 종류  : $trainingType');
+    sb.writeln('훈련 거리  : $distance km');
     sb.writeln('장소       : $location');
     if (memo.isNotEmpty) sb.writeln('특이 사항  : $memo');
     sb.writeln();
