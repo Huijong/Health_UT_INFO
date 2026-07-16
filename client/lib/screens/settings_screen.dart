@@ -198,7 +198,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const Expanded(
                         child: Text(
-                          '설정 메뉴',
+                          '설정',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 18,
@@ -212,7 +212,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 
-                // 설정 메뉴 목록
+                // 설정 목록
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.all(20),

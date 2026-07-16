@@ -1062,8 +1062,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 child: Text(
                   _getStepTitle(),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 18,
+                  style: TextStyle(
+                    fontSize: _currentStep == 4 ? 22 : 18,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.5,
                   ),
@@ -1155,7 +1155,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       case 3:
         return '착용 스트랩 종류 선택';
       case 4:
-        return '운동 종목 선택';
+        return 'Health Port';
       case 5:
         return '검증 파일 및 디테일 등록';
       case 6:
@@ -1858,52 +1858,59 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
           const SizedBox(height: 16),
 
-          // 착용 위치 (스위치 UI)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('착용 위치', style: TextStyle(fontSize: 14)),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                ),
-                padding: const EdgeInsets.all(4),
-                child: Row(
+          GlassCard(
+            radius: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('착용 상태', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildSwitchTab('왼쪽', _wearingPosition == '왼쪽'),
-                    _buildSwitchTab('오른쪽', _wearingPosition == '오른쪽'),
+                    const Text('착용 위치', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          _buildSwitchTab('왼쪽', _wearingPosition == '왼쪽'),
+                          _buildSwitchTab('오른쪽', _wearingPosition == '오른쪽'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('착용 정도', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          _buildSegmentTab('충분히', _wearingTightness == '충분히'),
+                          _buildSegmentTab('적당히', _wearingTightness == '적당히'),
+                          _buildSegmentTab('느슨하게', _wearingTightness == '느슨하게'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
-
-          // 착용 정도 (세그먼트 3버튼 UI)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('착용 정도', style: TextStyle(fontSize: 14)),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                ),
-                padding: const EdgeInsets.all(4),
-                child: Row(
-                  children: [
-                    _buildSegmentTab('충분히', _wearingTightness == '충분히'),
-                    _buildSegmentTab('적당히', _wearingTightness == '적당히'),
-                    _buildSegmentTab('느슨하게', _wearingTightness == '느슨하게'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
 
           // 동시에 착용한 타사 모델
           _buildCompetitorSection(),
