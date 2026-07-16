@@ -164,6 +164,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   AnimationController? _noticePulseController;
   bool _pendingNoticeHistory = false;
 
+  // 앱 업데이트 관련 상태 변수 및 애니메이션 컨트롤러
+  AnimationController? _updateNoticePulseController;
+  bool _hasUpdate = false;
+  String _updateVersionName = '';
+
   // 동의서 관련 상태 변수
   bool _agreePersonal = false;
   bool _agreeLocation = false;
@@ -205,6 +210,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   String _trainingType = '조깅'; // 조깅 / 인터벌 / LSD / 변속주 / 지속주 / 직접입력
   final _customTrainingCtrl = TextEditingController();
+  final _distanceCtrl = TextEditingController();
 
   final _locationCtrl = TextEditingController();
   final _memoCtrl = TextEditingController(); // 특이 사항
@@ -258,6 +264,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
+
+    _updateNoticePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _updateNoticePulseController?.repeat(reverse: true);
 
     // Foreground FCM 수신 대기 설정
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -344,6 +356,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     // 기기 접속 핑 전송
     _sendDevicePing();
 
+    // 앱 업데이트 가능 여부 체크
+    _checkAppUpdate();
+
     // 펜딩된 히스토리 이동 요청 처리
     if (_pendingNoticeHistory) {
       _navigateToNoticeHistory();
@@ -425,6 +440,57 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
+  Future<void> _checkAppUpdate() async {
+    try {
+      final url = Uri.parse('${AppConfig.apiUrl}/api/devices?latest_apk=true');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'success') {
+          final filename = data['filename'] as String;
+          final regExp = RegExp(r'HealthPort_([0-9\.]+)\.apk');
+          final match = regExp.firstMatch(filename);
+          if (match != null) {
+            final serverVersion = match.group(1)!;
+            final localVersion = AppConfig.appVersion;
+            
+            bool isNewer = false;
+            try {
+              final currentParts = localVersion.split('.').map(int.parse).toList();
+              final latestParts = serverVersion.split('.').map(int.parse).toList();
+              final length = currentParts.length > latestParts.length ? currentParts.length : latestParts.length;
+              for (int i = 0; i < length; i++) {
+                final currentVal = i < currentParts.length ? currentParts[i] : 0;
+                final latestVal = i < latestParts.length ? latestParts[i] : 0;
+                if (latestVal > currentVal) {
+                  isNewer = true;
+                  break;
+                }
+                if (currentVal > latestVal) {
+                  break;
+                }
+              }
+            } catch (_) {
+              isNewer = localVersion != serverVersion;
+            }
+
+            if (isNewer) {
+              final lastDismissed = _prefs?.lastDismissedUpdateVersion ?? '';
+              if (lastDismissed != serverVersion && mounted) {
+                setState(() {
+                  _hasUpdate = true;
+                  _updateVersionName = serverVersion;
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to check update on home: $e');
+    }
+  }
+
   Future<void> _sendNoticeAck(String noticeId, String testerName) async {
     if (noticeId.isEmpty || testerName.isEmpty) return;
     try {
@@ -468,10 +534,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     _customStrapCtrl.dispose();
     _customCompetitorCtrl.dispose();
     _customTrainingCtrl.dispose();
+    _distanceCtrl.dispose();
     _locationCtrl.dispose();
     _memoCtrl.dispose();
     _guidePulseController?.dispose();
     _noticePulseController?.dispose();
+    _updateNoticePulseController?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -549,6 +617,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         wearingTightness: _wearingTightness,
         competitorWatch: compDevice,
         trainingType: tType,
+        distance: _distanceCtrl.text.trim().isEmpty ? '-' : _distanceCtrl.text.trim(),
         location: _locationCtrl.text.trim(),
         remarks: _memoCtrl.text.trim(),
         consentDate: _prefs?.consentDate ?? '',
@@ -635,6 +704,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         wearingTightness: _wearingTightness,
         competitorWatch: compDevice,
         trainingType: tType,
+        distance: _distanceCtrl.text.trim().isEmpty ? '-' : _distanceCtrl.text.trim(),
         location: _locationCtrl.text.trim(),
         memo: memo,
         session: _session!,
@@ -684,6 +754,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       _customStrapCtrl.clear();
       _customCompetitorCtrl.clear();
       _customTrainingCtrl.clear();
+      _distanceCtrl.clear();
       _wearingPosition = '왼쪽';
       _wearingTightness = '적당히';
       _competitorWatch = '없음';
@@ -1536,6 +1607,92 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
         ),
         const SizedBox(height: 12),
+        if (_hasUpdate) ...[
+          AnimatedBuilder(
+            animation: _updateNoticePulseController!,
+            builder: (context, child) {
+              final double val = _updateNoticePulseController?.value ?? 0.0;
+              final Color pulseColor = Color.lerp(
+                const Color(0xFF2E5BFF),
+                const Color(0xFF3DFFC1),
+                val,
+              )!;
+
+              return Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: pulseColor.withOpacity(0.3 * val),
+                      blurRadius: 10 + (8 * val),
+                      spreadRadius: 1 + (2 * val),
+                    )
+                  ],
+                ),
+                child: child,
+              );
+            },
+            child: InkWell(
+              onTap: () async {
+                if (_prefs != null) {
+                  await _prefs!.saveLastDismissedUpdateVersion(_updateVersionName);
+                }
+                setState(() {
+                  _hasUpdate = false;
+                });
+                
+                if (!mounted) return;
+                await Navigator.push(
+                  context,
+                  InstantPageRoute(
+                    page: SettingsScreen(
+                      prefs: _prefs!,
+                      highlightUpdate: true,
+                    ),
+                  ),
+                );
+                _reloadPrefs();
+                _checkAppUpdate();
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: GlassCard(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                radius: 16,
+                child: Row(
+                  children: [
+                    const Icon(Icons.system_update_rounded, color: Color(0xFF3DFFC1), size: 26),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '앱 업데이트 요청 (v$_updateVersionName 출시) 🆕',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3DFFC1).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF3DFFC1), width: 1),
+                      ),
+                      child: const Text(
+                        '업데이트',
+                        style: TextStyle(fontSize: 10, color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (_latestNotice != null) ...[
           AnimatedBuilder(
             animation: _noticePulseController!,
@@ -1916,6 +2073,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           _buildCompetitorSection(),
           const SizedBox(height: 16),
 
+          // 훈련 거리
+          _buildDistanceSection(),
+          const SizedBox(height: 16),
+
           // 훈련 종류
           _buildTrainingSection(),
           const SizedBox(height: 16),
@@ -2181,6 +2342,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               ),
             ),
           ]
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDistanceSection() {
+    return GlassCard(
+      radius: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('훈련 거리', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _distanceCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            ],
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.linear_scale_rounded, size: 20),
+              hintText: '예) 21.09',
+              suffixText: 'km',
+            ),
+          ),
         ],
       ),
     );

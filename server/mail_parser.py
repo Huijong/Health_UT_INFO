@@ -28,6 +28,7 @@ def parse_email_body(body_text):
     tightness_match = re.search(r"착용[ \t]*정도[ \t]*:[ \t]*(.*)", body_text)
     competitor_match = re.search(r"동시착용[ \t]*타사기기[ \t]*:[ \t]*(.*)", body_text)
     training_match = re.search(r"훈련[ \t]*종류[ \t]*:[ \t]*(.*)", body_text)
+    distance_match = re.search(r"훈련[ \t]*거리[ \t]*:[ \t]*(.*)", body_text)
     location_match = re.search(r"장소[ \t]*:[ \t]*(.*)", body_text)
     remarks_match = re.search(r"특이[ \t]*사항[ \t]*:[ \t]*(.*)", body_text)
     
@@ -40,6 +41,10 @@ def parse_email_body(body_text):
     if not link_match:
         link_match = re.search(r"(https?://[^\s\r\n]+)", body_text)
     
+    distance_val = distance_match.group(1).strip() if distance_match else "-"
+    if distance_val.endswith(" km"):
+        distance_val = distance_val[:-3].strip()
+
     return {
         "tester_name": name_match.group(1).strip() if name_match else "알 수 없음",
         "session_id": session_match.group(1).strip() if session_match else "알 수 없음",
@@ -54,6 +59,7 @@ def parse_email_body(body_text):
         "wearing_tightness": tightness_match.group(1).strip() if tightness_match else "알 수 없음",
         "competitor_watch": competitor_match.group(1).strip() if competitor_match else "알 수 없음",
         "training_type": training_match.group(1).strip() if training_match else "알 수 없음",
+        "distance": distance_val,
         "location": location_match.group(1).strip() if location_match else "알 수 없음",
         "remarks": remarks_match.group(1).strip() if remarks_match else "",
         "share_link": link_match.group(1).strip() if link_match else "",

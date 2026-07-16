@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
@@ -48,7 +49,8 @@ ThemeData getSettingsTheme(BuildContext context) {
 
 class SettingsScreen extends StatefulWidget {
   final PrefsService prefs;
-  const SettingsScreen({super.key, required this.prefs});
+  final bool highlightUpdate;
+  const SettingsScreen({super.key, required this.prefs, this.highlightUpdate = false});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -63,6 +65,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late String _strap;
   late String _customStrap;
   bool _hasUpdate = false;
+
+  bool _blinkHighlightActive = false;
+  bool _blinkState = false;
+  Timer? _blinkTimer;
 
   @override
   void initState() {
@@ -79,6 +85,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_strap.isEmpty) _strap = kStrapOptions.first['name']!;
     
     _checkForUpdate();
+
+    _blinkHighlightActive = widget.highlightUpdate;
+    if (_blinkHighlightActive) {
+      _blinkTimer = Timer.periodic(const Duration(milliseconds: 400), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        setState(() {
+          _blinkState = !_blinkState;
+        });
+      });
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted) {
+          setState(() {
+            _blinkHighlightActive = false;
+            _blinkTimer?.cancel();
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _blinkTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _saveAll() async {
@@ -309,6 +342,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         subtitle: 'HealthPort(APK) 최신버전을 스마트폰에 다운로드하고 설치합니다.',
                         icon: Icons.system_update_rounded,
                         showBadge: _hasUpdate,
+                        isHighlighted: _blinkHighlightActive,
                         onTap: () {
                           _downloadAndInstallApk(
                             latestApkApiUrl: '${AppConfig.apiUrl}/api/devices?latest_apk=true',
@@ -398,8 +432,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required IconData icon,
     required VoidCallback onTap,
     bool showBadge = false,
+    bool isHighlighted = false,
   }) {
     return _GlassCard(
+      borderColor: isHighlighted
+          ? (_blinkState ? const Color(0xFF3DFFC1) : const Color(0xFF2E5BFF))
+          : null,
+      backgroundColor: isHighlighted
+          ? (_blinkState ? const Color(0xFF3DFFC1).withOpacity(0.12) : const Color(0xFF2E5BFF).withOpacity(0.08))
+          : null,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
