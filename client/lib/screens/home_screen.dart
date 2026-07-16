@@ -844,7 +844,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       final f = await FileService.pickCola();
       if (f != null && mounted) {
         final fileName = f.originalPath.split('/').last.split('\\').last;
-        if (!fileName.toLowerCase().startsWith('cola_file')) {
+        if (!fileName.toLowerCase().startsWith('cola')) {
           _showFileError('Cola.zip', '선택한 파일이 COLA_FILE로 시작하는 zip 파일이 아닙니다.');
           return;
         }
@@ -1794,7 +1794,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           _buildAttachCard(
             icon: Icons.directions_bike_rounded,
             title: 'Garmin FIT 파일 추가',
-            hint: 'Download/ (zip)',
+            hint: 'Download/23606307436.zip',
             busy: _fileBusy,
             onTap: _pickGarminFit,
             files: _garminFiles,
@@ -1804,7 +1804,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           // Cola
           _buildAttachCard(
             icon: Icons.folder_zip_outlined,
-            title: 'Cola.zip 추가',
+            title: 'COLA 파일 추가',
             hint: 'Documents/COLA_FILE/COLA_FILE*.zip',
             busy: _fileBusy,
             onTap: _pickCola,
