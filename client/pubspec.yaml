@@ -80,6 +80,9 @@ flutter:
   assets:
     - assert/Demo_7.mp4
     - assert/202607115.mp4
+    - assert/Quick_1.png
+    - assert/Quick_2.png
+    - assert/Quick_3.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

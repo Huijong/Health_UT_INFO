@@ -222,6 +222,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   bool _emailSending = false;
   bool _emailSent = false;
   String? _emailError;
+  String _step6State = 'waiting'; // waiting, sending, success
+  DateTime? _shareSheetOpenTime;
 
   DeviceSession? _session;
   PrefsService? _prefs;
@@ -524,6 +526,166 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     );
   }
 
+  void _showQuickShareGuideDialog(VoidCallback onConfirm) {
+    int guideIndex = 0;
+    bool dontShowAgain = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final images = [
+              'assert/Quick_1.png',
+              'assert/Quick_2.png',
+              'assert/Quick_3.png',
+            ];
+            final texts = [
+              '1. 퀵 쉐어 버튼 누르기',
+              '2. QR 코드 또는 링크 누르기',
+              '3. 링크 복사 누룬 후 뒤로 가기(Back 키)',
+            ];
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: GlassCard(
+                padding: const EdgeInsets.all(20),
+                radius: 20,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          '퀵 쉐어 가이드',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          '${guideIndex + 1} / 3',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.6),
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 280,
+                        width: double.infinity,
+                        color: Colors.black26,
+                        child: Image.asset(
+                          images[guideIndex],
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      texts[guideIndex],
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF3DFFC1),
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(color: Colors.white10, height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setDialogState(() {
+                              dontShowAgain = !dontShowAgain;
+                            });
+                          },
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: dontShowAgain,
+                                  activeColor: const Color(0xFF3DFFC1),
+                                  checkColor: Colors.black,
+                                  onChanged: (val) {
+                                    setDialogState(() {
+                                      dontShowAgain = val ?? false;
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '다시 보지 않기',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.6),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (guideIndex < 2)
+                          ElevatedButton(
+                            onPressed: () {
+                              setDialogState(() {
+                                guideIndex++;
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E5BFF),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('다음', style: TextStyle(fontWeight: FontWeight.bold)),
+                          )
+                        else
+                          ElevatedButton(
+                            onPressed: () async {
+                              if (dontShowAgain) {
+                                await _prefs?.saveHideQuickShareGuide(true);
+                              }
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                              }
+                              onConfirm();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3DFFC1),
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('확인', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _checkAppUpdate() async {
     try {
       final url = Uri.parse('${AppConfig.apiUrl}/api/devices?latest_apk=true');
@@ -648,13 +810,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       if (!text.startsWith('http')) return;
 
       final lowerText = text.toLowerCase();
-      final pattern = AppConfig.quickSharePattern.toLowerCase();
-      final isQuickShare = lowerText.contains(pattern) ||
-          lowerText.contains('samsungcloud.com') ||
-          lowerText.contains('quickshare') ||
+      final isQuickShare = lowerText.contains('quickshare.samsungcloud.com') ||
           lowerText.contains('sharing.samsung') ||
-          lowerText.contains('q1team.cc');
+          lowerText.contains('q1team.cc') ||
+          lowerText.contains('quickshare');
       if (!isQuickShare) return;
+
+      if (_shareSheetOpenTime != null) {
+        final diff = DateTime.now().difference(_shareSheetOpenTime!);
+        if (diff.inMilliseconds < 100) return;
+      }
 
       setState(() {
         _lastProcessedLink = text;
@@ -670,6 +835,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     setState(() {
       _emailSending = true;
       _emailError = null;
+      _step6State = 'sending';
     });
 
     try {
@@ -713,6 +879,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         setState(() {
           _emailSending = false;
           _emailSent = true;
+          _step6State = 'success';
         });
 
         // 1초 뒤에 새로운 검증 시작하기 버튼 동작처럼 초기화 후 운동 선택(4단계) 화면으로 이동
@@ -734,6 +901,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         setState(() {
           _emailSending = false;
           _emailError = e.toString();
+          _step6State = 'waiting';
         });
       }
     }
@@ -804,8 +972,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         setState(() {
           _packResult = result;
           _isPackaging = false;
+          _step6State = 'waiting';
         });
       }
+
+      // 클립보드 비우기 대신 현재 클립보드 값 읽어와 캐싱 (연결된 기기 복사 토스트 제거)
+      try {
+        final currentClip = await Clipboard.getData(Clipboard.kTextPlain);
+        _lastProcessedLink = currentClip?.text?.trim() ?? '';
+      } catch (_) {
+        _lastProcessedLink = '';
+      }
+      _shareSheetOpenTime = DateTime.now();
 
       // 압축 성공 후 자동으로 Quick Share 호출
       await ShareService.shareZip(result.zipPath, result.zipName);
@@ -851,6 +1029,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       _emailSending = false;
       _emailSent = false;
       _emailError = null;
+      _step6State = 'waiting';
+      _shareSheetOpenTime = null;
     });
   }
 
@@ -2496,6 +2676,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   }
 
   // ── Step 6: 압축 & 전송 완료 (Dashboard) ─────────────────────────
+  Future<void> _onReshare() async {
+    if (_packResult == null) return;
+    try {
+      final currentClip = await Clipboard.getData(Clipboard.kTextPlain);
+      _lastProcessedLink = currentClip?.text?.trim() ?? '';
+    } catch (_) {
+      _lastProcessedLink = '';
+    }
+    _shareSheetOpenTime = DateTime.now();
+    await ShareService.shareZip(_packResult!.zipPath, _packResult!.zipName);
+  }
+
   Widget _buildStep6Completion() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -2508,12 +2700,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           child: Stack(
             alignment: Alignment.center,
             children: [
-              if (_isPackaging || _emailSending)
+              if (_isPackaging || _step6State == 'sending')
                 const CircularProgressIndicator(
                   strokeWidth: 6,
                   valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
                 )
-              else
+              else if (_step6State == 'success')
                 Container(
                   width: 110,
                   height: 110,
@@ -2527,6 +2719,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     color: Color(0xFF3DFFC1),
                     size: 52,
                   ),
+                )
+              else
+                Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF2E5BFF).withOpacity(0.12),
+                    border: Border.all(color: const Color(0xFF2E5BFF), width: 3),
+                  ),
+                  child: const Icon(
+                    Icons.link_rounded,
+                    color: Color(0xFF2E5BFF),
+                    size: 52,
+                  ),
                 ),
             ],
           ),
@@ -2535,9 +2742,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         Text(
           _isPackaging
               ? '파일을 압축 중입니다...'
-              : (_emailSending
+              : (_step6State == 'sending'
                   ? '이메일로 전송을 완료하는 중...'
-                  : '데이터 제출 성공'),
+                  : (_step6State == 'success'
+                      ? '데이터 제출 성공'
+                      : 'Quick Share 링크 대기 중...')),
           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 24),
@@ -2597,9 +2806,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               // Timeline Step 3: 백엔드 이메일 발송
               _buildTimelineStep(
                 title: '이메일 발송 상태',
-                status: _emailSent ? '발송 완료' : (_emailSending ? '발송 중...' : '감지 대기 중'),
+                status: _step6State == 'success' ? '발송 완료' : (_step6State == 'sending' ? '발송 중...' : '감지 대기 중'),
                 desc: _emailError != null ? '오류: $_emailError' : null,
-                isDone: _emailSent,
+                isDone: _step6State == 'success',
                 isError: _emailError != null,
               ),
 
@@ -2620,20 +2829,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         ),
         const SizedBox(height: 30),
 
-        // 4. 새로운 검증 시작하기 버튼
-        ElevatedButton.icon(
-          onPressed: _resetVerification,
-          icon: const Icon(Icons.restart_alt_rounded, color: Colors.black),
-          label: const Text(
-            '새로운 검증 시작하기',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+        // 4. 상태별 제어 버튼
+        if (_step6State == 'success')
+          ElevatedButton.icon(
+            onPressed: _resetVerification,
+            icon: const Icon(Icons.restart_alt_rounded, color: Colors.black),
+            label: const Text(
+              '새로운 검증 시작하기',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3DFFC1),
+              minimumSize: const Size.fromHeight(54),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          )
+        else ...[
+          ElevatedButton.icon(
+            onPressed: _isPackaging || _step6State == 'sending' ? null : _onReshare,
+            icon: const Icon(Icons.share_rounded, color: Colors.black),
+            label: const Text(
+              '다시 공유하기 (퀵쉐어)',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3DFFC1),
+              minimumSize: const Size.fromHeight(54),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
           ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF3DFFC1),
-            minimumSize: const Size.fromHeight(54),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: _isPackaging || _step6State == 'sending' ? null : _resetVerification,
+            child: Text(
+              '검증 취소 및 초기화',
+              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 30),
       ],
     );
@@ -2741,7 +2974,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             child: ElevatedButton(
               onPressed: () async {
                 if (isStep5) {
-                  _onSend();
+                  if (_prefs?.hideQuickShareGuide == true) {
+                    _onSend();
+                  } else {
+                    _showQuickShareGuideDialog(_onSend);
+                  }
                 } else if (canNext) {
                   if (_currentStep == 1) {
                     if (!_formKey1.currentState!.validate()) return;
