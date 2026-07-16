@@ -50,6 +50,7 @@ class PrefsService {
   String get consentDate => _prefs.getString(_keyConsentDate) ?? '';
   String get lastDismissedUpdateVersion => _prefs.getString('last_dismissed_update_version') ?? '';
   String get lastPopupDismissedVersion => _prefs.getString('last_popup_dismissed_version') ?? '';
+  bool get hideQuickShareGuide => _prefs.getBool('hide_quick_share_guide') ?? false;
 
   Future<void> saveName(String value) => _prefs.setString(_keyName, value);
   Future<void> saveHeight(double value) => _prefs.setDouble(_keyHeight, value);
@@ -67,4 +68,5 @@ class PrefsService {
   Future<void> saveConsentDate(String value) => _prefs.setString(_keyConsentDate, value);
   Future<void> saveLastDismissedUpdateVersion(String value) => _prefs.setString('last_dismissed_update_version', value);
   Future<void> saveLastPopupDismissedVersion(String value) => _prefs.setString('last_popup_dismissed_version', value);
+  Future<void> saveHideQuickShareGuide(bool value) => _prefs.setBool('hide_quick_share_guide', value);
 }
