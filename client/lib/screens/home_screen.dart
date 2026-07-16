@@ -440,6 +440,90 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
+  void _showForceUpdateDialog(String serverVersion) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassCard(
+            padding: const EdgeInsets.all(24),
+            radius: 20,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.system_update_rounded, color: Color(0xFF3DFFC1), size: 48),
+                const SizedBox(height: 16),
+                const Text(
+                  '필수 업데이트 안내',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'HealthPort의 새로운 버전(v$serverVersion)이 출시되었습니다.\n\n원활한 검증 진행을 위해 반드시 업데이트 후 이용해 주세요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.7), height: 1.5),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () async {
+                          await _prefs?.saveLastPopupDismissedVersion(serverVersion);
+                          setState(() {
+                            _hasUpdate = true;
+                            _updateVersionName = serverVersion;
+                          });
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white54,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('나중에 하기', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (BuildContext context) {
+                              return DownloadDialog(
+                                latestApkApiUrl: '${AppConfig.apiUrl}/api/devices?latest_apk=true',
+                                defaultFileName: 'HealthPort_${AppConfig.appVersion}.apk',
+                                defaultUrlPath: '/static/apks/HealthPort_${AppConfig.appVersion}.apk',
+                              );
+                            },
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3DFFC1),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('업데이트 시작', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _checkAppUpdate() async {
     try {
       final url = Uri.parse('${AppConfig.apiUrl}/api/devices?latest_apk=true');
@@ -475,12 +559,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             }
 
             if (isNewer) {
+              setState(() {
+                _hasUpdate = true;
+                _updateVersionName = serverVersion;
+              });
               final lastDismissed = _prefs?.lastDismissedUpdateVersion ?? '';
-              if (lastDismissed != serverVersion && mounted) {
-                setState(() {
-                  _hasUpdate = true;
-                  _updateVersionName = serverVersion;
-                });
+              final lastPopupDismissed = _prefs?.lastPopupDismissedVersion ?? '';
+              if (lastDismissed != serverVersion && lastPopupDismissed != serverVersion) {
+                _showForceUpdateDialog(serverVersion);
               }
             }
           }
@@ -2668,14 +2754,63 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         final res = jsonDecode(response.body);
                         if (res['status'] == 'success' && res['exists'] == true) {
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('이미 등록된 닉네임입니다. 다른 닉네임을 입력해 주세요.'),
-                                backgroundColor: Colors.redAccent,
+                            final bool? reuse = await showDialog<bool>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (ctx) => Dialog(
+                                backgroundColor: Colors.transparent,
+                                child: GlassCard(
+                                  padding: const EdgeInsets.all(24),
+                                  radius: 20,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.info_outline_rounded, color: Color(0xFF3DFFC1), size: 24),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            '닉네임 연동 확인',
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        '"$nickname"은(는) 이미 등록된 닉네임입니다.\n\n기존에 이 닉네임을 사용하시던 본인이 맞으신가요?\n"예"를 누르면 기존 수집 내역 및 포인트(명예의 전당)를 유지하며 계속 연동합니다.',
+                                        style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.7), height: 1.5),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, false),
+                                            child: const Text('아니오', style: TextStyle(color: Colors.white54)),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          ElevatedButton(
+                                            onPressed: () => Navigator.pop(ctx, true),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF3DFFC1),
+                                              foregroundColor: Colors.black,
+                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            ),
+                                            child: const Text('예', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             );
+                            if (reuse != true) return;
+                          } else {
+                            return;
                           }
-                          return;
                         }
                       }
                     } catch (e) {
