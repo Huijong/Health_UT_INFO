@@ -1021,15 +1021,121 @@ class _StrapEditPageState extends State<StrapEditPage> {
                         const Padding(
                           padding: EdgeInsets.only(left: 4, bottom: 16),
                           child: Text(
-                            '테스트 중인 워치 스트랩 종류',
+                            '1안(추천), 2안 중 테스트 시 부착한 스트랩을 고르세요.',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        // 1안 카드
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, top: 8, bottom: 8),
+                          child: Text(
+                            '1안 (기본 스트랩/직접 입력)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFE2E2E2).withOpacity(0.7),
+                            ),
                           ),
                         ),
                         GlassCard(
                           padding: EdgeInsets.zero,
                           child: Column(
                             children: [
-                              ...kStrapOptions.map((strapOpt) {
+                              ...kStrapOptions
+                                  .where((opt) => opt['name'] == '기본 스트랩' || opt['name'] == '직접입력')
+                                  .map((strapOpt) {
+                                final strapName = strapOpt['name']!;
+                                final isSel = _selectedStrap == strapName;
+
+                                return RadioListTile<String>(
+                                  title: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              strapName,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                                color: isSel ? const Color(0xFF3DFFC1) : const Color(0xFFE2E2E2),
+                                              ),
+                                            ),
+                                            if (strapName == '기본 스트랩') ...[
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF3DFFC1).withOpacity(0.15),
+                                                  border: Border.all(color: const Color(0xFF3DFFC1), width: 1),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  '추천',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF3DFFC1),
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  value: strapName,
+                                  activeColor: Colors.white,
+                                  groupValue: _selectedStrap,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() => _selectedStrap = val);
+                                    }
+                                  },
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                        if (_selectedStrap == '직접입력') ...[
+                          const SizedBox(height: 12),
+                          GlassCard(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: TextField(
+                                controller: _customStrapCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: '스트랩 정보 직접 입력',
+                                  hintText: '예: 메탈 체인 스트랩',
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+
+                        // 2안 카드
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, top: 8, bottom: 8),
+                          child: Text(
+                            '2안 (공식/서드파티 스트랩)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFE2E2E2).withOpacity(0.7),
+                            ),
+                          ),
+                        ),
+                        GlassCard(
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            children: [
+                              ...kStrapOptions
+                                  .where((opt) => opt['name'] != '기본 스트랩' && opt['name'] != '직접입력')
+                                  .map((strapOpt) {
                                 final strapName = strapOpt['name']!;
                                 final url = strapOpt['url']!;
                                 final isSel = _selectedStrap == strapName;
@@ -1069,21 +1175,6 @@ class _StrapEditPageState extends State<StrapEditPage> {
                             ],
                           ),
                         ),
-                        if (_selectedStrap == '직접입력') ...[
-                          const SizedBox(height: 16),
-                          GlassCard(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: TextField(
-                                controller: _customStrapCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: '스트랩 정보 직접 입력',
-                                  hintText: '예: 메탈 체인 스트랩',
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
