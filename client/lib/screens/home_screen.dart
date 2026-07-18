@@ -1797,20 +1797,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '1안(추천), 2안 중 테스트 시 부착한 스트랩을 고르세요.',
-          style: TextStyle(
-            fontSize: 13,
-            color: const Color(0xFFE2E2E2).withOpacity(0.7),
-          ),
-        ),
-        const SizedBox(height: 20),
-
         // 1안 카드
         Padding(
           padding: const EdgeInsets.only(left: 4, top: 8, bottom: 8),
           child: Text(
-            '1안 (기본 스트랩/직접 입력)',
+            '기본 스트랩/직접 입력',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1840,25 +1831,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                 color: isSel ? const Color(0xFF3DFFC1) : const Color(0xFFE2E2E2),
                               ),
                             ),
-                            if (strapName == '기본 스트랩') ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF3DFFC1).withOpacity(0.15),
-                                  border: Border.all(color: const Color(0xFF3DFFC1), width: 1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  '추천',
-                                  style: TextStyle(
-                                    color: Color(0xFF3DFFC1),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -1903,7 +1875,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         Padding(
           padding: const EdgeInsets.only(left: 4, top: 8, bottom: 8),
           child: Text(
-            '2안 (공식/서드파티 스트랩)',
+            '공식/서드파티 스트랩',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
