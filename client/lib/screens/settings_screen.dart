@@ -1054,25 +1054,6 @@ class _StrapEditPageState extends State<StrapEditPage> {
                                                 color: isSel ? const Color(0xFF3DFFC1) : const Color(0xFFE2E2E2),
                                               ),
                                             ),
-                                            if (strapName == '기본 스트랩') ...[
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF3DFFC1).withOpacity(0.15),
-                                                  border: Border.all(color: const Color(0xFF3DFFC1), width: 1),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: const Text(
-                                                  '추천',
-                                                  style: TextStyle(
-                                                    color: Color(0xFF3DFFC1),
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
                                           ],
                                         ),
                                       ),

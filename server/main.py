@@ -223,6 +223,10 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
             history = await cursor.to_list(length=1000)
             for h in history:
                 h["_id"] = str(h["_id"])
+                if isinstance(h.get("created_at"), datetime):
+                    h["created_at"] = h["created_at"].isoformat()
+                if "email_id" in h:
+                    h["email_id"] = str(h["email_id"])
             return JSONResponse(content={"status": "success", "data": history})
 
         if rankings:
@@ -457,6 +461,10 @@ async def get_tester_points_history(tester_name: str):
         history = await cursor.to_list(length=1000)
         for h in history:
             h["_id"] = str(h["_id"])
+            if isinstance(h.get("created_at"), datetime):
+                h["created_at"] = h["created_at"].isoformat()
+            if "email_id" in h:
+                h["email_id"] = str(h["email_id"])
         return JSONResponse(content={"status": "success", "data": history})
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
