@@ -1018,18 +1018,11 @@ class _StrapEditPageState extends State<StrapEditPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Padding(
-                          padding: EdgeInsets.only(left: 4, bottom: 16),
-                          child: Text(
-                            '1안(추천), 2안 중 테스트 시 부착한 스트랩을 고르세요.',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ),
                         // 1안 카드
                         Padding(
                           padding: const EdgeInsets.only(left: 4, top: 8, bottom: 8),
                           child: Text(
-                            '1안 (기본 스트랩/직접 입력)',
+                            '기본 스트랩/직접 입력',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -1121,7 +1114,7 @@ class _StrapEditPageState extends State<StrapEditPage> {
                         Padding(
                           padding: const EdgeInsets.only(left: 4, top: 8, bottom: 8),
                           child: Text(
-                            '2안 (공식/서드파티 스트랩)',
+                            '공식/서드파티 스트랩',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
