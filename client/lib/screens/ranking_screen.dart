@@ -138,21 +138,19 @@ class _RankingScreenState extends State<RankingScreen> {
                           _buildMyRankHighlightCard(),
                           const SizedBox(height: 24),
                           
-                          // 랭킹 리스트 타이틀
-                          const Padding(
-                            padding: EdgeInsets.only(left: 4, bottom: 12),
-                            child: Text(
-                              '전체 순위',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white70,
+                          // 랭킹 리스트 타이틀 및 포디움 / 목록
+                          if (_rankings.isEmpty) ...[
+                            const Padding(
+                              padding: EdgeInsets.only(left: 4, bottom: 12),
+                              child: Text(
+                                '전체 순위',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white70,
+                                ),
                               ),
                             ),
-                          ),
-                          
-                          // 전체 순위 테이블 목록
-                          if (_rankings.isEmpty)
                             const Center(
                               child: Padding(
                                 padding: EdgeInsets.all(40),
@@ -161,15 +159,33 @@ class _RankingScreenState extends State<RankingScreen> {
                                   style: TextStyle(color: Colors.white38, fontSize: 14),
                                 ),
                               ),
-                            )
-                          else
-                            ...List.generate(_rankings.length, (index) {
-                              final item = _rankings[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildRankingItem(item, index),
-                              );
-                            }),
+                            ),
+                          ] else ...[
+                            _buildPodiumWidget(),
+                            const SizedBox(height: 24),
+                            
+                            if (_rankings.length > 3) ...[
+                              const Padding(
+                                padding: EdgeInsets.only(left: 4, bottom: 12),
+                                child: Text(
+                                  '전체 순위 (4위 ~)',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                              ...List.generate(_rankings.length - 3, (index) {
+                                final actualIndex = index + 3;
+                                final item = _rankings[actualIndex];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildRankingItem(item, actualIndex),
+                                );
+                              }),
+                            ],
+                          ],
                         ],
                       ),
                     ),
@@ -404,6 +420,199 @@ class _RankingScreenState extends State<RankingScreen> {
     );
   }
 
+  Widget _buildPodiumWidget() {
+    final rank1 = _rankings.isNotEmpty ? _rankings[0] : null;
+    final rank2 = _rankings.length > 1 ? _rankings[1] : null;
+    final rank3 = _rankings.length > 2 ? _rankings[2] : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            '명예의 전당 (Top 3)',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Colors.white70,
+            ),
+          ),
+        ),
+        _GlassCard(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 28, bottom: 16, left: 12, right: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _buildPodiumColumn(rank2, 2, 60),
+                _buildPodiumColumn(rank1, 1, 85),
+                _buildPodiumColumn(rank3, 3, 50),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPodiumColumn(dynamic item, int rank, double barHeight) {
+    if (item == null) {
+      return Expanded(
+        child: Opacity(
+          opacity: 0.15,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: rank == 1 ? 28 : 24,
+                backgroundColor: Colors.white10,
+                child: const Text('-', style: TextStyle(color: Colors.white30)),
+              ),
+              const SizedBox(height: 8),
+              const Text('-', style: TextStyle(color: Colors.white30, fontSize: 12)),
+              const SizedBox(height: 4),
+              Container(
+                height: barHeight,
+                width: 60,
+                decoration: const BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    topRight: Radius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final name = item['tester_name'] ?? '';
+    final points = item['points'] ?? 0;
+    final submissions = item['submissions'] ?? 0;
+    final isMe = name == widget.prefs.name.trim();
+
+    Color themeColor;
+    Color glowColor;
+    String badgeEmoji;
+    double avatarRadius;
+
+    if (rank == 1) {
+      themeColor = const Color(0xFFFFD700); // Gold
+      glowColor = const Color(0xFFFFD700).withOpacity(0.2);
+      badgeEmoji = '👑';
+      avatarRadius = 28;
+    } else if (rank == 2) {
+      themeColor = const Color(0xFFC0C0C0); // Silver
+      glowColor = Colors.white.withOpacity(0.1);
+      badgeEmoji = '🥈';
+      avatarRadius = 24;
+    } else {
+      themeColor = const Color(0xFFCD7F32); // Bronze
+      glowColor = const Color(0xFFCD7F32).withOpacity(0.15);
+      badgeEmoji = '🥉';
+      avatarRadius = 24;
+    }
+
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor,
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: avatarRadius,
+              backgroundColor: isMe ? const Color(0xFF3DFFC1) : themeColor.withOpacity(0.15),
+              child: CircleAvatar(
+                radius: avatarRadius - 2,
+                backgroundColor: const Color(0xFF1E2020),
+                child: Text(
+                  rank == 1
+                      ? '🥇'
+                      : rank == 2
+                          ? '🥈'
+                          : '🥉',
+                  style: TextStyle(
+                    fontSize: rank == 1 ? 22 : 18,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
+                color: isMe ? const Color(0xFF3DFFC1) : Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${points}P (${submissions}건)',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+              color: themeColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            height: barHeight,
+            width: 60,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  themeColor.withOpacity(0.4),
+                  themeColor.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              border: Border.all(
+                color: themeColor.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$rank',
+              style: TextStyle(
+                fontSize: rank == 1 ? 18 : 14,
+                fontWeight: FontWeight.bold,
+                color: themeColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
   Widget _buildRankingItem(dynamic item, int index) {
     final name = item['tester_name'] ?? '알 수 없음';
     final points = item['points'] ?? 0;
@@ -500,7 +709,7 @@ class _RankingScreenState extends State<RankingScreen> {
               ),
             ),
             Text(
-              '$submissions건 $points포인트',
+              '$submissions건 / $points포인트',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
