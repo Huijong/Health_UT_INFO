@@ -343,13 +343,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         icon: Icons.system_update_rounded,
                         showBadge: _hasUpdate,
                         isHighlighted: _blinkHighlightActive,
-                        onTap: () {
-                          _downloadAndInstallApk(
-                            latestApkApiUrl: '${AppConfig.apiUrl}/api/devices?latest_apk=true',
-                            defaultFileName: 'HealthPort_${AppConfig.appVersion}.apk',
-                            defaultUrlPath: '/static/apks/HealthPort_${AppConfig.appVersion}.apk',
-                          );
-                        },
+                        onTap: _handleHealthPortUpdate,
                       ),
                       const SizedBox(height: 24),
                       _buildSectionHeader('HealthPort 버전'),
@@ -390,6 +384,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _handleHealthPortUpdate() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: const EdgeInsets.all(24.0),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E2020),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+              ),
+              SizedBox(height: 16),
+              Text(
+                '최신 버전 확인 중...',
+                style: TextStyle(color: Colors.white, fontSize: 14, decoration: TextDecoration.none),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final dio = Dio();
+      final response = await dio.get('${AppConfig.apiUrl}/api/devices?latest_apk=true');
+      if (mounted) Navigator.pop(context); // Dismiss loading dialog
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data['status'] == 'success') {
+          final filename = data['filename'] as String;
+          final regExp = RegExp(r'HealthPort_([0-9\.]+)\.apk');
+          final match = regExp.firstMatch(filename);
+          if (match != null) {
+            final serverVersion = match.group(1)!;
+            final localVersion = AppConfig.appVersion;
+            
+            if (serverVersion == localVersion) {
+              if (mounted) {
+                _showUpdateNotNeededDialog(localVersion);
+              }
+              return;
+            }
+          }
+        }
+      }
+      
+      _downloadAndInstallApk(
+        latestApkApiUrl: '${AppConfig.apiUrl}/api/devices?latest_apk=true',
+        defaultFileName: 'HealthPort_${AppConfig.appVersion}.apk',
+        defaultUrlPath: '/static/apks/HealthPort_${AppConfig.appVersion}.apk',
+      );
+    } catch (e) {
+      if (mounted) Navigator.pop(context); // Dismiss loading if error
+      _downloadAndInstallApk(
+        latestApkApiUrl: '${AppConfig.apiUrl}/api/devices?latest_apk=true',
+        defaultFileName: 'HealthPort_${AppConfig.appVersion}.apk',
+        defaultUrlPath: '/static/apks/HealthPort_${AppConfig.appVersion}.apk',
+      );
+    }
+  }
+
+  void _showUpdateNotNeededDialog(String version) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2020),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          '업데이트 안내',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          '현재 설치된 버전($version)과 최신 업데이트 버전이 동일합니다.\n업데이트가 필요하지 않습니다.',
+          style: const TextStyle(color: Color(0xFFE2E2E2)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              '확인',
+              style: TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }
