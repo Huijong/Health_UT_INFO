@@ -518,9 +518,12 @@ class _RankingScreenState extends State<RankingScreen> {
     }
 
     return Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      child: GestureDetector(
+        onTap: () => _showTesterHistory(name),
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -609,6 +612,7 @@ class _RankingScreenState extends State<RankingScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -683,42 +687,221 @@ class _RankingScreenState extends State<RankingScreen> {
       );
     }
 
-    return _GlassCard(
-      borderColor: isMe ? const Color(0xFF3DFFC1).withOpacity(0.5) : null,
-      backgroundColor: isMe ? const Color(0xFF3DFFC1).withOpacity(0.04) : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            rankWidget,
-            const SizedBox(width: 14),
-            Expanded(
-              child: Row(
-                children: [
-                  Text(
-                    name,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                      color: isMe ? const Color(0xFF3DFFC1) : Colors.white,
+    return GestureDetector(
+      onTap: () => _showTesterHistory(name),
+      child: _GlassCard(
+        borderColor: isMe ? const Color(0xFF3DFFC1).withOpacity(0.5) : null,
+        backgroundColor: isMe ? const Color(0xFF3DFFC1).withOpacity(0.04) : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              rankWidget,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Row(
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
+                        color: isMe ? const Color(0xFF3DFFC1) : Colors.white,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  changeWidget,
-                ],
+                    const SizedBox(width: 10),
+                    changeWidget,
+                  ],
+                ),
               ),
-            ),
-            Text(
-              '$submissions건 / $points포인트',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                color: isMe ? const Color(0xFF3DFFC1) : Colors.white70,
+              Text(
+                '$submissions건 / $points포인트',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
+                  color: isMe ? const Color(0xFF3DFFC1) : Colors.white70,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Future<void> _showTesterHistory(String testerName) async {
+    if (testerName.isEmpty || testerName == '알 수 없음') return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF3DFFC1),
+        ),
+      ),
+    );
+
+    List<dynamic> history = [];
+    try {
+      final dio = Dio();
+      final response = await dio.get(
+        '${AppConfig.apiUrl}/api/devices',
+        queryParameters: {
+          'points_history': 'true',
+          'tester_name': testerName.trim(),
+        },
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        if (response.data['status'] == 'success') {
+          history = response.data['data'] ?? [];
+        }
+      }
+    } catch (e) {
+      debugPrint('[History] Error fetching points history: $e');
+    }
+
+    if (!mounted || !context.mounted) return;
+    Navigator.pop(context); // Dismiss loading dialog
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E2020),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 24,
+            bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E2020),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.08),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$testerName님의 포인트 내역',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: history.isEmpty
+                    ? const Center(
+                        child: Text(
+                          '적립된 포인트 이력이 없습니다.',
+                          style: TextStyle(color: Colors.white38),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: history.length,
+                        separatorBuilder: (context, index) => Divider(
+                          color: Colors.white.withOpacity(0.06),
+                          height: 1,
+                        ),
+                        itemBuilder: (context, index) {
+                          final item = history[index];
+                          final points = item['points'] ?? 0;
+                          final memo = item['memo'] ?? '';
+                          final createdAt = item['created_at'] ?? '';
+                          final dateStr = createdAt.length >= 10 ? createdAt.substring(0, 10) : createdAt;
+
+                          final isPositive = points >= 0;
+                          final pointsStr = isPositive ? '+$points P' : '$points P';
+                          final pointsColor = isPositive ? const Color(0xFF3DFFC1) : Colors.redAccent;
+                          final isBigBonus = points >= 4;
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        memo,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        dateStr,
+                                        style: const TextStyle(
+                                          color: Colors.white38,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isBigBonus) ...[
+                                      const Text('🔥 ', style: TextStyle(fontSize: 14)),
+                                    ],
+                                    Text(
+                                      pointsStr,
+                                      style: TextStyle(
+                                        color: pointsColor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

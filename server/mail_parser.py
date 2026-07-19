@@ -159,6 +159,34 @@ def fetch_and_parse_emails():
                             "email_id": parsed_data["_id"]
                         })
                         logging.info(f"포인트 1점 자동 적립 완료: {parsed_data['tester_name']} (email_id: {parsed_data['_id']})")
+
+                        # 거리 보너스 포인트 자동 추가
+                        additional_points = 0
+                        dist_val = 0.0
+                        try:
+                            dist_str = parsed_data.get("distance", "0").strip()
+                            dist_val = float(dist_str)
+                            if 10.0 <= dist_val < 20.0:
+                                additional_points = 1
+                            elif 20.0 <= dist_val < 30.0:
+                                additional_points = 2
+                            elif 30.0 <= dist_val < 40.0:
+                                additional_points = 4
+                            elif dist_val >= 40.0:
+                                additional_points = 6
+                        except ValueError:
+                            pass
+
+                        if additional_points > 0:
+                            points_col.insert_one({
+                                "tester_name": parsed_data["tester_name"],
+                                "points": additional_points,
+                                "memo": f"거리 보너스 적립 ({dist_val}km)",
+                                "month": month_str,
+                                "created_at": parsed_data["received_at"],
+                                "email_id": parsed_data["_id"]
+                            })
+                            logging.info(f"거리 보너스 포인트 {additional_points}점 적립 완료: {parsed_data['tester_name']} ({dist_val}km)")
                     except Exception as pe:
                         logging.error(f"포인트 자동 적립 실패: {pe}")
                 except Exception as e:
