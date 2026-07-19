@@ -1513,7 +1513,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   String _getStepTitle() {
     switch (_currentStep) {
       case 1:
-        return '테스트 프로필 입력';
+        return '프로필 입력';
       case 2:
         return '착용 워치 기종 선택';
       case 3:
@@ -1557,7 +1557,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'HealthPort 서비스 이용을 위한 테스터님의 닉네임을 입력해 주세요.',
+            'HealthPort 서비스 이용을 위한 닉네임을 입력해 주세요.\n※ 설정 > 프로필 설정에서 닉네임을 수정할 수 있습니다.',
             style: TextStyle(
               fontSize: 13,
               color: const Color(0xFFE2E2E2).withOpacity(0.7),
@@ -1571,13 +1571,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 TextFormField(
                   controller: _nameCtrl,
                   decoration: const InputDecoration(
-                    labelText: '닉네임 *',
+                    labelText: '닉네임',
                     hintText: '예) 기안84',
                     prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty) ? '닉네임을 입력해 주세요' : null,
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: _showNicknameFinderBottomSheet,
+              child: Container(
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Color(0xFF5E8BFF),
+                      width: 1.0,
+                    ),
+                  ),
+                ),
+                padding: const EdgeInsets.only(bottom: 1),
+                child: const Text(
+                  '닉네임이 기억나지 않나요? 닉네임 찾기',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF5E8BFF),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -3382,6 +3407,72 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       ],
     );
   }
+
+  Future<void> _showNicknameFinderBottomSheet() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF3DFFC1),
+        ),
+      ),
+    );
+
+    List<String> nicknames = [];
+    try {
+      final response = await http.get(Uri.parse('${AppConfig.apiUrl}/api/devices'));
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        if (decoded['status'] == 'success') {
+          final List<dynamic> devices = decoded['data'] ?? [];
+          nicknames = devices
+              .map((d) => (d['tester_name'] as String?)?.trim() ?? '')
+              .where((name) => name.isNotEmpty)
+              .toSet()
+              .toList();
+          nicknames.sort();
+        }
+      }
+    } catch (e) {
+      debugPrint('[Nickname Finder] Error fetching nicknames: $e');
+    }
+
+    if (!mounted) return;
+    Navigator.pop(context); // Close loading dialog
+
+    if (nicknames.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('등록된 닉네임이 없거나 서버 연결에 실패했습니다.'),
+          backgroundColor: Color(0xFFFF5252),
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E2020),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return _NicknameFinderSheetContent(
+          nicknames: nicknames,
+          onSelect: (selectedName) {
+            setState(() {
+              _nameCtrl.text = selectedName;
+            });
+          },
+        );
+      },
+    );
+  }
 }
 
 // ── 글래스모피즘 카드 위젯 ────────────────────────────────────────────
@@ -3609,4 +3700,145 @@ class _GuideVideoDialogState extends State<_GuideVideoDialog> {
     ),
   );
 }
+}
+
+class _NicknameFinderSheetContent extends StatefulWidget {
+  final List<String> nicknames;
+  final ValueChanged<String> onSelect;
+
+  const _NicknameFinderSheetContent({
+    required this.nicknames,
+    required this.onSelect,
+  });
+
+  @override
+  State<_NicknameFinderSheetContent> createState() => _NicknameFinderSheetContentState();
+}
+
+class _NicknameFinderSheetContentState extends State<_NicknameFinderSheetContent> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  List<String> _filteredNames = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredNames = widget.nicknames;
+  }
+
+  void _filterList(String query) {
+    setState(() {
+      if (query.trim().isEmpty) {
+        _filteredNames = widget.nicknames;
+      } else {
+        _filteredNames = widget.nicknames
+            .where((name) => name.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 24,
+        bottom: 24 + bottomInset,
+      ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E2020),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.08),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '등록된 닉네임 찾기',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, color: Colors.white70),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _searchCtrl,
+            onChanged: _filterList,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: '닉네임 검색...',
+              hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon: const Icon(Icons.search, color: Colors.white60),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            '목록에서 본인의 닉네임을 선택하면 자동으로 입력됩니다.',
+            style: TextStyle(fontSize: 12, color: Colors.white54),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: _filteredNames.isEmpty
+                ? const Center(
+                    child: Text(
+                      '일치하는 닉네임이 없습니다.',
+                      style: TextStyle(color: Colors.white38),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: _filteredNames.length,
+                    separatorBuilder: (context, index) => Divider(
+                      color: Colors.white.withOpacity(0.06),
+                      height: 1,
+                    ),
+                    itemBuilder: (context, index) {
+                      final name = _filteredNames[index];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          name,
+                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                        onTap: () {
+                          widget.onSelect(name);
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
 }
