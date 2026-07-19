@@ -19,6 +19,9 @@ class MainActivity : FlutterActivity() {
             if (call.method == "getSamsungHealthVersion") {
                 val version = getSamsungHealthVersion()
                 result.success(version)
+            } else if (call.method == "getAndroidId") {
+                val androidId = android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+                result.success(androidId ?: "")
             } else {
                 result.notImplemented()
             }

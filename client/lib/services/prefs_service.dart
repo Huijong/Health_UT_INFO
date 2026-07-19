@@ -16,6 +16,7 @@ class PrefsService {
   static const _keyConsentGiven = 'consent_given';
   static const _keyConsentDate = 'consent_date';
   static const _keyDeletedNoticeIds = 'deleted_notice_ids';
+  static const _keyDeviceUuid = 'device_uuid';
 
   final SharedPreferences _prefs;
 
@@ -51,8 +52,10 @@ class PrefsService {
   String get lastDismissedUpdateVersion => _prefs.getString('last_dismissed_update_version') ?? '';
   String get lastPopupDismissedVersion => _prefs.getString('last_popup_dismissed_version') ?? '';
   bool get hideQuickShareGuide => _prefs.getBool('hide_quick_share_guide') ?? false;
+  String get deviceUuid => _prefs.getString(_keyDeviceUuid) ?? '';
 
   Future<void> saveName(String value) => _prefs.setString(_keyName, value);
+  Future<void> saveDeviceUuid(String value) => _prefs.setString(_keyDeviceUuid, value);
   Future<void> saveHeight(double value) => _prefs.setDouble(_keyHeight, value);
   Future<void> saveWeight(double value) => _prefs.setDouble(_keyWeight, value);
   Future<void> saveWatch(String value) => _prefs.setString(_keyWatch, value);
