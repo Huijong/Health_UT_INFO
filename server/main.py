@@ -135,6 +135,7 @@ class DevicePing(BaseModel):
     tester_name: str
     watch: str
     os_version: str
+    device_uuid: Optional[str] = None
 
 class NoticeAck(BaseModel):
     tester_name: str
@@ -159,6 +160,8 @@ async def device_ping(ping: DevicePing):
             "os_version": ping.os_version,
             "last_active_at": datetime.utcnow()
         }
+        if ping.device_uuid:
+            device_dict["device_uuid"] = ping.device_uuid.strip()
         
         await db["devices"].update_one(
             {"tester_name": ping.tester_name},
@@ -207,11 +210,18 @@ async def create_point_adjustment_alt(pc: PointCreate, rename: bool = False):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/devices")
-async def get_devices(summary: bool = False, latest_apk: bool = False, rankings: bool = False, points_history: bool = False, check_nickname: Optional[str] = None, month: Optional[str] = None, tester_name: Optional[str] = None):
+async def get_devices(summary: bool = False, latest_apk: bool = False, rankings: bool = False, points_history: bool = False, check_nickname: Optional[str] = None, check_uuid: Optional[str] = None, month: Optional[str] = None, tester_name: Optional[str] = None):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
             
+        if check_uuid:
+            device = await db["devices"].find_one({"device_uuid": check_uuid.strip()})
+            if device:
+                return JSONResponse(content={"status": "success", "exists": True, "tester_name": device.get("tester_name", "")})
+            else:
+                return JSONResponse(content={"status": "success", "exists": False})
+
         if check_nickname:
             device = await db["devices"].find_one({"tester_name": check_nickname.strip()})
             return JSONResponse(content={"status": "success", "exists": device is not None})

@@ -22,6 +22,7 @@ import 'package:video_player/video_player.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 
 /// Galaxy Watch 드롭다운 선택지 (2단계 전용)
 const List<String> kWatchOptions = [
@@ -155,6 +156,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
+  static const _appChannel = MethodChannel('com.samsung.health.client/app_info');
   final _formKey1 = GlobalKey<FormState>();
   final _formKey5 = GlobalKey<FormState>();
 
@@ -243,6 +245,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   Future<void> _init() async {
     final prefs = await PrefsService.create();
     final session = await DeviceSession.collect();
+
+    // Android ID 획득 (앱 삭제 후 재설치 시에도 동일 기기 유지 가능)
+    String uuidStr = '';
+    try {
+      uuidStr = await _appChannel.invokeMethod<String>('getAndroidId') ?? '';
+    } catch (e) {
+      debugPrint('[Android ID] Failed to get native ID: $e');
+    }
+    if (uuidStr.isEmpty) {
+      uuidStr = prefs.deviceUuid;
+      if (uuidStr.isEmpty) {
+        uuidStr = const Uuid().v4();
+      }
+    }
+    await prefs.saveDeviceUuid(uuidStr);
+
+    if (prefs.consentGiven && !prefs.onboardingComplete) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkDeviceUuidAndPrompt();
+      });
+    }
 
     _nameCtrl.text = prefs.name;
     final h = prefs.height;
@@ -371,6 +394,101 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
+  Future<void> _checkDeviceUuidAndPrompt() async {
+    if (_prefs == null) return;
+    final uuidStr = _prefs!.deviceUuid;
+    if (uuidStr.isEmpty) return;
+
+    try {
+      final url = Uri.parse('${AppConfig.apiUrl}/api/devices?check_uuid=$uuidStr');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['status'] == 'success' && decoded['exists'] == true) {
+          final String savedName = decoded['tester_name'] ?? '';
+          if (savedName.isNotEmpty && mounted) {
+            _showRestoreDialog(savedName);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[UUID CHECK] Failed to check UUID on server: $e");
+    }
+  }
+
+  void _showRestoreDialog(String savedName) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: GlassCard(
+          padding: const EdgeInsets.all(24),
+          radius: 20,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.account_circle_rounded, color: Color(0xFF3DFFC1), size: 48),
+              const SizedBox(height: 16),
+              const Text(
+                '이전 등록 정보 발견',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '이 기기에 이전에 등록했던 닉네임("$savedName")이 존재합니다.\n\n해당 닉네임으로 로그인을 진행하시겠습니까, 아니면 새 프로필을 만드시겠습니까?',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.7), height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx), // Close dialog & start new profile
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white60,
+                        side: const BorderSide(color: Colors.white30),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('새로 만들기', style: TextStyle(fontSize: 13)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx); // Close dialog
+                        await _prefs!.saveName(savedName);
+                        await _prefs!.saveOnboardingComplete(true);
+                        await _updateNotificationTopic(savedName);
+                        _sendDevicePing();
+                        if (mounted) {
+                          setState(() {
+                            _nameCtrl.text = savedName;
+                            _currentStep = 4;
+                          });
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E5BFF),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('기존 닉네임 사용', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _navigateToNoticeHistory() {
     if (!mounted) return;
     if (_prefs == null) {
@@ -438,6 +556,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           'tester_name': testerName,
           'watch': watchName.isEmpty ? '미지정' : watchName,
           'os_version': 'Android ${_session!.androidVersion} (Model: ${_session!.deviceModel})',
+          'device_uuid': _prefs!.deviceUuid,
         }),
       );
       debugPrint("[PING] Device ping sent successfully for $testerName");
@@ -3171,6 +3290,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
                     _prefs?.saveName(nickname);
                     _updateNotificationTopic(nickname);
+                    _sendDevicePing(); // Bind UUID immediately
                     _prefs?.saveHeight(double.tryParse(_heightCtrl.text) ?? 0.0);
                     _prefs?.saveWeight(double.tryParse(_weightCtrl.text) ?? 0.0);
                   } else if (_currentStep == 2) {
@@ -3360,6 +3480,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     await _prefs!.saveConsentGiven(true);
                     await _prefs!.saveConsentDate(nowStr);
                     setState(() {});
+                    _checkDeviceUuidAndPrompt(); // Prompt immediately after consent is given!
                   }
                 : null,
             style: ElevatedButton.styleFrom(
