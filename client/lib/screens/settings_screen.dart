@@ -114,39 +114,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _saveAll() async {
-    final oldName = widget.prefs.name.trim();
-    final newName = _name.trim();
-
-    if (newName.isNotEmpty && oldName.isNotEmpty && oldName != newName) {
-      try {
-        final dio = Dio();
-        final response = await dio.post(
-          '${AppConfig.apiUrl}/api/devices',
-          queryParameters: {'rename': 'true'},
-          data: {
-            'old_name': oldName,
-            'new_name': newName,
-          },
-        );
-        debugPrint('[Rename] Server response: ${response.data}');
-      } catch (e) {
-        debugPrint('[Rename] Failed to rename nickname on server: $e');
-      }
-    }
-
-    await widget.prefs.saveName(_name);
-    await widget.prefs.saveHeight(_height ?? 0.0);
-    await widget.prefs.saveWeight(_weight ?? 0.0);
-    await widget.prefs.saveWatch(_watch);
-    await widget.prefs.saveCustomWatch(_customWatch);
-    await widget.prefs.saveStrap(_strap);
-    await widget.prefs.saveCustomStrap(_customStrap);
-    if (mounted) {
-      Navigator.pop(context, true);
-    }
-  }
-
   Future<void> _checkForUpdate() async {
     try {
       final dio = Dio();
@@ -250,10 +217,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
-                      _buildSectionHeader('테스터 프로필 정보'),
+                      _buildSectionHeader('프로필 정보'),
                       const SizedBox(height: 8),
                       _buildMenuCard(
-                        title: '테스터 프로필 설정',
+                        title: '프로필 설정',
                         subtitle: '닉네임 정보를 수정합니다.',
                         icon: Icons.person_rounded,
                         onTap: () async {
@@ -268,11 +235,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           );
                           if (result != null) {
+                            final newName = result['name'].toString().trim();
+                            final oldName = _name.trim();
+
+                            if (newName.isNotEmpty && oldName.isNotEmpty && oldName != newName) {
+                              try {
+                                final dio = Dio();
+                                final response = await dio.post(
+                                  '${AppConfig.apiUrl}/api/devices',
+                                  queryParameters: {'rename': 'true'},
+                                  data: {
+                                    'old_name': oldName,
+                                    'new_name': newName,
+                                  },
+                                );
+                                debugPrint('[Rename] Server response: ${response.data}');
+                              } catch (e) {
+                                debugPrint('[Rename] Failed to rename nickname on server: $e');
+                              }
+                            }
+
+                            await widget.prefs.saveName(newName);
+                            await widget.prefs.saveHeight(result['height'] ?? 0.0);
+                            await widget.prefs.saveWeight(result['weight'] ?? 0.0);
+
                             setState(() {
-                              _name = result['name'];
+                              _name = newName;
                               _height = result['height'];
                               _weight = result['weight'];
                             });
+
+                            if (mounted && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('프로필 정보가 저장되었습니다.'),
+                                  backgroundColor: Color(0xFF3DFFC1),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+                            }
                           }
                         },
                       ),
@@ -292,10 +293,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           );
                           if (result != null) {
+                            final newWatch = result['watch'];
+                            final newCustomWatch = result['customWatch'];
+
+                            await widget.prefs.saveWatch(newWatch);
+                            await widget.prefs.saveCustomWatch(newCustomWatch);
+
                             setState(() {
-                              _watch = result['watch'];
-                              _customWatch = result['customWatch'];
+                              _watch = newWatch;
+                              _customWatch = newCustomWatch;
                             });
+
+                            if (mounted && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('착용 워치 설정이 저장되었습니다.'),
+                                  backgroundColor: Color(0xFF3DFFC1),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+                            }
                           }
                         },
                       ),
@@ -315,10 +332,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           );
                           if (result != null) {
+                            final newStrap = result['strap'];
+                            final newCustomStrap = result['customStrap'];
+
+                            await widget.prefs.saveStrap(newStrap);
+                            await widget.prefs.saveCustomStrap(newCustomStrap);
+
                             setState(() {
-                              _strap = result['strap'];
-                              _customStrap = result['customStrap'];
+                              _strap = newStrap;
+                              _customStrap = newCustomStrap;
                             });
+
+                            if (mounted && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('착용 스트랩 설정이 저장되었습니다.'),
+                                  backgroundColor: Color(0xFF3DFFC1),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+                            }
                           }
                         },
                       ),
@@ -354,30 +387,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         icon: Icons.info_outline_rounded,
                       ),
                     ],
-                  ),
-                ),
-
-                // 하단 저장 버튼
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _saveAll,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E5BFF),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 4,
-                      ),
-                      child: const Text(
-                        '변경사항 저장',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ),
                   ),
                 ),
               ],
@@ -815,7 +824,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('완료', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: const Text('저장', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
@@ -987,7 +996,7 @@ class _WatchEditPageState extends State<WatchEditPage> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('완료', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: const Text('저장', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
@@ -1259,7 +1268,7 @@ class _StrapEditPageState extends State<StrapEditPage> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('완료', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: const Text('저장', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
@@ -1422,9 +1431,13 @@ class _DownloadDialogState extends State<DownloadDialog> {
       if (e is DioException && e.type == DioExceptionType.cancel) {
         debugPrint('[APK Install] Download cancelled.');
       } else {
+        String errorMsg = '다운로드 실패: $e';
+        if (e is DioException && e.response?.statusCode == 404) {
+          errorMsg = '서버에 설치 파일(APK)이 존재하지 않습니다. (404 에러)';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('다운로드 실패: $e'),
+            content: Text(errorMsg),
             backgroundColor: const Color(0xFFFF5252),
           ),
         );
@@ -1448,7 +1461,7 @@ class _DownloadDialogState extends State<DownloadDialog> {
             const Icon(Icons.downloading_rounded, color: Color(0xFF3DFFC1), size: 40),
             const SizedBox(height: 16),
             const Text(
-              '부속 도구 설치 파일 다운로드',
+              '설치 파일 다운로드',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             const SizedBox(height: 16),
