@@ -652,6 +652,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   void _showQuickShareGuideDialog(VoidCallback onConfirm) {
     int guideIndex = 0;
     bool dontShowAgain = false;
+    final PageController pageController = PageController(initialPage: 0);
 
     showDialog(
       context: context,
@@ -672,6 +673,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
             return Dialog(
               backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               child: GlassCard(
                 padding: const EdgeInsets.all(20),
                 radius: 20,
@@ -703,52 +705,107 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        height: 280,
+                        height: 380,
                         width: double.infinity,
                         color: Colors.black26,
-                        child: Image.asset(
-                          images[guideIndex],
-                          fit: BoxFit.contain,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            PageView.builder(
+                              controller: pageController,
+                              itemCount: images.length,
+                              onPageChanged: (index) {
+                                setDialogState(() {
+                                  guideIndex = index;
+                                });
+                              },
+                              itemBuilder: (context, index) {
+                                return Image.asset(
+                                  images[index],
+                                  fit: BoxFit.contain,
+                                );
+                              },
+                            ),
+                            if (guideIndex > 0)
+                              Positioned(
+                                left: 4,
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.chevron_left_rounded,
+                                    color: Color(0xFF3DFFC1),
+                                    size: 36,
+                                  ),
+                                  onPressed: () {
+                                    pageController.previousPage(
+                                      duration: const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  },
+                                ),
+                              ),
+                            if (guideIndex < 2)
+                              Positioned(
+                                right: 4,
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: Color(0xFF3DFFC1),
+                                    size: 36,
+                                  ),
+                                  onPressed: () {
+                                    pageController.nextPage(
+                                      duration: const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  },
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    guideIndex == 2
-                        ? Text.rich(
-                            const TextSpan(
-                              text: '3. 링크 복사 누룬 후 뒤로 가기(',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF3DFFC1),
-                                height: 1.4,
-                              ),
-                              children: [
-                                TextSpan(
-                                  text: 'Back 키',
-                                  style: TextStyle(
-                                    color: Color(0xFFFF5252),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                TextSpan(text: ')'),
-                              ],
-                            ),
-                            textAlign: TextAlign.center,
-                          )
-                        : Text(
-                            texts[guideIndex],
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF3DFFC1),
-                              height: 1.4,
-                            ),
-                          ),
-                    const SizedBox(height: 24),
-                    const Divider(color: Colors.white10, height: 1),
                     const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Center(
+                        child: guideIndex == 2
+                            ? Text.rich(
+                                const TextSpan(
+                                  text: '3. 링크 복사 누룬 후 뒤로 가기(',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF3DFFC1),
+                                    height: 1.4,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: 'Back 키',
+                                      style: TextStyle(
+                                        color: Color(0xFFFF5252),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    TextSpan(text: ')'),
+                                  ],
+                                ),
+                                textAlign: TextAlign.center,
+                              )
+                            : Text(
+                                texts[guideIndex],
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF3DFFC1),
+                                  height: 1.4,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(color: Colors.white10, height: 1),
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -786,27 +843,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                             ],
                           ),
                         ),
-                        if (guideIndex < 2)
-                          ElevatedButton(
-                            onPressed: () {
-                              setDialogState(() {
-                                guideIndex++;
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2E5BFF),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            child: const Text('다음', style: TextStyle(fontWeight: FontWeight.bold)),
-                          )
-                        else
+                        if (guideIndex == 2)
                           ElevatedButton(
                             onPressed: () async {
                               if (dontShowAgain) {
                                 await _prefs?.saveHideQuickShareGuide(true);
                               }
+                              pageController.dispose();
                               if (context.mounted) {
                                 Navigator.pop(context);
                               }
@@ -819,7 +862,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             child: const Text('확인', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
+                          )
+                        else
+                          const SizedBox(height: 40),
                       ],
                     ),
                   ],
