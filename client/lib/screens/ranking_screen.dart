@@ -260,15 +260,15 @@ class _RankingScreenState extends State<RankingScreen> {
         Expanded(
           child: _GlassCard(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
               child: Column(
                 children: [
-                  const Text('전체 인원', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                  const Text('전체 인원', style: TextStyle(color: Colors.white60, fontSize: 11)),
                   const SizedBox(height: 6),
                   Text(
                     '$totalTesters명',
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF3DFFC1),
                     ),
@@ -278,29 +278,128 @@ class _RankingScreenState extends State<RankingScreen> {
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
           child: _GlassCard(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
               child: Column(
                 children: [
-                  const Text('평균 포인트', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                  const Text('평균 포인트', style: TextStyle(color: Colors.white60, fontSize: 11)),
                   const SizedBox(height: 6),
                   Text(
-                    '$avgSubmissions포인트',
+                    '${avgSubmissions.toStringAsFixed(1)}P',
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF3DFFC1),
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: GestureDetector(
+            onTap: _showRankingRulesDialog,
+            child: _GlassCard(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                child: Column(
+                  children: [
+                    const Text('랭킹 기준', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF3DFFC1)),
+                        SizedBox(width: 4),
+                        Text(
+                          '상세 보기',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF3DFFC1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  void _showRankingRulesDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: _GlassCard(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.info_outline_rounded, color: Color(0xFF3DFFC1), size: 22),
+                    SizedBox(width: 8),
+                    Text(
+                      '포인트 적립 기준 안내',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildRuleItem('건당 기본 적립', '+ 1 포인트'),
+                _buildRuleItem('10km 이상 ~ 20km 미만', '+ 1 포인트'),
+                _buildRuleItem('20km 이상 ~ 30km 미만', '+ 2 포인트'),
+                _buildRuleItem('30km 이상 ~ 40km 미만', '+ 4 포인트'),
+                _buildRuleItem('40km 이상', '+ 6 포인트'),
+                _buildRuleItem('특별 포인트 (JY)', '+ x 포인트'),
+                const SizedBox(height: 20),
+                const Divider(color: Colors.white10, height: 1),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3DFFC1),
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                    child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRuleItem(String label, String point) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+          Text(point, style: const TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold, fontSize: 13)),
+        ],
+      ),
     );
   }
 
