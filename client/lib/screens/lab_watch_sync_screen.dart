@@ -4,10 +4,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:nearby_connections/nearby_connections.dart' as nc;
 import 'package:client/services/prefs_service.dart';
-import 'package:client/config/app_config.dart';
-import 'package:crypto/crypto.dart';
 import 'package:geolocator/geolocator.dart';
 
 class LabWatchSyncScreen extends StatefulWidget {
@@ -19,35 +16,62 @@ class LabWatchSyncScreen extends StatefulWidget {
 }
 
 class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProviderStateMixin {
-  static const String _serviceId = "com.samsung.health.client.sync";
+  static const _wifiP2pChannel = MethodChannel("com.samsung.health.client/wifi_p2p");
+  static const _wifiP2pEventChannel = EventChannel("com.samsung.health.client/wifi_p2p_events");
+  static const _appChannel = MethodChannel("com.samsung.health.client/app_info");
 
   bool _isSearching = false;
   String? _connectedEndpointId;
   String? _connectedEndpointName;
 
-  // Discovered devices: endpointId -> name
-  final Map<String, String> _discoveredDevices = {};
-
   // List of files fetched from watch
   List<Map<String, dynamic>> _files = [];
   bool _isLoadingFileList = false;
 
-  // Active file transfers tracking: payloadId -> tempFilePath
-  final Map<int, String> _activeTransfers = {};
-  
-  // Received MD5 checksum mapping: filename -> md5Hex
-  final Map<String, String> _incomingMd5Map = {};
-
-  // Current transferring payloadId -> progress (0.0 to 1.0)
-  final Map<int, double> _transferProgress = {};
-  final Map<int, String> _payloadToFilename = {};
-  String? _nextExpectedFilename;
-
-  static const _appChannel = MethodChannel("com.samsung.health.client/app_info");
   bool _isWatchAppInstalled = true; // Default to true
 
   // Animation controller for radar pulsing effect
   AnimationController? _radarController;
+  StreamSubscription? _wifiP2pSubscription;
+
+  final List<String> _logs = [];
+
+  void _addLog(String msg) {
+    final time = DateTime.now().toIso8601String().substring(11, 19);
+    setState(() {
+      _logs.add("[$time] $msg");
+    });
+    debugPrint("[SyncDebug] $msg");
+  }
+
+  void _showDebugLogs() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text("실시간 연동 디버그 로그", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 350,
+          child: _logs.isEmpty
+              ? const Center(child: Text("기록된 로그가 없습니다.", style: TextStyle(color: Colors.white30)))
+              : ListView.builder(
+                  itemCount: _logs.length,
+                  itemBuilder: (context, idx) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2.0),
+                    child: Text(_logs[idx], style: const TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace')),
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("닫기", style: TextStyle(color: Color(0xFF3DFFC1))),
+          )
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -58,16 +82,113 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     );
     _checkPermissions();
     _checkWatchAppInstalled();
+    _setupWifiP2pEventSubscription();
   }
 
   @override
   void dispose() {
     _radarController?.dispose();
-    nc.Nearby().stopDiscovery();
-    if (_connectedEndpointId != null) {
-      nc.Nearby().disconnectFromEndpoint(_connectedEndpointId!);
-    }
+    _wifiP2pSubscription?.cancel();
+    _wifiP2pChannel.invokeMethod("stopServer");
     super.dispose();
+  }
+
+  void _setupWifiP2pEventSubscription() {
+    _wifiP2pSubscription = _wifiP2pEventChannel.receiveBroadcastStream().listen((event) {
+      final map = Map<String, dynamic>.from(event);
+      final type = map['type'] as String;
+      final data = map['data'];
+      _handleWifiP2pEvent(type, data);
+    }, onError: (err) {
+      _addLog("Event Stream Error: $err");
+    });
+  }
+
+  void _handleWifiP2pEvent(String type, dynamic data) {
+    switch (type) {
+      case "connectionStateChanged":
+        final connected = data["connected"] as bool;
+        if (connected) {
+          final deviceName = data["deviceName"] as String? ?? "Smartwatch";
+          _addLog("Wi-Fi Direct connected with $deviceName.");
+          setState(() {
+            _connectedEndpointId = "wifi_p2p_watch";
+            _connectedEndpointName = deviceName;
+            _isSearching = false;
+          });
+          _radarController?.stop();
+          _sendFileListRequest();
+        } else {
+          _addLog("Wi-Fi Direct disconnected.");
+          setState(() {
+            _connectedEndpointId = null;
+            _connectedEndpointName = null;
+            _files.clear();
+          });
+        }
+        break;
+
+      case "fileListReceived":
+        final jsonStr = data as String;
+        _addLog("Received file list JSON.");
+        try {
+          final decoded = jsonDecode(jsonStr) as List<dynamic>;
+          setState(() {
+            _files = decoded.map((e) {
+              final map = Map<String, dynamic>.from(e);
+              map['selected'] = false;
+              map['progress'] = 0.0;
+              map['status'] = "대기";
+              return map;
+            }).toList();
+            _isLoadingFileList = false;
+          });
+        } catch (e) {
+          _addLog("JSON Parse error: $e");
+          setState(() {
+            _isLoadingFileList = false;
+          });
+        }
+        break;
+
+      case "downloadProgress":
+        final progressMap = Map<String, dynamic>.from(data);
+        final filename = progressMap["filename"] as String;
+        final progress = progressMap["progress"] as double;
+        final transferred = progressMap["transferred"] as int;
+        final total = progressMap["total"] as int;
+
+        _updateFileStatus(
+          filename,
+          "다운로드 중...",
+          progress,
+          transferredBytes: transferred,
+          totalBytes: total,
+        );
+        break;
+
+      case "downloadComplete":
+        final completeMap = Map<String, dynamic>.from(data);
+        final filename = completeMap["filename"] as String;
+        final tempPath = completeMap["path"] as String;
+        _addLog("Download finished for $filename. Processing...");
+        _processDownloadedFile(filename, tempPath);
+        break;
+
+      case "downloadFailure":
+        final failMap = Map<String, dynamic>.from(data);
+        final filename = failMap["filename"] as String?;
+        final error = failMap["error"] as String? ?? "Unknown error";
+        _addLog("Download failed: $error");
+        if (filename != null) {
+          _updateFileStatus(filename, "실패", 0.0);
+        }
+        break;
+
+      case "error":
+        _addLog("Native Error: $data");
+        break;
+    }
   }
 
   Future<void> _checkWatchAppInstalled() async {
@@ -88,20 +209,14 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         const SnackBar(content: Text("워치 플레이 스토어로 설치 명령을 전송했습니다.")),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("원격 설치 실패: $e")),
-      );
+      debugPrint("Remote install failed: $e");
     }
   }
 
-  Future<void> _checkPermissions() async {
-    // Check location permission using Geolocator
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      await Geolocator.requestPermission();
-    }
-    // Check/request Bluetooth & Nearby Wifi permissions natively
+  void _checkPermissions() async {
     try {
+      // Calls native Android requestPermissions which requests ACCESS_FINE_LOCATION,
+      // ACCESS_COARSE_LOCATION, and NEARBY_WIFI_DEVICES all in one unified dialog.
       await _appChannel.invokeMethod("requestNearbyPermissions");
     } catch (e) {
       debugPrint("Nearby permissions check failed: $e");
@@ -109,43 +224,17 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   }
 
   void _startDiscovery() async {
-    try {
-      await _appChannel.invokeMethod("requestNearbyPermissions");
-    } catch (e) {
-      debugPrint("Nearby permissions check failed: $e");
-    }
-
     setState(() {
-      _discoveredDevices.clear();
       _isSearching = true;
     });
     _radarController?.repeat();
 
+    _addLog("Creating Wi-Fi P2P Group Owner & Starting TCP Server...");
     try {
-      await nc.Nearby().startDiscovery(
-        widget.prefs.name.isNotEmpty ? widget.prefs.name : "Smartphone",
-        nc.Strategy.P2P_POINT_TO_POINT,
-        onEndpointFound: (endpointId, name, serviceId) {
-          debugPrint("[Nearby] Discovered endpoint: $endpointId ($name)");
-          setState(() {
-            _discoveredDevices[endpointId] = name;
-          });
-          // Auto connect when watch is found
-          _connectToDevice(endpointId);
-        },
-        onEndpointLost: (endpointId) {
-          debugPrint("[Nearby] Lost endpoint: $endpointId");
-          setState(() {
-            _discoveredDevices.remove(endpointId);
-          });
-        },
-        serviceId: _serviceId,
-      );
+      await _wifiP2pChannel.invokeMethod("startServer");
+      _addLog("P2P Group and Server started. Waiting for watch connection...");
     } catch (e) {
-      debugPrint("[Nearby] Error starting discovery: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("탐색 시작 실패: $e")),
-      );
+      _addLog("Start Server Error: $e");
       setState(() {
         _isSearching = false;
       });
@@ -153,205 +242,50 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     }
   }
 
-  void _connectToDevice(String endpointId) async {
-    nc.Nearby().stopDiscovery();
-    setState(() {
-      _isSearching = false;
-    });
-    _radarController?.stop();
-
-    try {
-      await nc.Nearby().requestConnection(
-        widget.prefs.name.isNotEmpty ? widget.prefs.name : "Smartphone",
-        endpointId,
-        onConnectionInitiated: (id, info) async {
-          debugPrint("[Nearby] Connection initiated with $id (${info.endpointName})");
-          // Accept connection
-          await nc.Nearby().acceptConnection(
-            id,
-            onPayLoadRecieved: _onPayloadReceived,
-            onPayloadTransferUpdate: _onPayloadTransferUpdate,
-          );
-        },
-        onConnectionResult: (id, status) {
-          if (status == nc.Status.CONNECTED) {
-            debugPrint("[Nearby] Connected to $id");
-            setState(() {
-              _connectedEndpointId = id;
-              _connectedEndpointName = _discoveredDevices[id] ?? "Smartwatch";
-            });
-            // Request file list immediately upon connection
-            _sendFileListRequest();
-          } else {
-            debugPrint("[Nearby] Connection failed with status: $status");
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("워치 연결에 실패했습니다.")),
-            );
-          }
-        },
-        onDisconnected: (id) {
-          debugPrint("[Nearby] Disconnected from $id");
-          if (_connectedEndpointId == id) {
-            setState(() {
-              _connectedEndpointId = null;
-              _connectedEndpointName = null;
-              _files.clear();
-            });
-          }
-        },
-      );
-    } catch (e) {
-      debugPrint("[Nearby] Error requesting connection: $e");
-    }
-  }
-
-  void _sendFileListRequest() {
+  void _sendFileListRequest() async {
     if (_connectedEndpointId == null) return;
     setState(() {
       _isLoadingFileList = true;
     });
-    nc.Nearby().sendBytesPayload(
-      _connectedEndpointId!,
-      Uint8List.fromList(utf8.encode("GET_FILE_LIST")),
-    );
-  }
-
-  void _onPayloadReceived(String endpointId, nc.Payload payload) {
-    if (payload.type == nc.PayloadType.BYTES) {
-      final bytes = payload.bytes;
-      if (bytes != null) {
-        final text = utf8.decode(bytes);
-        debugPrint("[Nearby] Payload BYTES received: $text");
-        if (text.startsWith("FILE_MD5:")) {
-          // Format: FILE_MD5:[filename]:[md5]:[payloadId]
-          final parts = text.split(":");
-          if (parts.length >= 4) {
-            final filename = parts[1];
-            final md5 = parts[2];
-            final payloadIdStr = parts[3];
-            final payloadId = int.tryParse(payloadIdStr);
-
-            _incomingMd5Map[filename] = md5;
-            _nextExpectedFilename = filename;
-            if (payloadId != null) {
-              _payloadToFilename[payloadId] = filename;
-              debugPrint("[Nearby] Registered payload ID mapping: $payloadId -> $filename");
-            }
-          } else if (parts.length >= 3) {
-            // Fallback for older versions
-            final filename = parts[1];
-            final md5 = parts[2];
-            _incomingMd5Map[filename] = md5;
-            _nextExpectedFilename = filename;
-            debugPrint("[Nearby] Registered MD5 (legacy) for $filename: $md5");
-          }
-        } else if (text.startsWith("ERROR:")) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("워치 오류: ${text.substring(6)}")),
-          );
-          setState(() {
-            _isLoadingFileList = false;
-          });
-        } else {
-          // Parse File list JSON
-          try {
-            final decoded = jsonDecode(text) as List<dynamic>;
-            setState(() {
-              _files = decoded.map((e) {
-                final map = Map<String, dynamic>.from(e);
-                map['selected'] = false;
-                map['progress'] = 0.0;
-                map['status'] = "대기";
-                return map;
-              }).toList();
-              _isLoadingFileList = false;
-            });
-          } catch (e) {
-            debugPrint("[Nearby] JSON Parse error: $e");
-            setState(() {
-              _isLoadingFileList = false;
-            });
-          }
-        }
-      }
-    } else if (payload.type == nc.PayloadType.FILE) {
-      final String? tempPath = payload.filePath;
-      if (tempPath != null) {
-        _activeTransfers[payload.id] = tempPath;
-        if (_nextExpectedFilename != null && !_payloadToFilename.containsKey(payload.id)) {
-          _payloadToFilename[payload.id] = _nextExpectedFilename!;
-          _nextExpectedFilename = null;
-        }
-        debugPrint("[Nearby] Incoming file payload: id=${payload.id}, path=$tempPath, filename=${_payloadToFilename[payload.id]}");
-      }
-    }
-  }
-
-  void _onPayloadTransferUpdate(String endpointId, nc.PayloadTransferUpdate update) async {
-    final payloadId = update.id;
-    final progress = update.totalBytes > 0 ? update.bytesTransferred / update.totalBytes : 0.0;
-
-    setState(() {
-      _transferProgress[payloadId] = progress;
-    });
-
-    final filename = _payloadToFilename[payloadId];
-
-    if (update.status == nc.PayloadStatus.SUCCESS) {
-      final tempPath = _activeTransfers[payloadId];
-      if (tempPath != null && filename != null) {
-        debugPrint("[Nearby] File payload transfer complete. ID=$payloadId, Name=$filename");
-        await _processDownloadedFile(filename, tempPath);
-      }
-    } else if (update.status == nc.PayloadStatus.FAILURE) {
-      if (filename != null) {
-        _updateFileStatus(filename, "실패", 0.0);
-      }
-    } else if (update.status == nc.PayloadStatus.IN_PROGRESS) {
-      if (filename != null) {
-        _updateFileStatus(
-          filename, 
-          "다운로드 중...", 
-          progress, 
-          transferredBytes: update.bytesTransferred, 
-          totalBytes: update.totalBytes
-        );
-      }
+    _addLog("Requesting file list from Watch...");
+    try {
+      await _wifiP2pChannel.invokeMethod("requestFileList");
+    } catch (e) {
+      _addLog("Failed to request file list: $e");
+      setState(() {
+        _isLoadingFileList = false;
+      });
     }
   }
 
   Future<void> _processDownloadedFile(String filename, String tempPath) async {
     try {
+      _addLog("Locating target folder: /sdcard/Documents/COLA_FILE/...");
       final targetFolder = Directory("/sdcard/Documents/COLA_FILE/");
       if (!await targetFolder.exists()) {
+        _addLog("Target folder does not exist. Creating...");
         await targetFolder.create(recursive: true);
       }
 
       final targetFile = File("${targetFolder.path}$filename");
       final sourceFile = File(tempPath);
-
-      if (await sourceFile.exists()) {
-        // Calculate MD5 true MD5 using crypto package
-        final bytes = await sourceFile.readAsBytes();
-        final calculatedMd5 = md5.convert(bytes).toString();
-
-        final expectedMd5 = _incomingMd5Map[filename];
-
-        if (expectedMd5 != null && expectedMd5.toLowerCase() != calculatedMd5.toLowerCase()) {
-          debugPrint("[Sync] MD5 verification failed! Expected: $expectedMd5, Calculated: $calculatedMd5");
-          _updateFileStatus(filename, "실패 (손상됨)", 0.0);
-          return;
-        }
-
-        // Copy/Move to target path
+      
+      final srcExists = await sourceFile.exists();
+      if (srcExists) {
+        _addLog("Copying file to target path: ${targetFile.path}...");
         await sourceFile.copy(targetFile.path);
-        await sourceFile.delete(); // Delete temp cache file
+        
+        _addLog("Deleting temporary cache file...");
+        await sourceFile.delete();
 
-        debugPrint("[Sync] File successfully saved and verified: ${targetFile.path}");
+        _addLog("File transfer workflow successfully completed.");
         _updateFileStatus(filename, "완료", 1.0);
+      } else {
+        _addLog("Error: Source cache file does not exist at $tempPath!");
+        _updateFileStatus(filename, "실패", 0.0);
       }
     } catch (e) {
-      debugPrint("[Sync] Error saving file: $e");
+      _addLog("Exception in _processDownloadedFile: $e");
       _updateFileStatus(filename, "실패", 0.0);
     }
   }
@@ -376,7 +310,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     });
   }
 
-  void _requestDownload(String filename) {
+  void _requestDownload(String filename) async {
     if (_connectedEndpointId == null) return;
 
     setState(() {
@@ -388,13 +322,12 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       }
     });
 
-    _payloadToFilename[filename.hashCode] = filename;
-    _incomingMd5Map.remove(filename);
-
-    nc.Nearby().sendBytesPayload(
-      _connectedEndpointId!,
-      Uint8List.fromList(utf8.encode("DOWNLOAD_FILE:$filename")),
-    );
+    _addLog("Requesting download for $filename...");
+    try {
+      await _wifiP2pChannel.invokeMethod("requestFileDownload", {"filename": filename});
+    } catch (e) {
+      _addLog("Request download error: $e");
+    }
   }
 
   void _downloadSelectedFiles() {
@@ -408,7 +341,6 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
     for (var f in selected) {
       final filename = f['name'] as String;
-      _payloadToFilename[filename.hashCode] = filename; 
       _requestDownload(filename);
     }
   }
@@ -421,6 +353,12 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         title: const Text('실험실 - 워치 동기화', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report, color: Color(0xFF3DFFC1)),
+            onPressed: _showDebugLogs,
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -477,7 +415,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
             IconButton(
               icon: const Icon(Icons.close, color: Colors.white70),
               onPressed: () {
-                nc.Nearby().disconnectFromEndpoint(_connectedEndpointId!);
+                _wifiP2pChannel.invokeMethod("stopServer");
                 setState(() {
                   _connectedEndpointId = null;
                   _connectedEndpointName = null;
@@ -537,7 +475,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         ),
         const SizedBox(height: 40),
         Text(
-          _isSearching ? '블루투스 기반 기기 탐색 중...' : '연동할 워치를 찾아주세요.',
+          _isSearching ? 'Wi-Fi Direct 기기 탐색 대기 중...' : '연동할 워치를 찾아주세요.',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
         ),
         const SizedBox(height: 8),
@@ -552,10 +490,10 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF2E5BFF),
             foregroundColor: Colors.white,
-            minimumSize: const Size(200, 50),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size(180, 50),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
           ),
-          child: Text(_isSearching ? '탐색 진행 중' : '워치 탐색 시작'),
+          child: Text(_isSearching ? '탐색 진행 중...' : '탐색 시작', style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
     );
