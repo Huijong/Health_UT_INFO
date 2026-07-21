@@ -53,6 +53,7 @@ dependencies:
   http: ^1.6.0
   dio: ^5.7.0
   open_filex: ^4.7.0
+  nearby_connections: ^4.3.0
 
 dev_dependencies:
   flutter_test:

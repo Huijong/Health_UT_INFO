@@ -12,6 +12,7 @@ import 'package:dio/dio.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:client/config/app_config.dart';
+import 'package:client/screens/lab_watch_sync_screen.dart';
 
 ThemeData getSettingsTheme(BuildContext context) {
   return ThemeData.dark().copyWith(
@@ -377,6 +378,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         showBadge: _hasUpdate,
                         isHighlighted: _blinkHighlightActive,
                         onTap: _handleHealthPortUpdate,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMenuCard(
+                        title: '실험실 (워치 연동)',
+                        subtitle: '워치에서 운동 데이터를 고속 무선 LAN(P2P)으로 전송받습니다.',
+                        icon: Icons.biotech_rounded,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => LabWatchSyncScreen(prefs: widget.prefs),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 24),
                       _buildSectionHeader('HealthPort 버전'),
