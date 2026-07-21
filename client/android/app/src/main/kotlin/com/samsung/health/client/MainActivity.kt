@@ -16,11 +16,13 @@ import androidx.wear.remote.interactions.RemoteActivityHelper
 class MainActivity : FlutterActivity() {
 
     private val fileChannel = FileChannelPlugin { this }
+    private val wifiP2pPlugin by lazy { WifiP2pPlugin(this) }
     private val CHANNEL = "com.samsung.health.client/app_info"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         fileChannel.register(flutterEngine)
+        wifiP2pPlugin.register(flutterEngine)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
