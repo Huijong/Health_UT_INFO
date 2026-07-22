@@ -11,6 +11,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.wifi.WifiManager
+import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -63,6 +64,9 @@ class SyncService : Service() {
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
+    // Auto Wifi Join System Callback
+    private var autoJoinCallback: ConnectivityManager.NetworkCallback? = null
+
     // ────────────────────────────────────────────────────────────────
     // LIFECYCLE
     // ────────────────────────────────────────────────────────────────
@@ -99,7 +103,14 @@ class SyncService : Service() {
         startDirectConnectFallback()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent != null && intent.action == "ACTION_TRIGGER_WIFI_JOIN") {
+            writeLog("Received Intent command: ACTION_TRIGGER_WIFI_JOIN")
+            triggerWifiNetworkSpecifier()
+        }
+        return START_STICKY
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
@@ -108,8 +119,82 @@ class SyncService : Service() {
         mainHandler.removeCallbacksAndMessages(null)
         stopTcpClient()
         releaseWifiNetworkRequest()
+        releaseAutoJoinRequest()
         releaseLocks()
         super.onDestroy()
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // WIFI NETWORK SPECIFIER (AUTO JOIN GALAXY WATCH WI-FI)
+    // ────────────────────────────────────────────────────────────────
+
+    private fun triggerWifiNetworkSpecifier() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            writeLog("WifiNetworkSpecifier is not supported on Android version < 10")
+            return
+        }
+
+        try {
+            writeLog("Triggering WifiNetworkSpecifier for SSID 'healthport'...")
+            ensureWifiEnabled()
+
+            // Release any existing autojoin callback to prevent memory leak
+            releaseAutoJoinRequest()
+
+            // 1. Build Network Specifier targeting hotspot credentials
+            val specifier = WifiNetworkSpecifier.Builder()
+                .setSsid("healthport")
+                .setWpa2Passphrase("00000000")
+                .build()
+
+            // 2. Build Network Request
+            val request = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .setNetworkSpecifier(specifier)
+                .build()
+
+            // 3. Register callback. Android OS will now display a Wear OS popup asking user to approve join
+            autoJoinCallback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    super.onAvailable(network)
+                    writeLog("Successfully joined healthport hotspot network!")
+                    activeWifiNetwork = network
+                    connectivityManager?.bindProcessToNetwork(network)
+                    
+                    // Restart UDP search immediately since we are now on the hotspot
+                    mainHandler.post {
+                        startUdpBeaconListener()
+                    }
+                }
+
+                override fun onUnavailable() {
+                    super.onUnavailable()
+                    writeLog("User denied joining healthport hotspot or network was not found.")
+                }
+
+                override fun onLost(network: Network) {
+                    super.onLost(network)
+                    writeLog("Connection to healthport lost.")
+                }
+            }
+
+            autoJoinCallback?.let {
+                connectivityManager?.requestNetwork(request, it)
+                writeLog("OS confirmation dialog has been triggered. Please look at the Watch Screen.")
+            }
+
+        } catch (e: Exception) {
+            writeLog("Failed to execute WifiNetworkSpecifier: ${e.message}")
+        }
+    }
+
+    private fun releaseAutoJoinRequest() {
+        try {
+            autoJoinCallback?.let {
+                connectivityManager?.unregisterNetworkCallback(it)
+            }
+            autoJoinCallback = null
+        } catch (_: Exception) {}
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -121,7 +206,6 @@ class SyncService : Service() {
             writeLog("Requesting physical Wi-Fi network link (offline ok) from OS...")
             val request = NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                // REMOVED: NET_CAPABILITY_INTERNET constraint to allow offline local hotspots
                 .build()
 
             networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -254,49 +338,19 @@ class SyncService : Service() {
     // DIRECT TCP CONNECT FALLBACK (FOR HOTSPOT & BT TETHERING)
     // ────────────────────────────────────────────────────────────────
 
-    private fun getWifiGatewayIp(): String? {
-        return try {
-            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val dhcp = wm.dhcpInfo
-            val gateway = dhcp.gateway
-            if (gateway != 0) {
-                val ip = String.format(
-                    java.util.Locale.US,
-                    "%d.%d.%d.%d",
-                    gateway and 0xff,
-                    gateway shr 8 and 0xff,
-                    gateway shr 16 and 0xff,
-                    gateway shr 24 and 0xff
-                )
-                writeLog("DHCP detected Gateway IP: $ip")
-                ip
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            writeLog("Failed to read DHCP gateway: ${e.message}")
-            null
-        }
-    }
-
     private fun startDirectConnectFallback() {
         if (directConnectThread?.isAlive == true) return
         directConnectThread = Thread {
             writeLog("Starting Direct Connection Fallback thread...")
+            val fallbackIps = listOf("192.168.43.1", "192.168.44.1", "192.168.45.1", "192.168.1.1", "192.168.0.1")
             
             while (isServiceActive) {
                 if (!isSocketRunning) {
                     val fallbackIps = mutableListOf<String>()
-                    
-                    // 1. Try to read active DHCP gateway IP dynamically
                     getWifiGatewayIp()?.let {
                         fallbackIps.add(it)
                     }
-                    
-                    // 2. Load static fallback IPs
                     fallbackIps.addAll(listOf("192.168.43.1", "192.168.44.1", "192.168.45.1", "192.168.1.1", "192.168.0.1"))
-                    
-                    // Distinct list to avoid duplicate attempts
                     val uniqueIps = fallbackIps.distinct()
                     
                     for (ip in uniqueIps) {
@@ -306,7 +360,6 @@ class SyncService : Service() {
                             socket.receiveBufferSize = BUFFER_SIZE
                             socket.sendBufferSize = BUFFER_SIZE
                             
-                            // Bind socket to physical Wi-Fi interface if available
                             activeWifiNetwork?.let {
                                 it.bindSocket(socket)
                             }
@@ -323,13 +376,12 @@ class SyncService : Service() {
                             
                             sendSocketLine("HELLO_FROM_WATCH")
                             
-                            // Run receive loop on current thread
                             while (isSocketRunning) {
                                 val line = socketReader?.readLine() ?: break
                                 handleSocketCommand(line, socket.getInputStream())
                             }
                         } catch (e: Exception) {
-                            // Silently ignore failed attempts
+                            // Silently ignore
                         } finally {
                             if (isSocketRunning) {
                                 writeLog("Direct client session closed.")
@@ -338,7 +390,7 @@ class SyncService : Service() {
                         }
                     }
                 }
-                Thread.sleep(3000) // Retry every 3 seconds
+                Thread.sleep(3000)
             }
         }.apply { isDaemon = true; start() }
     }
@@ -357,7 +409,6 @@ class SyncService : Service() {
                 socket.receiveBufferSize = BUFFER_SIZE
                 socket.sendBufferSize = BUFFER_SIZE
 
-                // Force bind socket to physical Wi-Fi network interface to bypass BT proxying
                 activeWifiNetwork?.let {
                     it.bindSocket(socket)
                 }
@@ -428,7 +479,7 @@ class SyncService : Service() {
             
             val out = BufferedOutputStream(tcpSocket?.getOutputStream() ?: return, BUFFER_SIZE)
             FileInputStream(file).use { fis ->
-                val buf = ByteArray(65536) // 64KB chunk reads
+                val buf = ByteArray(65536)
                 var r: Int
                 while (fis.read(buf).also { r = it } != -1) {
                     out.write(buf, 0, r)
@@ -456,10 +507,35 @@ class SyncService : Service() {
     // UTILITIES
     // ────────────────────────────────────────────────────────────────
 
+    private fun getWifiGatewayIp(): String? {
+        return try {
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val dhcp = wm.dhcpInfo
+            val gateway = dhcp.gateway
+            if (gateway != 0) {
+                val ip = String.format(
+                    java.util.Locale.US,
+                    "%d.%d.%d.%d",
+                    gateway and 0xff,
+                    gateway shr 8 and 0xff,
+                    gateway shr 16 and 0xff,
+                    gateway shr 24 and 0xff
+                )
+                writeLog("DHCP detected Gateway IP: $ip")
+                ip
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            writeLog("Failed to read DHCP gateway: ${e.message}")
+            null
+        }
+    }
+
     private fun getMd5(file: File): String {
         val d = MessageDigest.getInstance("MD5")
         FileInputStream(file).use { fis ->
-            val b = ByteArray(32768) // 32KB buffer for fast md5 hashing
+            val b = ByteArray(32768)
             var r: Int
             while (fis.read(b).also { r = it } > 0) d.update(b, 0, r)
         }

@@ -343,13 +343,13 @@ class _RankingScreenState extends State<RankingScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return DefaultTabController(
-              length: 2,
+              length: 3,
               child: Dialog(
                 backgroundColor: const Color(0xFF161819),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 child: Container(
-                  constraints: const BoxConstraints(maxWidth: 400),
+                  constraints: const BoxConstraints(maxWidth: 420),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -372,15 +372,17 @@ class _RankingScreenState extends State<RankingScreen> {
                           ],
                         ),
                       ),
-                      // Tab Bar
+                      // Tab Bar (Text Only for saving space)
                       const TabBar(
                         indicatorColor: Color(0xFF3DFFC1),
                         labelColor: Color(0xFF3DFFC1),
                         unselectedLabelColor: Colors.white38,
-                        labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        padding: EdgeInsets.symmetric(horizontal: 8),
                         tabs: [
-                          Tab(text: '🏃 걷기/달리기/하이킹'),
-                          Tab(text: '🚴 실외 자전거'),
+                          Tab(text: '러닝/걷기/하이킹'),
+                          Tab(text: '실외 자전거'),
+                          Tab(text: '기타 모든 운동'),
                         ],
                       ),
                       // Tab Content
@@ -390,6 +392,7 @@ class _RankingScreenState extends State<RankingScreen> {
                           children: [
                             _buildGroupARules(),
                             _buildGroupBRules(),
+                            _buildOtherExerciseRules(),
                           ],
                         ),
                       ),
@@ -450,6 +453,21 @@ class _RankingScreenState extends State<RankingScreen> {
         _buildTableItem('41 ~ 50 km', '1km당 +0.1P', '50km = 5.0P'),
         _buildTableItem('51 ~ 99 km', '50~100km 구간 등간격 가산', '51km=5.14P ... 99km=11.86P'),
         _buildTableItem('100 km 이상', '기본 12.0P + 1km당 +0.16P', '110km = 13.6P'),
+      ],
+    );
+  }
+
+  Widget _buildOtherExerciseRules() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _buildInfoBox('💡 수영, 근력 운동, 요가 등 기타 종목 대상\n💡 기본 점수 외에 거리 가산은 제외됩니다.'),
+        const SizedBox(height: 16),
+        _buildTableHeader(),
+        _buildTableItem('수영 (실내/외)', '건당 +1.0P 고정', '활동당 1.0P'),
+        _buildTableItem('근력 운동', '건당 +1.0P 고정', '활동당 1.0P'),
+        _buildTableItem('기타 웰니스', '건당 +1.0P 고정', '활동당 1.0P'),
+        _buildTableItem('마스터 특별(JY)', '수동 가감에 따른 보너스', '지정된 가산P'),
       ],
     );
   }
