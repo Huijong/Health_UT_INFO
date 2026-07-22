@@ -1,6 +1,7 @@
 package com.samsung.health.client
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -43,8 +44,67 @@ class MainActivity : FlutterActivity() {
                 "requestNearbyPermissions" -> {
                     requestNearbyPermissions(result)
                 }
+                "openHotspotSettings" -> {
+                    openHotspotSettings(result)
+                }
+                "openSysDump" -> {
+                    openSysDump(result)
+                }
                 else -> {
                     result.notImplemented()
+                }
+            }
+        }
+    }
+
+    private fun openSysDump(result: MethodChannel.Result) {
+        try {
+            // 1. Target Samsung Dialer specifically
+            val intent = Intent(Intent.ACTION_DIAL)
+            intent.setClassName("com.samsung.android.dialer", "com.samsung.android.dialer.DialtactsActivity")
+            intent.data = Uri.parse("tel:*%239900%23")
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            result.success("DIRECT")
+        } catch (e: Exception) {
+            // 2. Fallback to default dialer if Samsung dialer package name differs
+            try {
+                val dialIntent = Intent(Intent.ACTION_DIAL)
+                dialIntent.data = Uri.parse("tel:*%239900%23")
+                dialIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(dialIntent)
+                result.success("FALLBACK")
+            } catch (ex: Exception) {
+                result.error("INTENT_ERROR", ex.message, null)
+            }
+        }
+    }
+
+    private fun openHotspotSettings(result: MethodChannel.Result) {
+        try {
+            // 1. Target Samsung specific Mobile AP Settings Activity
+            val intent = Intent()
+            intent.setClassName("com.android.settings", "com.samsung.settings.wifi.mobileap.WifiApSettings")
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            try {
+                // 2. Fallback to standard Tether Settings
+                val intent = Intent()
+                intent.setClassName("com.android.settings", "com.android.settings.Settings\$TetherSettingsActivity")
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                result.success(true)
+            } catch (ex: Exception) {
+                try {
+                    // 3. Fallback to wireless settings
+                    val intent = Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                    result.success(true)
+                } catch (exc: Exception) {
+                    result.error("INTENT_ERROR", exc.message, null)
                 }
             }
         }

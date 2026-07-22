@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:2:1-61:12
-INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:2:1-61:12
-INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:2:1-61:12
-INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:2:1-61:12
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:2:1-63:12
+INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:2:1-63:12
+INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:2:1-63:12
+INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:2:1-63:12
 MERGED from [androidx.wear:wear:1.3.0] C:\Users\user\.gradle\caches\8.14\transforms\657976f60fd45bee967086684122e5b7\transformed\wear-1.3.0\AndroidManifest.xml:17:1-28:12
 MERGED from [com.google.android.gms:play-services-wearable:18.1.0] C:\Users\user\.gradle\caches\8.14\transforms\3260890cb889b20b2eb97eb9b7e819fd\transformed\play-services-wearable-18.1.0\AndroidManifest.xml:17:1-24:12
 MERGED from [com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:2:1-16:12
@@ -98,37 +98,45 @@ uses-permission#android.permission.CHANGE_WIFI_MULTICAST_STATE
 ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:18:5-86
 	android:name
 		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:18:22-83
+uses-permission#android.permission.CHANGE_NETWORK_STATE
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:19:5-79
+	android:name
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:19:22-76
+uses-permission#android.permission.WRITE_SETTINGS
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:20:5-73
+	android:name
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:20:22-70
 uses-permission#android.permission.ACCESS_COARSE_LOCATION
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:21:5-81
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:23:5-81
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:21:22-78
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:23:22-78
 uses-permission#android.permission.ACCESS_FINE_LOCATION
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:22:5-79
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:24:5-79
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:22:22-76
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:24:22-76
 uses-permission#android.permission.READ_EXTERNAL_STORAGE
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:25:5-80
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:27:5-80
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:25:22-77
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:27:22-77
 uses-permission#android.permission.WRITE_EXTERNAL_STORAGE
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:26:5-81
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:28:5-81
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:26:22-78
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:28:22-78
 uses-permission#android.permission.MANAGE_EXTERNAL_STORAGE
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:27:5-82
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:29:5-82
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:27:22-79
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:29:22-79
 uses-permission#android.permission.FOREGROUND_SERVICE
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:30:5-77
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:32:5-77
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:30:22-74
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:32:22-74
 uses-permission#android.permission.FOREGROUND_SERVICE_DATA_SYNC
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:31:5-87
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:33:5-87
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:31:22-84
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:33:22-84
 application
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:33:5-59:19
-INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:33:5-59:19
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:35:5-61:19
+INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:35:5-61:19
 MERGED from [androidx.wear:wear:1.3.0] C:\Users\user\.gradle\caches\8.14\transforms\657976f60fd45bee967086684122e5b7\transformed\wear-1.3.0\AndroidManifest.xml:22:5-26:19
 MERGED from [androidx.wear:wear:1.3.0] C:\Users\user\.gradle\caches\8.14\transforms\657976f60fd45bee967086684122e5b7\transformed\wear-1.3.0\AndroidManifest.xml:22:5-26:19
 MERGED from [com.google.android.gms:play-services-wearable:18.1.0] C:\Users\user\.gradle\caches\8.14\transforms\3260890cb889b20b2eb97eb9b7e819fd\transformed\play-services-wearable-18.1.0\AndroidManifest.xml:22:5-20
@@ -148,55 +156,55 @@ MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] C:\Users\us
 	android:extractNativeLibs
 		INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml
 	android:requestLegacyExternalStorage
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:39:9-52
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:41:9-52
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.12.0] C:\Users\user\.gradle\caches\8.14\transforms\5755d0ee235c5240f0c34b791297e15e\transformed\core-1.12.0\AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:37:9-35
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:39:9-35
 	android:label
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:36:9-40
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:38:9-40
 	android:icon
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:35:9-58
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:37:9-58
 	android:allowBackup
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:34:9-35
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:36:9-35
 	android:theme
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:38:9-59
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:40:9-59
 uses-library#com.google.android.wearable
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:41:9-92
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:43:9-92
 MERGED from [androidx.wear:wear:1.3.0] C:\Users\user\.gradle\caches\8.14\transforms\657976f60fd45bee967086684122e5b7\transformed\wear-1.3.0\AndroidManifest.xml:23:9-25:40
 MERGED from [androidx.wear:wear:1.3.0] C:\Users\user\.gradle\caches\8.14\transforms\657976f60fd45bee967086684122e5b7\transformed\wear-1.3.0\AndroidManifest.xml:23:9-25:40
 	android:required
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:41:66-89
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:43:66-89
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:41:23-65
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:43:23-65
 activity#com.samsung.health.client.watch.MainActivity
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:43:9-51:20
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:45:9-53:20
 	android:label
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:46:13-44
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:48:13-44
 	android:exported
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:45:13-36
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:47:13-36
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:44:13-41
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:46:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:47:13-50:29
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:49:13-52:29
 action#android.intent.action.MAIN
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:48:17-69
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:50:17-69
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:48:25-66
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:50:25-66
 category#android.intent.category.LAUNCHER
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:49:17-77
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:51:17-77
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:49:27-74
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:51:27-74
 service#com.samsung.health.client.watch.SyncService
-ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:53:9-57:56
+ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:55:9-59:56
 	android:enabled
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:55:13-35
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:57:13-35
 	android:exported
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:56:13-37
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:58:13-37
 	android:foregroundServiceType
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:57:13-53
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:59:13-53
 	android:name
-		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:54:13-40
+		ADDED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:56:13-40
 uses-sdk
 INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml

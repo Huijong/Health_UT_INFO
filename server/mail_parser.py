@@ -150,43 +150,67 @@ def fetch_and_parse_emails():
                     try:
                         points_col = db["points_transactions"]
                         month_str = parsed_data["received_at"][:7] # YYYY-MM
-                        points_col.insert_one({
-                            "tester_name": parsed_data["tester_name"],
-                            "points": 1,
-                            "memo": "자동 적립 (이메일 수집)",
-                            "month": month_str,
-                            "created_at": parsed_data["received_at"],
-                            "email_id": parsed_data["_id"]
-                        })
-                        logging.info(f"포인트 1점 자동 적립 완료: {parsed_data['tester_name']} (email_id: {parsed_data['_id']})")
 
-                        # 거리 보너스 포인트 자동 추가
-                        additional_points = 0
+                        # 1. Determine base exercise points
+                        exercise_name = parsed_data.get("exercise", "").strip()
+                        is_hiking = "하이킹" in exercise_name or "Hiking" in exercise_name
+                        base_points = 3.0 if is_hiking else 1.0
+
+                        # 2. Parse and round distance
                         dist_val = 0.0
                         try:
                             dist_str = parsed_data.get("distance", "0").strip()
                             dist_val = float(dist_str)
-                            if 10.0 <= dist_val < 20.0:
-                                additional_points = 1
-                            elif 20.0 <= dist_val < 30.0:
-                                additional_points = 2
-                            elif 30.0 <= dist_val < 40.0:
-                                additional_points = 4
-                            elif dist_val >= 40.0:
-                                additional_points = 6
                         except ValueError:
                             pass
+                        
+                        rounded_dist = int(round(dist_val + 1e-9)) # 정수 반올림 (부동 소수점 오차 보정)
 
-                        if additional_points > 0:
-                            points_col.insert_one({
-                                "tester_name": parsed_data["tester_name"],
-                                "points": additional_points,
-                                "memo": f"거리 보너스 적립 ({dist_val}km)",
-                                "month": month_str,
-                                "created_at": parsed_data["received_at"],
-                                "email_id": parsed_data["_id"]
-                            })
-                            logging.info(f"거리 보너스 포인트 {additional_points}점 적립 완료: {parsed_data['tester_name']} ({dist_val}km)")
+                        # 3. Calculate distance bonus points
+                        bonus_points = 0.0
+                        
+                        # Group A: Walking, Running, Hiking
+                        is_group_a = any(k in exercise_name for k in ["걷기", "달리기", "러닝", "하이킹", "Hiking", "Walk", "Run"])
+                        
+                        if is_group_a and rounded_dist > 0:
+                            if rounded_dist <= 10:
+                                bonus_points = rounded_dist * 0.1
+                            elif rounded_dist <= 20:
+                                bonus_points = 1.0 + (rounded_dist - 10) * 0.15
+                            elif rounded_dist <= 30:
+                                bonus_points = 2.5 + (rounded_dist - 20) * 0.2
+                            elif rounded_dist <= 40:
+                                bonus_points = 4.5 + (rounded_dist - 30) * 0.3
+                            elif rounded_dist < 100:
+                                bonus_points = 7.5 + (rounded_dist - 40) * 0.20833
+                            else:
+                                bonus_points = 20.0 + (rounded_dist - 100) * 0.2
+                        
+                        # Group B: Cycling
+                        is_group_b = any(k in exercise_name for k in ["자전거", "사이클", "Cycling", "Bike"])
+                        if is_group_b and rounded_dist > 0:
+                            if rounded_dist <= 40:
+                                bonus_points = rounded_dist * 0.1
+                            elif rounded_dist <= 50:
+                                bonus_points = rounded_dist * 0.1  # Continuous 0.1 increment
+                            elif rounded_dist < 100:
+                                bonus_points = 5.0 + (rounded_dist - 50) * 0.14
+                            else:
+                                bonus_points = 12.0 + (rounded_dist - 100) * 0.16
+
+                        # 4. Integrate total points (rounded to 2 decimal places)
+                        total_points = round(base_points + bonus_points, 2)
+
+                        # 5. Insert unified points transaction
+                        points_col.insert_one({
+                            "tester_name": parsed_data["tester_name"],
+                            "points": total_points,
+                            "memo": f"자동 적립 ({exercise_name}, {rounded_dist}km)",
+                            "month": month_str,
+                            "created_at": parsed_data["received_at"],
+                            "email_id": parsed_data["_id"]
+                        })
+                        logging.info(f"운동 자동 적립 완료: {parsed_data['tester_name']} -> {total_points}점 (기본: {base_points}, 거리 보너스: {bonus_points:.2f}점)")
                     except Exception as pe:
                         logging.error(f"포인트 자동 적립 실패: {pe}")
                 except Exception as e:

@@ -339,65 +339,163 @@ class _RankingScreenState extends State<RankingScreen> {
   void _showRankingRulesDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        child: _GlassCard(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: const [
-                    Icon(Icons.info_outline_rounded, color: Color(0xFF3DFFC1), size: 22),
-                    SizedBox(width: 8),
-                    Text(
-                      '포인트 적립 기준 안내',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                _buildRuleItem('건당 기본 적립', '+ 1 포인트'),
-                _buildRuleItem('10km 이상 ~ 20km 미만', '+ 1 포인트'),
-                _buildRuleItem('20km 이상 ~ 30km 미만', '+ 2 포인트'),
-                _buildRuleItem('30km 이상 ~ 40km 미만', '+ 4 포인트'),
-                _buildRuleItem('40km 이상', '+ 6 포인트'),
-                _buildRuleItem('특별 포인트 (JY)', '+ x 포인트'),
-                const SizedBox(height: 20),
-                const Divider(color: Colors.white10, height: 1),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3DFFC1),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    ),
-                    child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.bold)),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return DefaultTabController(
+              length: 2,
+              child: Dialog(
+                backgroundColor: const Color(0xFF161819),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.stars_rounded, color: Color(0xFF3DFFC1), size: 24),
+                            SizedBox(width: 8),
+                            Text(
+                              '포인트 적립 기준 안내',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: Colors.white,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Tab Bar
+                      const TabBar(
+                        indicatorColor: Color(0xFF3DFFC1),
+                        labelColor: Color(0xFF3DFFC1),
+                        unselectedLabelColor: Colors.white38,
+                        labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        tabs: [
+                          Tab(text: '🏃 걷기/달리기/하이킹'),
+                          Tab(text: '🚴 실외 자전거'),
+                        ],
+                      ),
+                      // Tab Content
+                      SizedBox(
+                        height: 380,
+                        child: TabBarView(
+                          children: [
+                            _buildGroupARules(),
+                            _buildGroupBRules(),
+                          ],
+                        ),
+                      ),
+                      const Divider(color: Colors.white10, height: 1),
+                      // Footer Button
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: TextButton.styleFrom(
+                              backgroundColor: const Color(0xFF3DFFC1),
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildGroupARules() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _buildInfoBox('💡 기본 점수: 건당 1.0P (단, 하이킹은 건당 3.0P)\n💡 모든 거리는 소수점 첫째 자리에서 반올림 적용'),
+        const SizedBox(height: 16),
+        _buildTableHeader(),
+        _buildTableItem('1 ~ 10 km', '1km당 +0.1P', '10km = 1.0P'),
+        _buildTableItem('11 ~ 20 km', '1km당 +0.15P', '20km = 2.5P'),
+        _buildTableItem('21 ~ 30 km', '1km당 +0.2P', '30km = 4.5P'),
+        _buildTableItem('31 ~ 40 km', '1km당 +0.3P', '40km = 7.5P'),
+        _buildTableItem('41 ~ 99 km', '40~100km 구간 등간격 가산', '41km=7.71P ... 99km=19.79P'),
+        _buildTableItem('100 km 이상', '기본 20.0P + 1km당 +0.2P', '110km = 22.0P'),
+      ],
+    );
+  }
+
+  Widget _buildGroupBRules() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _buildInfoBox('💡 기본 점수: 건당 1.0P\n💡 모든 거리는 소수점 첫째 자리에서 반올림 적용'),
+        const SizedBox(height: 16),
+        _buildTableHeader(),
+        _buildTableItem('1 ~ 40 km', '1km당 +0.1P', '40km = 4.0P'),
+        _buildTableItem('41 ~ 50 km', '1km당 +0.1P', '50km = 5.0P'),
+        _buildTableItem('51 ~ 99 km', '50~100km 구간 등간격 가산', '51km=5.14P ... 99km=11.86P'),
+        _buildTableItem('100 km 이상', '기본 12.0P + 1km당 +0.16P', '110km = 13.6P'),
+      ],
+    );
+  }
+
+  Widget _buildInfoBox(String text) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2E5BFF).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF2E5BFF).withOpacity(0.2)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(color: Color(0xFF8AB4F8), fontSize: 12, height: 1.5, fontWeight: FontWeight.w500),
       ),
     );
   }
 
-  Widget _buildRuleItem(String label, String point) {
+  Widget _buildTableHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.only(bottom: 8, left: 4, right: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: const [
+          Expanded(flex: 3, child: Text('거리 구간', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold))),
+          Expanded(flex: 4, child: Text('구간 가산 규칙', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold))),
+          Expanded(flex: 3, child: Text('예시 값', textAlign: TextAlign.right, style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTableItem(String range, String rule, String example) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
+      ),
+      child: Row(
         children: [
-          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
-          Text(point, style: const TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold, fontSize: 13)),
+          Expanded(flex: 3, child: Text(range, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+          Expanded(flex: 4, child: Text(rule, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11))),
+          Expanded(flex: 3, child: Text(example, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFF3DFFC1), fontSize: 11, fontWeight: FontWeight.bold))),
         ],
       ),
     );

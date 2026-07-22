@@ -6,9 +6,15 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -26,24 +32,47 @@ class SyncService : Service() {
     companion object {
         private const val TAG = "HP_SyncService"
         private const val CHANNEL_ID = "WatchSyncServiceChannel"
-        private const val UDP_BEACON_PORT = 8889
+        private const val TCP_PORT = 8888
+        private const val UDP_PORT = 8889
+        private const val BUFFER_SIZE = 1024 * 1024
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    // TCP Socket
     private var tcpSocket: Socket? = null
     private var socketWriter: BufferedWriter? = null
     private var socketReader: BufferedReader? = null
     private var isSocketRunning = false
 
-    private var udpListenerThread: Thread? = null
+    // Service state
     private var isServiceActive = false
+
+    // UDP Listener
+    private var udpListenerThread: Thread? = null
+    private var udpStarted = false
+
+    // Direct Connect Thread for Hotspot
+    private var directConnectThread: Thread? = null
+
+    // Active Wi-Fi Network for binding
+    private var activeWifiNetwork: Network? = null
+    private var connectivityManager: ConnectivityManager? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+    // ────────────────────────────────────────────────────────────────
+    // LIFECYCLE
+    // ────────────────────────────────────────────────────────────────
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         acquireLocks()
+
+        connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -53,288 +82,411 @@ class SyncService : Service() {
             }
             writeLog("Foreground service started successfully.")
         } catch (e: Exception) {
-            writeLog("Failed to start foreground service: ${e.message}")
-            try {
-                startForeground(1, createNotification())
-                writeLog("Foreground service started (legacy fallback).")
-            } catch (ex: Exception) {
-                writeLog("Fatal error starting foreground: ${ex.message}")
-            }
+            writeLog("Foreground start error: ${e.message}")
+            try { startForeground(1, createNotification()) } catch (_: Exception) {}
         }
 
         isServiceActive = true
         ensureWifiEnabled()
+
+        // Request Physical Wi-Fi Network directly (without internet requirement for offline hotspot compatibility)
+        requestPhysicalWifiNetwork()
+
+        // Start UDP listener immediately
         startUdpBeaconListener()
+
+        // Start Direct Connect fallback
+        startDirectConnectFallback()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
-    }
-
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         writeLog("Destroying SyncService. Releasing resources...")
         isServiceActive = false
+        mainHandler.removeCallbacksAndMessages(null)
         stopTcpClient()
+        releaseWifiNetworkRequest()
         releaseLocks()
         super.onDestroy()
     }
 
+    // ────────────────────────────────────────────────────────────────
+    // BIND PHYSICAL WI-FI NETWORK (BYPASS BLUETOOTH PROXY)
+    // ────────────────────────────────────────────────────────────────
+
+    private fun requestPhysicalWifiNetwork() {
+        try {
+            writeLog("Requesting physical Wi-Fi network link (offline ok) from OS...")
+            val request = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                // REMOVED: NET_CAPABILITY_INTERNET constraint to allow offline local hotspots
+                .build()
+
+            networkCallback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    super.onAvailable(network)
+                    writeLog("Physical Wi-Fi network available! Binding active socket link...")
+                    activeWifiNetwork = network
+                    connectivityManager?.bindProcessToNetwork(network)
+                }
+
+                override fun onLost(network: Network) {
+                    super.onLost(network)
+                    writeLog("Physical Wi-Fi network lost.")
+                    if (activeWifiNetwork == network) {
+                        activeWifiNetwork = null
+                        connectivityManager?.bindProcessToNetwork(null)
+                    }
+                }
+            }
+
+            networkCallback?.let {
+                connectivityManager?.requestNetwork(request, it)
+            }
+        } catch (e: Exception) {
+            writeLog("Failed to request Wi-Fi network: ${e.message}")
+        }
+    }
+
+    private fun releaseWifiNetworkRequest() {
+        try {
+            networkCallback?.let {
+                connectivityManager?.unregisterNetworkCallback(it)
+            }
+            connectivityManager?.bindProcessToNetwork(null)
+            activeWifiNetwork = null
+            writeLog("Wi-Fi network binding released.")
+        } catch (_: Exception) {}
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // LOCKS
+    // ────────────────────────────────────────────────────────────────
+
     private fun acquireLocks() {
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HealthPort:SyncWakeLock").apply {
-                acquire(10 * 60 * 1000L)
-            }
-            val wm = getApplicationContext().getSystemService(Context.WIFI_SERVICE) as WifiManager
-            wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "HealthPort:SyncWifiLock").apply {
-                acquire()
-            }
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HealthPort:SyncWakeLock")
+                .apply { acquire(10 * 60 * 1000L) }
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            @Suppress("DEPRECATION")
+            wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "HealthPort:SyncWifiLock")
+                .apply { acquire() }
             writeLog("WakeLock and WifiLock acquired.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to acquire locks: ${e.message}")
-        }
+        } catch (e: Exception) { Log.e(TAG, "Lock error: ${e.message}") }
     }
 
     private fun releaseLocks() {
         try {
-            wakeLock?.let {
-                if (it.isHeld) it.release()
-            }
-            wifiLock?.let {
-                if (it.isHeld) it.release()
-            }
+            wakeLock?.let { if (it.isHeld) it.release() }
+            wifiLock?.let { if (it.isHeld) it.release() }
             writeLog("Locks released.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to release locks: ${e.message}")
-        }
+        } catch (e: Exception) { Log.e(TAG, "Release lock error: ${e.message}") }
     }
+
+    // ────────────────────────────────────────────────────────────────
+    // WI-FI HARDWARE
+    // ────────────────────────────────────────────────────────────────
 
     private fun ensureWifiEnabled() {
         try {
             val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             if (!wm.isWifiEnabled) {
-                writeLog("Wi-Fi hardware is OFF. Turning ON Wi-Fi on Watch...")
+                writeLog("Wi-Fi is OFF → turning ON...")
                 @Suppress("DEPRECATION")
                 wm.isWifiEnabled = true
             } else {
                 writeLog("Wi-Fi hardware is already ON.")
             }
-        } catch (e: Exception) {
-            writeLog("Error checking Wi-Fi hardware: ${e.message}")
-        }
+        } catch (e: Exception) { writeLog("Wi-Fi check error: ${e.message}") }
     }
 
+    // ────────────────────────────────────────────────────────────────
+    // UDP BEACON LISTENER
+    // ────────────────────────────────────────────────────────────────
+
     private fun startUdpBeaconListener() {
+        if (udpStarted || isSocketRunning) return
+        udpStarted = true
+
         udpListenerThread = Thread {
-            writeLog("Starting UDP Beacon Listener on port $UDP_BEACON_PORT...")
-            var datagramSocket: DatagramSocket? = null
+            writeLog("Starting UDP Beacon Listener on port $UDP_PORT...")
+            var ds: DatagramSocket? = null
             try {
-                datagramSocket = DatagramSocket(UDP_BEACON_PORT)
-                val buffer = ByteArray(1024)
+                ds = DatagramSocket(null)
+                ds.reuseAddress = true
+                ds.soTimeout = 15000
+                ds.bind(InetSocketAddress(UDP_PORT))
 
+                val buf = ByteArray(1024)
                 while (isServiceActive && !isSocketRunning) {
-                    val packet = DatagramPacket(buffer, buffer.size)
-                    datagramSocket.receive(packet)
-                    val message = String(packet.data, 0, packet.length, Charsets.UTF_8)
-                    writeLog("UDP Beacon received: $message")
-
-                    if (message.startsWith("HEALTHPORT_SERVER:")) {
-                        // Format: HEALTHPORT_SERVER:[ip]:[port]
-                        val parts = message.split(":")
-                        if (parts.size >= 3) {
-                            val ip = parts[1]
-                            val port = parts[2].toIntOrNull() ?: 8888
-                            writeLog("Discovered HealthPort Server at $ip:$port. Connecting TCP...")
-                            startTcpClient(ip, port)
-                            break
+                    try {
+                        val pkt = DatagramPacket(buf, buf.size)
+                        ds.receive(pkt)
+                        val msg = String(pkt.data, 0, pkt.length, Charsets.UTF_8)
+                        writeLog("UDP Beacon received: $msg")
+                        if (msg.startsWith("HEALTHPORT_SERVER:")) {
+                            val parts = msg.split(":")
+                            if (parts.size >= 3) {
+                                val ip = parts[1]
+                                val port = parts[2].toIntOrNull() ?: TCP_PORT
+                                writeLog("Discovered Server at $ip:$port → Connecting TCP...")
+                                startTcpClient(ip, port)
+                                break
+                            }
                         }
+                    } catch (e: java.net.SocketTimeoutException) {
+                        writeLog("UDP timeout - listening for beacon...")
                     }
                 }
             } catch (e: Exception) {
                 writeLog("UDP Beacon listener error: ${e.message}")
             } finally {
-                try {
-                    datagramSocket?.close()
-                } catch (e: Exception) {
-                    // ignore
-                }
+                try { ds?.close() } catch (_: Exception) {}
+                udpStarted = false
             }
-        }.apply { start() }
+        }.apply { isDaemon = true; start() }
     }
+
+    // ────────────────────────────────────────────────────────────────
+    // DIRECT TCP CONNECT FALLBACK (FOR HOTSPOT & BT TETHERING)
+    // ────────────────────────────────────────────────────────────────
+
+    private fun getWifiGatewayIp(): String? {
+        return try {
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val dhcp = wm.dhcpInfo
+            val gateway = dhcp.gateway
+            if (gateway != 0) {
+                val ip = String.format(
+                    java.util.Locale.US,
+                    "%d.%d.%d.%d",
+                    gateway and 0xff,
+                    gateway shr 8 and 0xff,
+                    gateway shr 16 and 0xff,
+                    gateway shr 24 and 0xff
+                )
+                writeLog("DHCP detected Gateway IP: $ip")
+                ip
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            writeLog("Failed to read DHCP gateway: ${e.message}")
+            null
+        }
+    }
+
+    private fun startDirectConnectFallback() {
+        if (directConnectThread?.isAlive == true) return
+        directConnectThread = Thread {
+            writeLog("Starting Direct Connection Fallback thread...")
+            
+            while (isServiceActive) {
+                if (!isSocketRunning) {
+                    val fallbackIps = mutableListOf<String>()
+                    
+                    // 1. Try to read active DHCP gateway IP dynamically
+                    getWifiGatewayIp()?.let {
+                        fallbackIps.add(it)
+                    }
+                    
+                    // 2. Load static fallback IPs
+                    fallbackIps.addAll(listOf("192.168.43.1", "192.168.44.1", "192.168.45.1", "192.168.1.1", "192.168.0.1"))
+                    
+                    // Distinct list to avoid duplicate attempts
+                    val uniqueIps = fallbackIps.distinct()
+                    
+                    for (ip in uniqueIps) {
+                        if (isSocketRunning) break
+                        try {
+                            val socket = Socket()
+                            socket.receiveBufferSize = BUFFER_SIZE
+                            socket.sendBufferSize = BUFFER_SIZE
+                            
+                            // Bind socket to physical Wi-Fi interface if available
+                            activeWifiNetwork?.let {
+                                it.bindSocket(socket)
+                            }
+                            
+                            writeLog("Attempting direct TCP connection to gateway: $ip:$TCP_PORT...")
+                            socket.connect(InetSocketAddress(ip, TCP_PORT), 3000)
+                            
+                            writeLog("Direct connection success to $ip! Initiating synchronization client...")
+                            tcpSocket = socket
+                            isSocketRunning = true
+                            
+                            socketWriter = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
+                            socketReader = BufferedReader(InputStreamReader(BufferedInputStream(socket.getInputStream(), BUFFER_SIZE), Charsets.UTF_8))
+                            
+                            sendSocketLine("HELLO_FROM_WATCH")
+                            
+                            // Run receive loop on current thread
+                            while (isSocketRunning) {
+                                val line = socketReader?.readLine() ?: break
+                                handleSocketCommand(line, socket.getInputStream())
+                            }
+                        } catch (e: Exception) {
+                            // Silently ignore failed attempts
+                        } finally {
+                            if (isSocketRunning) {
+                                writeLog("Direct client session closed.")
+                                stopTcpClient()
+                            }
+                        }
+                    }
+                }
+                Thread.sleep(3000) // Retry every 3 seconds
+            }
+        }.apply { isDaemon = true; start() }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // TCP CLIENT (UDP BEACON INITIATED)
+    // ────────────────────────────────────────────────────────────────
 
     private fun startTcpClient(ip: String, port: Int) {
         if (isSocketRunning) return
         isSocketRunning = true
         Thread {
             try {
-                writeLog("Connecting to TCP Server at $ip:$port...")
+                writeLog("TCP connecting to $ip:$port...")
                 val socket = Socket()
+                socket.receiveBufferSize = BUFFER_SIZE
+                socket.sendBufferSize = BUFFER_SIZE
+
+                // Force bind socket to physical Wi-Fi network interface to bypass BT proxying
+                activeWifiNetwork?.let {
+                    it.bindSocket(socket)
+                }
+
                 socket.connect(InetSocketAddress(ip, port), 15000)
                 tcpSocket = socket
-                writeLog("TCP Connected to Server at $ip:$port!")
+                writeLog("TCP connected to $ip:$port!")
 
                 socketWriter = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
-                socketReader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
+                socketReader = BufferedReader(InputStreamReader(BufferedInputStream(socket.getInputStream(), BUFFER_SIZE), Charsets.UTF_8))
 
                 sendSocketLine("HELLO_FROM_WATCH")
 
                 while (isSocketRunning) {
                     val line = socketReader?.readLine() ?: break
-                    writeLog("Socket command received: $line")
-                    handleSocketCommand(line)
+                    handleSocketCommand(line, socket.getInputStream())
                 }
             } catch (e: Exception) {
-                writeLog("TCP Client error: ${e.message}")
+                writeLog("TCP error: ${e.message}")
             } finally {
-                writeLog("TCP Client connection closed.")
+                writeLog("TCP closed.")
                 stopTcpClient()
                 if (isServiceActive) {
-                    // Restart UDP beacon listener if disconnected
-                    startUdpBeaconListener()
+                    mainHandler.postDelayed({
+                        writeLog("Restarting UDP beacon listener after disconnect...")
+                        udpStarted = false
+                        startUdpBeaconListener()
+                    }, 3000)
                 }
             }
-        }.start()
+        }.apply { isDaemon = true; start() }
     }
 
     private fun stopTcpClient() {
         isSocketRunning = false
-        try {
-            socketWriter?.close()
-            socketReader?.close()
-            tcpSocket?.close()
-        } catch (e: Exception) {
-            // ignore
-        }
-        socketWriter = null
-        socketReader = null
-        tcpSocket = null
+        try { socketWriter?.close() } catch (_: Exception) {}
+        try { socketReader?.close() } catch (_: Exception) {}
+        try { tcpSocket?.close() } catch (_: Exception) {}
+        socketWriter = null; socketReader = null; tcpSocket = null
     }
 
     private fun sendSocketLine(text: String) {
-        try {
-            socketWriter?.write(text + "\n")
-            socketWriter?.flush()
-        } catch (e: Exception) {
-            writeLog("Failed to write to socket: ${e.message}")
-        }
+        try { socketWriter?.run { write(text + "\n"); flush() } }
+        catch (e: Exception) { writeLog("Socket write error: ${e.message}") }
     }
 
-    private fun handleSocketCommand(command: String) {
+    private fun handleSocketCommand(command: String, inStream: InputStream) {
+        writeLog("CMD: $command")
         when {
             command == "GET_FILE_LIST" -> {
-                val fileListJson = getFileListJson()
-                sendSocketLine("FILE_LIST:$fileListJson")
+                sendSocketLine("FILE_LIST:${getFileListJson()}")
             }
             command.startsWith("DOWNLOAD_FILE:") -> {
-                val filename = command.substring("DOWNLOAD_FILE:".length).trim()
-                sendSocketFile(filename)
+                sendSocketFile(command.substring("DOWNLOAD_FILE:".length).trim())
             }
         }
     }
 
     private fun sendSocketFile(filename: String) {
         val file = File("/sdcard/Documents/COLA_FILE/", filename)
-        if (!file.exists()) {
-            writeLog("Error: File not found - $filename")
-            sendSocketLine("ERROR:File not found")
-            return
-        }
-
+        if (!file.exists()) { sendSocketLine("ERROR:File not found"); return }
         try {
-            writeLog("Computing MD5 for $filename...")
-            val md5 = getMd5OfFile(file)
+            val md5 = getMd5(file)
             val size = file.length()
-
-            writeLog("Sending FILE_START header for $filename (Size: $size, MD5: $md5)...")
+            writeLog("Sending $filename ($size bytes) with 1MB Buffer...")
             sendSocketLine("FILE_START:$filename:$size:$md5")
             socketWriter?.flush()
-
-            val outputStream = tcpSocket?.getOutputStream() ?: throw Exception("Output stream is null")
-            val fileInputStream = FileInputStream(file)
-            val buffer = ByteArray(16384)
-            var bytesRead: Int
-            var totalSent: Long = 0
-
-            writeLog("Streaming bytes for $filename...")
-            while (fileInputStream.read(buffer).also { bytesRead = it } != -1) {
-                outputStream.write(buffer, 0, bytesRead)
-                totalSent += bytesRead
+            
+            val out = BufferedOutputStream(tcpSocket?.getOutputStream() ?: return, BUFFER_SIZE)
+            FileInputStream(file).use { fis ->
+                val buf = ByteArray(65536) // 64KB chunk reads
+                var r: Int
+                while (fis.read(buf).also { r = it } != -1) {
+                    out.write(buf, 0, r)
+                }
+                out.flush()
             }
-            outputStream.flush()
-            fileInputStream.close()
-            writeLog("File $filename fully streamed over socket ($totalSent bytes).")
-            sendSocketLine("FILE_END:$filename")
+            writeLog("$filename sent successfully.")
         } catch (e: Exception) {
-            writeLog("Exception streaming file: ${e.message}")
-            sendSocketLine("ERROR:Exception during file stream: ${e.message}")
+            writeLog("File send error: ${e.message}")
+            sendSocketLine("ERROR:${e.message}")
         }
     }
 
     private fun getFileListJson(): String {
         val folder = File("/sdcard/Documents/COLA_FILE/")
-        if (!folder.exists()) {
-            folder.mkdirs()
+        if (!folder.exists()) folder.mkdirs()
+        val arr = JSONArray()
+        folder.listFiles { _, n -> n.endsWith(".zip", true) }?.forEach { f ->
+            arr.put(JSONObject().apply { put("name", f.name); put("size", f.length()); put("last_modified", f.lastModified()) })
         }
-        val files = folder.listFiles { _, name -> name.endsWith(".zip", ignoreCase = true) }
-        val jsonArray = JSONArray()
-        files?.forEach { file ->
-            val obj = JSONObject()
-            obj.put("name", file.name)
-            obj.put("size", file.length())
-            obj.put("last_modified", file.lastModified())
-            jsonArray.put(obj)
-        }
-        return jsonArray.toString()
+        return arr.toString()
     }
 
-    private fun writeLog(message: String) {
+    // ────────────────────────────────────────────────────────────────
+    // UTILITIES
+    // ────────────────────────────────────────────────────────────────
+
+    private fun getMd5(file: File): String {
+        val d = MessageDigest.getInstance("MD5")
+        FileInputStream(file).use { fis ->
+            val b = ByteArray(32768) // 32KB buffer for fast md5 hashing
+            var r: Int
+            while (fis.read(b).also { r = it } > 0) d.update(b, 0, r)
+        }
+        return java.math.BigInteger(1, d.digest()).toString(16).padStart(32, '0')
+    }
+
+    fun writeLog(msg: String) {
+        Log.d(TAG, msg)
         try {
             val folder = File("/sdcard/Documents/COLA_FILE/")
             if (!folder.exists()) folder.mkdirs()
-            val logFile = File(folder, "sync_log.txt")
-            logFile.appendText("[${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}] $message\n")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to write log: ${e.message}")
-        }
-    }
-
-    private fun getMd5OfFile(file: File): String {
-        val digest = MessageDigest.getInstance("MD5")
-        val fis = FileInputStream(file)
-        val buffer = ByteArray(8192)
-        var read: Int
-        while (fis.read(buffer).also { read = it } > 0) {
-            digest.update(buffer, 0, read)
-        }
-        fis.close()
-        val md5sum = digest.digest()
-        val bigInt = java.math.BigInteger(1, md5sum)
-        var output = bigInt.toString(16)
-        while (output.length < 32) {
-            output = "0$output"
-        }
-        return output
+            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            File(folder, "sync_log.txt").appendText("[$ts] $msg\n")
+        } catch (_: Exception) {}
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val serviceChannel = NotificationChannel(
-                CHANNEL_ID,
-                "Watch Sync Service Channel",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(serviceChannel)
+            val ch = NotificationChannel(CHANNEL_ID, "Watch Sync", NotificationManager.IMPORTANCE_LOW)
+            (getSystemService(NotificationManager::class.java))?.createNotificationChannel(ch)
         }
     }
 
-    private fun createNotification(): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun createNotification(): Notification =
+        NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("HealthPort Sync")
             .setContentText("기기 연동 대기 중...")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .build()
-    }
 }
