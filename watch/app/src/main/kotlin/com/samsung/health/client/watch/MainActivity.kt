@@ -15,9 +15,12 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.android.gms.wearable.MessageClient
+import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Wearable
 import java.io.File
 
-class MainActivity : Activity() {
+class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
 
     private lateinit var statusText: TextView
     private lateinit var actionButton: Button
@@ -69,11 +72,46 @@ class MainActivity : Activity() {
         if (!folder.exists()) {
             folder.mkdirs()
         }
+
+        // Register Wearable Message Listener
+        Wearable.getMessageClient(this).addListener(this)
     }
 
     override fun onResume() {
         super.onResume()
         checkAndUpdateServiceState()
+    }
+
+    override fun onDestroy() {
+        // Unregister Wearable Message Listener
+        Wearable.getMessageClient(this).removeListener(this)
+        super.onDestroy()
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // WEARABLE MESSAGE LISTENER
+    // ────────────────────────────────────────────────────────────────
+
+    override fun onMessageReceived(messageEvent: MessageEvent) {
+        if (messageEvent.path == "/request_wifi_join") {
+            runOnUiThread {
+                Toast.makeText(this, "스마트폰으로부터 와이파이 자동 연결 명령 수신!", Toast.LENGTH_SHORT).show()
+            }
+            // 1. Ensure SyncService is running
+            if (!isServiceRunning) {
+                checkPermissionsAndStart()
+            }
+            
+            // 2. Trigger wifi join process via Service Intent
+            val serviceIntent = Intent(this, SyncService::class.java).apply {
+                action = "ACTION_TRIGGER_WIFI_JOIN"
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        }
     }
 
     private fun checkAndUpdateServiceState() {
@@ -137,7 +175,11 @@ class MainActivity : Activity() {
 
     private fun startSyncService() {
         val intent = Intent(this, SyncService::class.java)
-        startService(intent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
         isServiceRunning = true
         statusText.text = "HealthPort Sync\n작동 중..."
         actionButton.text = "연동 종료"

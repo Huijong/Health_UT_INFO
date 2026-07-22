@@ -1,6 +1,6 @@
 1<?xml version="1.0" encoding="utf-8"?>
 2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-3    package="com.samsung.health.client.watch"
+3    package="com.samsung.health.client"
 4    android:versionCode="1"
 5    android:versionName="1.0" >
 6
@@ -87,17 +87,17 @@
 44
 45    <permission
 45-->[androidx.core:core:1.12.0] C:\Users\user\.gradle\caches\8.14\transforms\5755d0ee235c5240f0c34b791297e15e\transformed\core-1.12.0\AndroidManifest.xml:22:5-24:47
-46        android:name="com.samsung.health.client.watch.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+46        android:name="com.samsung.health.client.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 46-->[androidx.core:core:1.12.0] C:\Users\user\.gradle\caches\8.14\transforms\5755d0ee235c5240f0c34b791297e15e\transformed\core-1.12.0\AndroidManifest.xml:23:9-81
 47        android:protectionLevel="signature" />
 47-->[androidx.core:core:1.12.0] C:\Users\user\.gradle\caches\8.14\transforms\5755d0ee235c5240f0c34b791297e15e\transformed\core-1.12.0\AndroidManifest.xml:24:9-44
 48
-49    <uses-permission android:name="com.samsung.health.client.watch.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+49    <uses-permission android:name="com.samsung.health.client.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
 49-->[androidx.core:core:1.12.0] C:\Users\user\.gradle\caches\8.14\transforms\5755d0ee235c5240f0c34b791297e15e\transformed\core-1.12.0\AndroidManifest.xml:26:5-97
 49-->[androidx.core:core:1.12.0] C:\Users\user\.gradle\caches\8.14\transforms\5755d0ee235c5240f0c34b791297e15e\transformed\core-1.12.0\AndroidManifest.xml:26:22-94
 50
 51    <application
-51-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:35:5-61:19
+51-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:35:5-70:19
 52        android:allowBackup="true"
 52-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:36:9-35
 53        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
@@ -152,29 +152,44 @@
 80            android:foregroundServiceType="dataSync" />
 80-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:59:13-53
 81        <service
-81-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:10:9-13:105
-82            android:name="com.google.android.gms.nearby.exposurenotification.WakeUpService"
-82-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:11:13-92
-83            android:exported="true"
-83-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:12:13-36
-84            android:permission="com.google.android.gms.nearby.exposurenotification.EXPOSURE_CALLBACK" />
-84-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:13:13-102
-85
-86        <activity
-86-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:20:9-22:45
-87            android:name="com.google.android.gms.common.api.GoogleApiActivity"
-87-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:20:19-85
-88            android:exported="false"
-88-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:22:19-43
-89            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-89-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:21:19-78
-90
-91        <meta-data
-91-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:21:9-23:69
-92            android:name="com.google.android.gms.version"
-92-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:22:13-58
-93            android:value="@integer/google_play_services_version" />
-93-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:23:13-66
-94    </application>
-95
-96</manifest>
+81-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:61:9-68:19
+82            android:name="com.samsung.health.client.watch.WatchMessageReceiverService"
+82-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:62:13-56
+83            android:enabled="true"
+83-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:64:13-35
+84            android:exported="true" >
+84-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:63:13-36
+85            <intent-filter>
+85-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:65:13-67:29
+86                <action android:name="com.google.android.gms.wearable.BIND_LISTENER" />
+86-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:66:17-88
+86-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:66:25-85
+87            </intent-filter>
+88        </service>
+89        <service
+89-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:10:9-13:105
+90            android:name="com.google.android.gms.nearby.exposurenotification.WakeUpService"
+90-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:11:13-92
+91            android:exported="true"
+91-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:12:13-36
+92            android:permission="com.google.android.gms.nearby.exposurenotification.EXPOSURE_CALLBACK" />
+92-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:13:13-102
+93
+94        <activity
+94-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:20:9-22:45
+95            android:name="com.google.android.gms.common.api.GoogleApiActivity"
+95-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:20:19-85
+96            android:exported="false"
+96-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:22:19-43
+97            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+97-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:21:19-78
+98
+99        <meta-data
+99-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:21:9-23:69
+100            android:name="com.google.android.gms.version"
+100-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:22:13-58
+101            android:value="@integer/google_play_services_version" />
+101-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:23:13-66
+102    </application>
+103
+104</manifest>

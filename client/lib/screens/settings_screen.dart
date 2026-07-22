@@ -1647,6 +1647,30 @@ class LabSubScreen extends StatelessWidget {
                         }
                       },
                     ),
+                    _buildMenuCard(
+                      title: '워치 와이파이 자동 연결',
+                      subtitle: '블루투스로 연결된 갤럭시 워치가 폰의 핫스팟에 자동 접속하도록 유도합니다.',
+                      icon: Icons.wifi_find_rounded,
+                      onTap: () async {
+                        const channel = MethodChannel('com.samsung.health.client/app_info');
+                        try {
+                          final bool result = await channel.invokeMethod('requestWatchWifiJoin');
+                          if (result) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('워치에 와이파이 가입 요청을 전송했습니다.')),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('페어링된 워치 노드를 찾을 수 없습니다.')),
+                            );
+                          }
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('가입 요청 전송 실패: $e')),
+                          );
+                        }
+                      },
+                    ),
                   ],
                 ),
               ),

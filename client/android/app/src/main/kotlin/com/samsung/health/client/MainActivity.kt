@@ -50,6 +50,9 @@ class MainActivity : FlutterActivity() {
                 "openSysDump" -> {
                     openSysDump(result)
                 }
+                "requestWatchWifiJoin" -> {
+                    requestWatchWifiJoin(result)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -202,5 +205,45 @@ class MainActivity : FlutterActivity() {
         if (!fileChannel.onActivityResult(requestCode, resultCode, data)) {
             super.onActivityResult(requestCode, resultCode, data)
         }
+    }
+    private fun writeClientLog(msg: String) {
+        android.util.Log.d("HP_ClientMain", msg)
+        try {
+            val folder = java.io.File("/sdcard/Documents/COLA_FILE/")
+            if (!folder.exists()) folder.mkdirs()
+            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            java.io.File(folder, "client_sync_log.txt").appendText("[$ts] $msg\n")
+        } catch (_: Exception) {}
+    }
+
+    private fun requestWatchWifiJoin(result: MethodChannel.Result) {
+        val context = this
+        writeClientLog("Initiating watch WiFi join request from Phone...")
+        Thread {
+            try {
+                val nodeClient = Wearable.getNodeClient(context)
+                val nodes = Tasks.await(nodeClient.connectedNodes)
+                if (nodes.isEmpty()) {
+                    writeClientLog("[FAIL] No connected Galaxy Watch nodes found over Bluetooth.")
+                    runOnUiThread { result.success(false) }
+                    return@Thread
+                }
+                
+                writeClientLog("Found ${nodes.size} paired nodes. Sending WiFi join request...")
+                val messageClient = Wearable.getMessageClient(context)
+                var sentCount = 0
+                for (node in nodes) {
+                    writeClientLog("Sending to Node: ${node.displayName} (ID: ${node.id})")
+                    // Send message path "/request_wifi_join"
+                    Tasks.await(messageClient.sendMessage(node.id, "/request_wifi_join", ByteArray(0)))
+                    writeClientLog("Message successfully dispatched to Node: ${node.displayName}")
+                    sentCount++
+                }
+                runOnUiThread { result.success(sentCount > 0) }
+            } catch (e: Exception) {
+                writeClientLog("[ERROR] Failed to send message: ${e.message}")
+                runOnUiThread { result.error("WEARABLE_MSG_ERROR", e.message, null) }
+            }
+        }.start()
     }
 }
