@@ -243,120 +243,107 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   }
 
   Future<void> _init() async {
-    final prefs = await PrefsService.create();
-    final session = await DeviceSession.collect();
-
-    // Android ID 획득 (앱 삭제 후 재설치 시에도 동일 기기 유지 가능)
-    String uuidStr = '';
     try {
-      uuidStr = await _appChannel.invokeMethod<String>('getAndroidId') ?? '';
-    } catch (e) {
-      debugPrint('[Android ID] Failed to get native ID: $e');
-    }
-    if (uuidStr.isEmpty) {
-      uuidStr = prefs.deviceUuid;
+      final prefs = await PrefsService.create();
+      final session = await DeviceSession.collect();
+
+      // Android ID 획득 (앱 삭제 후 재설치 시에도 동일 기기 유지 가능)
+      String uuidStr = '';
+      try {
+        uuidStr = await _appChannel.invokeMethod<String>('getAndroidId') ?? '';
+      } catch (e) {
+        debugPrint('[Android ID] Failed to get native ID: $e');
+      }
       if (uuidStr.isEmpty) {
-        uuidStr = const Uuid().v4();
-      }
-    }
-    await prefs.saveDeviceUuid(uuidStr);
-
-    if (prefs.consentGiven && !prefs.onboardingComplete) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkDeviceUuidAndPrompt();
-      });
-    }
-
-    _nameCtrl.text = prefs.name;
-    final h = prefs.height;
-    final w = prefs.weight;
-    if (h != null) _heightCtrl.text = h.toStringAsFixed(1);
-    if (w != null) _weightCtrl.text = w.toStringAsFixed(1);
-
-    final savedWatch = prefs.watch;
-    final savedStrap = prefs.strap;
-    if (savedWatch.isNotEmpty) _selectedWatch = savedWatch;
-    _customWatchCtrl.text = prefs.customWatch;
-    if (savedStrap.isNotEmpty) _selectedStrap = savedStrap;
-    _customStrapCtrl.text = prefs.customStrap;
-
-    final hasWatched = prefs.hasWatchedGuide;
-    _guidePulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-    if (!hasWatched) {
-      _guidePulseController?.repeat(reverse: true);
-    }
-
-    _noticePulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-
-    _updateNoticePulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-    _updateNoticePulseController?.repeat(reverse: true);
-
-    // Foreground FCM 수신 대기 설정
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      final notification = message.notification;
-      if (notification != null && mounted) {
-        // 공지사항 푸시 수신 시 실시간으로 공지 카드도 갱신
-        _fetchLatestNotice();
-
-        final noticeId = message.data['notice_id'] as String?;
-        final testerName = _prefs?.name.trim() ?? '';
-        if (noticeId != null && testerName.isNotEmpty) {
-          _sendNoticeAck(noticeId, testerName);
+        uuidStr = prefs.deviceUuid;
+        if (uuidStr.isEmpty) {
+          uuidStr = const Uuid().v4();
         }
+      }
+      await prefs.saveDeviceUuid(uuidStr);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.notifications_active_rounded, color: Color(0xFF3DFFC1)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(notification.title ?? '공지사항', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      Text(notification.body ?? '', style: const TextStyle(fontSize: 12)),
-                    ],
+      if (prefs.consentGiven && !prefs.onboardingComplete) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkDeviceUuidAndPrompt();
+        });
+      }
+
+      _nameCtrl.text = prefs.name;
+      final h = prefs.height;
+      final w = prefs.weight;
+      if (h != null) _heightCtrl.text = h.toStringAsFixed(1);
+      if (w != null) _weightCtrl.text = w.toStringAsFixed(1);
+
+      final savedWatch = prefs.watch;
+      final savedStrap = prefs.strap;
+      if (savedWatch.isNotEmpty) _selectedWatch = savedWatch;
+      _customWatchCtrl.text = prefs.customWatch;
+      if (savedStrap.isNotEmpty) _selectedStrap = savedStrap;
+      _customStrapCtrl.text = prefs.customStrap;
+
+      final hasWatched = prefs.hasWatchedGuide;
+      _guidePulseController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1000),
+      );
+      if (!hasWatched) {
+        _guidePulseController?.repeat(reverse: true);
+      }
+
+      _noticePulseController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1000),
+      );
+
+      _updateNoticePulseController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1000),
+      );
+      _updateNoticePulseController?.repeat(reverse: true);
+
+      // Foreground FCM 수신 대기 설정
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        final notification = message.notification;
+        if (notification != null && mounted) {
+          // 공지사항 푸시 수신 시 실시간으로 공지 카드도 갱신
+          _fetchLatestNotice();
+
+          final noticeId = message.data['notice_id'] as String?;
+          final testerName = _prefs?.name.trim() ?? '';
+          if (noticeId != null && testerName.isNotEmpty) {
+            _sendNoticeAck(noticeId, testerName);
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.notifications_active_rounded, color: Color(0xFF3DFFC1)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(notification.title ?? '공지사항', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text(notification.body ?? '', style: const TextStyle(fontSize: 12)),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+              duration: const Duration(seconds: 4),
+              backgroundColor: const Color(0xFF1429A0).withOpacity(0.9),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            duration: const Duration(seconds: 4),
-            backgroundColor: const Color(0xFF1429A0).withOpacity(0.9),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
-    });
+          );
+        }
+      });
 
-    // 백그라운드 상태에서 푸시 알림을 탭하여 앱을 열었을 때 공지사항 즉시 갱신 및 히스토리 이동
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint("[FCM] Notification tapped from background. Reloading notices & navigating to history.");
-      _fetchLatestNotice();
-      _navigateToNoticeHistory();
-
-      final noticeId = message.data['notice_id'] as String?;
-      final testerName = _prefs?.name.trim() ?? '';
-      if (noticeId != null && testerName.isNotEmpty) {
-        _sendNoticeAck(noticeId, testerName);
-      }
-    });
-
-    // 앱이 완전히 종료된 상태에서 푸시 알림을 탭하여 앱을 시작했을 때 공지사항 즉시 갱신 및 히스토리 이동
-    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
-      if (message != null) {
-        debugPrint("[FCM] App launched from terminated state via notification. Reloading notices & navigating to history.");
+      // 백그라운드 상태에서 푸시 알림을 탭하여 앱을 열었을 때 공지사항 즉시 갱신 및 히스토리 이동
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        debugPrint("[FCM] Notification tapped from background. Reloading notices & navigating to history.");
         _fetchLatestNotice();
         _navigateToNoticeHistory();
 
@@ -365,34 +352,62 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         if (noticeId != null && testerName.isNotEmpty) {
           _sendNoticeAck(noticeId, testerName);
         }
+      });
+
+      // 앱이 완전히 종료된 상태에서 푸시 알림을 탭하여 앱을 시작했을 때 공지사항 즉시 갱신 및 히스토리 이동
+      FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+        if (message != null) {
+          debugPrint("[FCM] App launched from terminated state via notification. Reloading notices & navigating to history.");
+          _fetchLatestNotice();
+          _navigateToNoticeHistory();
+
+          final noticeId = message.data['notice_id'] as String?;
+          final testerName = _prefs?.name.trim() ?? '';
+          if (noticeId != null && testerName.isNotEmpty) {
+            _sendNoticeAck(noticeId, testerName);
+          }
+        }
+      });
+
+      if (!mounted) return;
+      setState(() {
+        _prefs = prefs;
+        _session = session;
+        _hasWatchedGuide = hasWatched;
+        _currentStep = prefs.onboardingComplete ? 4 : 1;
+        _isLoading = false;
+      });
+
+      // 최신 공지사항 로드
+      _fetchLatestNotice();
+
+      // 개인 알림 토픽 구독
+      _updateNotificationTopic(prefs.name);
+
+      // 기기 접속 핑 전송
+      _sendDevicePing();
+
+      // 앱 업데이트 가능 여부 체크
+      _checkAppUpdate();
+
+      // 펜딩된 히스토리 이동 요청 처리
+      if (_pendingNoticeHistory) {
+        _navigateToNoticeHistory();
       }
-    });
-
-    setState(() {
-      _prefs = prefs;
-      _session = session;
-      _hasWatchedGuide = hasWatched;
-      _currentStep = prefs.onboardingComplete ? 4 : 1;
-      _isLoading = false;
-    });
-
-    // 최신 공지사항 로드
-    _fetchLatestNotice();
-
-    // 개인 알림 토픽 구독
-    _updateNotificationTopic(prefs.name);
-
-    // 기기 접속 핑 전송
-    _sendDevicePing();
-
-    // 앱 업데이트 가능 여부 체크
-    _checkAppUpdate();
-
-    // 펜딩된 히스토리 이동 요청 처리
-    if (_pendingNoticeHistory) {
-      _navigateToNoticeHistory();
+    } catch (e) {
+      debugPrint('[_init] Exception during initialization: $e');
+      // 어떤 예외가 발생하더라도 로딩 화면을 해제하여 앱 진입을 막지 않음
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
+
+
+
+
 
   Future<void> _checkDeviceUuidAndPrompt() async {
     if (_prefs == null) return;

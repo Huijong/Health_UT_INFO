@@ -379,16 +379,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         isHighlighted: _blinkHighlightActive,
                         onTap: _handleHealthPortUpdate,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 24),
+                      _buildSectionHeader('실험실'),
+                      const SizedBox(height: 8),
                       _buildMenuCard(
-                        title: '실험실 (워치 연동)',
-                        subtitle: '워치에서 운동 데이터를 고속 무선 LAN(P2P)으로 전송받습니다.',
+                        title: '실험실',
+                        subtitle: '워치 연동, 모바일 핫스팟, SysDump 등 연구/검증 기능 목록으로 이동합니다.',
                         icon: Icons.biotech_rounded,
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => LabWatchSyncScreen(prefs: widget.prefs),
+                              builder: (context) => LabSubScreen(prefs: widget.prefs),
                             ),
                           );
                         },
@@ -1504,3 +1506,155 @@ class _DownloadDialogState extends State<DownloadDialog> {
     );
   }
 }
+
+class LabSubScreen extends StatelessWidget {
+  final PrefsService prefs;
+  const LabSubScreen({super.key, required this.prefs});
+
+  Widget _buildMenuCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E2020),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E5BFF).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: const Color(0xFF2E5BFF), size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.5)),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.3), size: 24),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: getSettingsTheme(context),
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Custom Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        '실험실',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 40),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    _buildMenuCard(
+                      title: '실험실 (워치 연동)',
+                      subtitle: '워치에서 운동 데이터를 고속 무선 LAN(P2P)으로 전송받습니다.',
+                      icon: Icons.biotech_rounded,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LabWatchSyncScreen(prefs: prefs),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildMenuCard(
+                      title: '모바일 핫스팟 설정',
+                      subtitle: '스마트폰의 [모바일 핫스팟 및 테더링] 설정 화면으로 즉시 이동합니다.',
+                      icon: Icons.wifi_tethering_rounded,
+                      onTap: () async {
+                        const channel = MethodChannel('com.samsung.health.client/app_info');
+                        try {
+                          await channel.invokeMethod('openHotspotSettings');
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('핫스팟 설정 화면 이동 실패: $e')),
+                          );
+                        }
+                      },
+                    ),
+                    _buildMenuCard(
+                      title: '*#9900# (SysDump)',
+                      subtitle: '갤럭시 전용 시스템 디버그(SysDump) 화면으로 이동합니다.',
+                      icon: Icons.bug_report_rounded,
+                      onTap: () async {
+                        const channel = MethodChannel('com.samsung.health.client/app_info');
+                        try {
+                          await channel.invokeMethod('openSysDump');
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('SysDump 화면 이동 실패: $e')),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

@@ -24,6 +24,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   String? _connectedEndpointId;
   String? _connectedEndpointName;
 
+  // 'BT' (블루투스), 'AP' (공용 Wi-Fi), 'HOTSPOT' (모바일 핫스팟)
+  String _syncMode = 'AP'; 
+
   // List of files fetched from watch
   List<Map<String, dynamic>> _files = [];
   bool _isLoadingFileList = false;
@@ -110,7 +113,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         final connected = data["connected"] as bool;
         if (connected) {
           final deviceName = data["deviceName"] as String? ?? "Smartwatch";
-          _addLog("Wi-Fi Direct connected with $deviceName.");
+          _addLog("Wi-Fi connected with $deviceName.");
           setState(() {
             _connectedEndpointId = "wifi_p2p_watch";
             _connectedEndpointName = deviceName;
@@ -119,13 +122,20 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
           _radarController?.stop();
           _sendFileListRequest();
         } else {
-          _addLog("Wi-Fi Direct disconnected.");
+          _addLog("Wi-Fi disconnected.");
           setState(() {
             _connectedEndpointId = null;
             _connectedEndpointName = null;
             _files.clear();
           });
         }
+        break;
+
+      case "hotspotStarted":
+        final ssid = data["ssid"] as String? ?? "healthport";
+        final pw   = data["password"] as String? ?? "00000000";
+        _addLog("Direct Hotspot Started: SSID=$ssid, PW=$pw");
+        _showHotspotInfoDialog(ssid, pw);
         break;
 
       case "fileListReceived":
@@ -191,6 +201,82 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     }
   }
 
+  void _showHotspotInfoDialog(String ssid, String password) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A2035),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.wifi_tethering, color: Color(0xFF3DFFC1), size: 22),
+            SizedBox(width: 8),
+            Text("직접 연결 Wi-Fi 정보", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "외부 Wi-Fi 없이 연결하려면\n워치 Wi-Fi 설정에서 아래 네트워크에 연결하세요.",
+              style: TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            _hotspotInfoRow("SSID", ssid),
+            const SizedBox(height: 8),
+            _hotspotInfoRow("비밀번호", password),
+            const SizedBox(height: 12),
+            const Text(
+              "※ 최초 1회만 연결하면 이후 자동 연결됩니다.",
+              style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 11),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              const channel = MethodChannel('com.samsung.health.client/app_info');
+              try {
+                await channel.invokeMethod('openHotspotSettings');
+              } catch (e) {
+                debugPrint('Failed to open hotspot settings: $e');
+              }
+            },
+            child: const Text("핫스팟 설정 켜기", style: TextStyle(color: Color(0xFF2E5BFF), fontWeight: FontWeight.bold)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("닫기", style: TextStyle(color: Color(0xFF3DFFC1))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hotspotInfoRow(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1B2A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Text("$label  ", style: const TextStyle(color: Colors.white38, fontSize: 11)),
+          Expanded(
+            child: Text(value,
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _checkWatchAppInstalled() async {
     try {
       final bool installed = await _appChannel.invokeMethod("checkWatchAppInstalled");
@@ -229,10 +315,16 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     });
     _radarController?.repeat();
 
-    _addLog("Creating Wi-Fi P2P Group Owner & Starting TCP Server...");
+    _addLog("Starting synchronization server in mode: $_syncMode...");
     try {
-      await _wifiP2pChannel.invokeMethod("startServer");
-      _addLog("P2P Group and Server started. Waiting for watch connection...");
+      await _wifiP2pChannel.invokeMethod("startServer", {"mode": _syncMode});
+      if (_syncMode == 'BT') {
+        _addLog("Bluetooth mode ready. Waiting for Wear OS communication...");
+      } else if (_syncMode == 'HOTSPOT') {
+        _addLog("Hotspot Server started. Connect watch to 'healthport' (00000000) and wait...");
+      } else {
+        _addLog("AP Server started. Connect both to same Wi-Fi and wait...");
+      }
     } catch (e) {
       _addLog("Start Server Error: $e");
       setState(() {
@@ -345,6 +437,60 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     }
   }
 
+  Widget _buildModeSelector() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E2020),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          _buildModeTab('AP', '와이파이 AP', Icons.wifi_rounded),
+          _buildModeTab('HOTSPOT', '모바일 핫스팟', Icons.wifi_tethering_rounded),
+          _buildModeTab('BT', '블루투스 (BT)', Icons.bluetooth_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeTab(String mode, String label, IconData icon) {
+    final isSelected = _syncMode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: _isSearching ? null : () {
+          setState(() {
+            _syncMode = mode;
+          });
+          _addLog("동기화 모드 변경 ➔ $label");
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF2E5BFF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: isSelected ? Colors.white : Colors.white30, size: 20),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : Colors.white30,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -365,6 +511,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
           padding: const EdgeInsets.all(20.0),
           child: Column(
             children: [
+              _buildModeSelector(),
               _buildConnectionHeader(),
               const SizedBox(height: 24),
               Expanded(
@@ -475,12 +622,18 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         ),
         const SizedBox(height: 40),
         Text(
-          _isSearching ? 'Wi-Fi Direct 기기 탐색 대기 중...' : '연동할 워치를 찾아주세요.',
+          _isSearching 
+              ? (_syncMode == 'BT' ? '블루투스 페어링 대기 중...' : (_syncMode == 'HOTSPOT' ? '모바일 핫스팟 연동 대기 중...' : '공용 와이파이(AP) 탐색 대기 중...'))
+              : '연동할 워치를 찾아주세요.',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
         ),
         const SizedBox(height: 8),
         Text(
-          '워치 앱에서 [연동 시작] 버튼을 누르면 탐색에 노출됩니다.',
+          _syncMode == 'BT'
+              ? '스마트폰과 워치가 블루투스로 연결되어 있어야 합니다.\n이후 워치 앱에서 [연동 시작]을 눌러주세요.'
+              : (_syncMode == 'HOTSPOT'
+                  ? '스마트폰 핫스팟(healthport / 00000000)을 활성화하고,\n워치가 이 핫스팟에 연결되었는지 확인해 주세요.'
+                  : '스마트폰과 워치가 모두 동일한 Wi-Fi 공유기(AP)망에\n연결되어 있어야 무선 고속 연동이 가능합니다.'),
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
         ),
