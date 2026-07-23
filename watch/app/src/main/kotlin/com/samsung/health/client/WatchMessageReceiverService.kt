@@ -15,21 +15,16 @@ class WatchMessageReceiverService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         if (messageEvent.path == "/request_wifi_join") {
-            writeLog("[BG_MSG] Received /request_wifi_join from paired phone!")
-
-            // Trigger Wifi join process via SyncService
-            val intent = Intent(this, SyncService::class.java).apply {
-                action = "ACTION_TRIGGER_WIFI_JOIN"
-            }
+            writeLog("[BG_MSG] Received /request_wifi_join. Bringing MainActivity to foreground...")
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(intent)
-                } else {
-                    startService(intent)
+                val mainIntent = Intent(this, MainActivity::class.java).apply {
+                    action = "ACTION_TRIGGER_WIFI_JOIN"
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 }
-                writeLog("[BG_MSG] Successfully launched SyncService with ACTION_TRIGGER_WIFI_JOIN.")
+                startActivity(mainIntent)
+                writeLog("[BG_MSG] MainActivity launched successfully with wifi join action.")
             } catch (e: Exception) {
-                writeLog("[BG_MSG] Failed to start SyncService: ${e.message}")
+                writeLog("[BG_MSG] Failed to start MainActivity: ${e.message}")
             }
         } else if (messageEvent.path == "/open_watch_sysdump") {
             writeLog("[SysDump_Msg] Received command from phone! Launching dialog activity directly...")

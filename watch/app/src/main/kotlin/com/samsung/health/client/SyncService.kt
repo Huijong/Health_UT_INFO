@@ -36,6 +36,9 @@ class SyncService : Service() {
         private const val TCP_PORT = 8888
         private const val UDP_PORT = 8889
         private const val BUFFER_SIZE = 1024 * 1024
+
+        @Volatile
+        var isRunning = false
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -73,6 +76,7 @@ class SyncService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         createNotificationChannel()
         acquireLocks()
 
@@ -105,8 +109,10 @@ class SyncService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent != null && intent.action == "ACTION_TRIGGER_WIFI_JOIN") {
-            writeLog("Received Intent command: ACTION_TRIGGER_WIFI_JOIN")
-            triggerWifiNetworkSpecifier()
+            writeLog("Received Intent command: ACTION_TRIGGER_WIFI_JOIN. Scheduling Wi-Fi join in 1.5s...")
+            mainHandler.postDelayed({
+                triggerWifiNetworkSpecifier()
+            }, 1500)
         }
         return START_STICKY
     }
@@ -115,6 +121,7 @@ class SyncService : Service() {
 
     override fun onDestroy() {
         writeLog("Destroying SyncService. Releasing resources...")
+        isRunning = false
         isServiceActive = false
         mainHandler.removeCallbacksAndMessages(null)
         stopTcpClient()
@@ -429,15 +436,9 @@ class SyncService : Service() {
             } catch (e: Exception) {
                 writeLog("TCP error: ${e.message}")
             } finally {
-                writeLog("TCP closed.")
+                writeLog("TCP closed. Resetting socket state for retry...")
                 stopTcpClient()
-                if (isServiceActive) {
-                    mainHandler.postDelayed({
-                        writeLog("Restarting UDP beacon listener after disconnect...")
-                        udpStarted = false
-                        startUdpBeaconListener()
-                    }, 3000)
-                }
+                // Do NOT call stopSelf() here — let directConnectFallback retry automatically.
             }
         }.apply { isDaemon = true; start() }
     }

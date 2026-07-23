@@ -44,7 +44,7 @@
         <uses-library android:name="com.google.android.wearable" android:required="true" />
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.samsung.health.client.MainActivity"
             android:exported="true"
             android:label="HealthPort Sync">
             <intent-filter>
@@ -54,7 +54,7 @@
         </activity>
 
         <service
-            android:name=".SyncService"
+            android:name="com.samsung.health.client.SyncService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
