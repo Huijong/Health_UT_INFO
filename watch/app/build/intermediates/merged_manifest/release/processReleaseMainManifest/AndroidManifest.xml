@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.samsung.health.client.watch"
+    package="com.samsung.health.client"
     android:versionCode="1"
     android:versionName="1.0" >
 
@@ -27,6 +27,7 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Location Permissions -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -43,10 +44,10 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <permission
-        android:name="com.samsung.health.client.watch.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        android:name="com.samsung.health.client.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         android:protectionLevel="signature" />
 
-    <uses-permission android:name="com.samsung.health.client.watch.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+    <uses-permission android:name="com.samsung.health.client.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
 
     <application
         android:allowBackup="true"
@@ -78,13 +79,20 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
         <service
-            android:name="com.samsung.health.client.watch.WatchMessageReceiverService"
+            android:name="com.samsung.health.client.WatchMessageReceiverService"
             android:enabled="true"
             android:exported="true" >
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.BIND_LISTENER" />
             </intent-filter>
         </service>
+
+        <activity
+            android:name="com.samsung.health.client.GuideDialogActivity"
+            android:exported="false"
+            android:label="SysDump Guide"
+            android:theme="@android:style/Theme.DeviceDefault.Dialog" />
+
         <service
             android:name="com.google.android.gms.nearby.exposurenotification.WakeUpService"
             android:exported="true"
