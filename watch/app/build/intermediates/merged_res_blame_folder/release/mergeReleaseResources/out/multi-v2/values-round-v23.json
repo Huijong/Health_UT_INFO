@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.samsung.health.client.watch.app-mergeReleaseResources-16:/values-round-v23/values-round-v23.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\user\\.gradle\\caches\\8.14\\transforms\\657976f60fd45bee967086684122e5b7\\transformed\\wear-1.3.0\\res\\values-round-v23\\values-round-v23.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "84",
+                        "endOffsets": "135"
+                    }
+                }
+            ]
+        }
+    ]
+}
