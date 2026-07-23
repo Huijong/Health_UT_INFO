@@ -261,7 +261,11 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
                             "points": {"$sum": "$points"},
                             "submissions": {
                                 "$sum": {
-                                    "$cond": [{"$eq": ["$memo", "자동 적립 (이메일 수집)"]}, 1, 0]
+                                    "$cond": [
+                                        {"$eq": [{"$indexOfCP": ["$memo", "자동 적립"]}, 0]},
+                                        1,
+                                        0
+                                    ]
                                 }
                             }
                         }

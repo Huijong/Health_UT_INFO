@@ -288,7 +288,7 @@ class _RankingScreenState extends State<RankingScreen> {
                   const Text('평균 포인트', style: TextStyle(color: Colors.white60, fontSize: 11)),
                   const SizedBox(height: 6),
                   Text(
-                    '${avgSubmissions.toStringAsFixed(1)}P',
+                    '${_formatPoints(avgSubmissions)}P',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -429,15 +429,15 @@ class _RankingScreenState extends State<RankingScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _buildInfoBox('💡 기본 점수: 건당 1.0P (단, 하이킹은 건당 3.0P)\n💡 모든 거리는 소수점 첫째 자리에서 반올림 적용'),
+        _buildInfoBox('💡 아래 거리별 예시값은 건당 [기본 점수 1.0P (하이킹 3.0P)]가 미리 합산되어 최종 수령할 총 포인트 기준입니다.\n💡 모든 거리는 소수점 첫째 자리에서 반올림 적용'),
         const SizedBox(height: 16),
         _buildTableHeader(),
-        _buildTableItem('1 ~ 10 km', '1km당 +0.1P', '10km = 1.0P'),
-        _buildTableItem('11 ~ 20 km', '1km당 +0.15P', '20km = 2.5P'),
-        _buildTableItem('21 ~ 30 km', '1km당 +0.2P', '30km = 4.5P'),
-        _buildTableItem('31 ~ 40 km', '1km당 +0.3P', '40km = 7.5P'),
-        _buildTableItem('41 ~ 99 km', '40~100km 구간 등간격 가산', '41km=7.71P ... 99km=19.79P'),
-        _buildTableItem('100 km 이상', '기본 20.0P + 1km당 +0.2P', '110km = 22.0P'),
+        _buildTableItem('1 ~ 10 km', '1km당 +0.1P', '10km = 2.0P'),
+        _buildTableItem('11 ~ 20 km', '1km당 +0.15P', '20km = 3.5P'),
+        _buildTableItem('21 ~ 30 km', '1km당 +0.2P', '30km = 5.5P'),
+        _buildTableItem('31 ~ 40 km', '1km당 +0.3P', '40km = 8.5P'),
+        _buildTableItem('41 ~ 99 km', '40~100km 구간 등간격 가산', '41km=8.71P ... 99km=20.79P'),
+        _buildTableItem('100 km 이상', '기본 20.0P + 1km당 +0.2P', '110km = 23.0P'),
       ],
     );
   }
@@ -446,13 +446,13 @@ class _RankingScreenState extends State<RankingScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _buildInfoBox('💡 기본 점수: 건당 1.0P\n💡 모든 거리는 소수점 첫째 자리에서 반올림 적용'),
+        _buildInfoBox('💡 아래 거리별 예시값은 건당 [기본 점수 1.0P]가 미리 합산되어 최종 수령할 총 포인트 기준입니다.\n💡 모든 거리는 소수점 첫째 자리에서 반올림 적용'),
         const SizedBox(height: 16),
         _buildTableHeader(),
-        _buildTableItem('1 ~ 40 km', '1km당 +0.1P', '40km = 4.0P'),
-        _buildTableItem('41 ~ 50 km', '1km당 +0.1P', '50km = 5.0P'),
-        _buildTableItem('51 ~ 99 km', '50~100km 구간 등간격 가산', '51km=5.14P ... 99km=11.86P'),
-        _buildTableItem('100 km 이상', '기본 12.0P + 1km당 +0.16P', '110km = 13.6P'),
+        _buildTableItem('1 ~ 40 km', '1km당 +0.1P', '40km = 5.0P'),
+        _buildTableItem('41 ~ 50 km', '1km당 +0.1P', '50km = 6.0P'),
+        _buildTableItem('51 ~ 99 km', '50~100km 구간 등간격 가산', '51km=6.14P ... 99km=12.86P'),
+        _buildTableItem('100 km 이상', '기본 12.0P + 1km당 +0.16P', '110km = 14.6P'),
       ],
     );
   }
@@ -552,7 +552,7 @@ class _RankingScreenState extends State<RankingScreen> {
       else if (aboveRank == 3) targetMedal = '🥉';
 
       final rankName = targetMedal.isNotEmpty ? '$targetMedal $aboveRank위' : '$aboveRank위';
-      motivationText = '$myName님은 현재 공동 $myRank위입니다. $rankName ($aboveName님)까지 앞으로 단 $diff포인트 남았습니다! 조금만 더 힘내세요! 🔥';
+      motivationText = '$myName님은 현재 공동 $myRank위입니다. $rankName ($aboveName님)까지 앞으로 단 ${_formatPoints(diff)}포인트 남았습니다! 조금만 더 힘내세요! 🔥';
     } else {
       motivationText = '첫 제출을 완료하셨네요! 상위 랭킹을 향해 조금 더 도전해 보세요! 🚀';
     }
@@ -608,7 +608,7 @@ class _RankingScreenState extends State<RankingScreen> {
                     border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
                   ),
                   child: Text(
-                    '$myCount포인트 ($mySubmissions건)',
+                    '${_formatPoints(myCount)}포인트 ($mySubmissions건)',
                     style: const TextStyle(
                       color: Color(0xFF3DFFC1),
                       fontWeight: FontWeight.bold,
@@ -786,7 +786,7 @@ class _RankingScreenState extends State<RankingScreen> {
           ),
           const SizedBox(height: 2),
           Text(
-            '${points}P (${submissions}건)',
+            '${_formatPoints(points)}P (${submissions}건)',
             style: TextStyle(
               fontSize: 10.5,
               fontWeight: FontWeight.bold,
@@ -930,7 +930,7 @@ class _RankingScreenState extends State<RankingScreen> {
                 ),
               ),
               Text(
-                '$submissions건 / $points포인트',
+                '$submissions건 / ${_formatPoints(points)}포인트',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
@@ -1059,7 +1059,7 @@ class _RankingScreenState extends State<RankingScreen> {
                           final dateStr = createdAt.length >= 10 ? createdAt.substring(0, 10) : createdAt;
 
                           final isPositive = points >= 0;
-                          final pointsStr = isPositive ? '+$points P' : '$points P';
+                          final pointsStr = isPositive ? '+${_formatPoints(points)} P' : '${_formatPoints(points)} P';
                           final pointsColor = isPositive ? const Color(0xFF3DFFC1) : Colors.redAccent;
                           final isBigBonus = points >= 4;
 
@@ -1113,6 +1113,33 @@ class _RankingScreenState extends State<RankingScreen> {
                         },
                       ),
               ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.02),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.04)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF3DFFC1), size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '포인트는 [기본 점수 1.0P(하이킹 3.0P) + 거리별 보너스 가산P]가 합산되어 자동 적립됩니다. (예: 10km 완주 시 2.00P)',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 10.5,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         );
@@ -1152,4 +1179,16 @@ class _GlassCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatPoints(dynamic value) {
+  if (value == null) return "0.00";
+  if (value is num) {
+    return value.toStringAsFixed(2);
+  }
+  final double? parsed = double.tryParse(value.toString());
+  if (parsed != null) {
+    return parsed.toStringAsFixed(2);
+  }
+  return value.toString();
 }
