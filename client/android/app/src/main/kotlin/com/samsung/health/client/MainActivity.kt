@@ -53,6 +53,9 @@ class MainActivity : FlutterActivity() {
                 "requestWatchWifiJoin" -> {
                     requestWatchWifiJoin(result)
                 }
+                "openWatchSysDump" -> {
+                    openWatchSysDump(result)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -242,6 +245,40 @@ class MainActivity : FlutterActivity() {
                 runOnUiThread { result.success(sentCount > 0) }
             } catch (e: Exception) {
                 writeClientLog("[ERROR] Failed to send message: ${e.message}")
+                runOnUiThread { result.error("WEARABLE_MSG_ERROR", e.message, null) }
+            }
+        }.start()
+    }
+
+    private fun openWatchSysDump(result: MethodChannel.Result) {
+        val context = this
+        writeClientLog("[SysDump] Command requested from Phone UI...")
+        Thread {
+            try {
+                val nodeClient = Wearable.getNodeClient(context)
+                val nodes = Tasks.await(nodeClient.connectedNodes)
+                if (nodes.isEmpty()) {
+                    writeClientLog("[SysDump][FAIL] No Bluetooth connected Watch nodes found.")
+                    runOnUiThread { result.success(false) }
+                    return@Thread
+                }
+
+                writeClientLog("[SysDump] Found ${nodes.size} connected watch nodes. Broadcasting command...")
+                val messageClient = Wearable.getMessageClient(context)
+                var sentCount = 0
+                for (node in nodes) {
+                    writeClientLog("[SysDump] Sending /open_watch_sysdump message to Node: ${node.displayName} (ID: ${node.id})")
+                    val taskResult = messageClient.sendMessage(node.id, "/open_watch_sysdump", ByteArray(0))
+                    Tasks.await(taskResult)
+                    writeClientLog("[SysDump] Message dispatched successfully to Node: ${node.displayName}")
+                    sentCount++
+                }
+                writeClientLog("[SysDump][SUCCESS] Dispatched to total $sentCount watch nodes.")
+                runOnUiThread { result.success(sentCount > 0) }
+            } catch (e: Exception) {
+                val sw = java.io.StringWriter()
+                e.printStackTrace(java.io.PrintWriter(sw))
+                writeClientLog("[SysDump][ERROR] Failed to dispatch Wearable Message. StackTrace:\n$sw")
                 runOnUiThread { result.error("WEARABLE_MSG_ERROR", e.message, null) }
             }
         }.start()

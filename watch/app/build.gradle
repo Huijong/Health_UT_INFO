@@ -8,17 +8,26 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.samsung.health.client.watch"
+        applicationId "com.samsung.health.client"
         minSdk 29
         targetSdk 29
         versionCode 1
         versionName "1.0"
     }
 
+    signingConfigs {
+        release {
+            storeFile file("upload-keystore.jks")
+            storePassword "android"
+            keyAlias "key"
+            keyPassword "android"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
