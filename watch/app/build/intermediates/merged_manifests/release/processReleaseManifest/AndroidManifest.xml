@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.samsung.health.client"
-    android:versionCode="1"
-    android:versionName="1.0" >
+    android:versionCode="2"
+    android:versionName="1.1" >
 
     <uses-sdk
         android:minSdkVersion="29"
@@ -63,7 +63,7 @@
             android:required="true" />
 
         <activity
-            android:name="com.samsung.health.client.watch.MainActivity"
+            android:name="com.samsung.health.client.MainActivity"
             android:exported="true"
             android:label="HealthPort Sync" >
             <intent-filter>
@@ -74,7 +74,7 @@
         </activity>
 
         <service
-            android:name="com.samsung.health.client.watch.SyncService"
+            android:name="com.samsung.health.client.SyncService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />

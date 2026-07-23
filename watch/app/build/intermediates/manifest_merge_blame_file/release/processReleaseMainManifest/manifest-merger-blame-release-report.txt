@@ -1,8 +1,8 @@
 1<?xml version="1.0" encoding="utf-8"?>
 2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
 3    package="com.samsung.health.client"
-4    android:versionCode="1"
-5    android:versionName="1.0" >
+4    android:versionCode="2"
+5    android:versionName="1.1" >
 6
 7    <uses-sdk
 8        android:minSdkVersion="29"
@@ -125,8 +125,8 @@
 64
 65        <activity
 65-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:46:9-54:20
-66            android:name="com.samsung.health.client.watch.MainActivity"
-66-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:47:13-41
+66            android:name="com.samsung.health.client.MainActivity"
+66-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:47:13-66
 67            android:exported="true"
 67-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:48:13-36
 68            android:label="HealthPort Sync" >
@@ -145,8 +145,8 @@
 75
 76        <service
 76-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:56:9-60:56
-77            android:name="com.samsung.health.client.watch.SyncService"
-77-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:57:13-40
+77            android:name="com.samsung.health.client.SyncService"
+77-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:57:13-65
 78            android:enabled="true"
 78-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:58:13-35
 79            android:exported="false"

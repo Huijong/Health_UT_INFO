@@ -25,39 +25,57 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
     private lateinit var statusText: TextView
     private lateinit var actionButton: Button
     private var isServiceRunning = false
+    private var wifiJoinPending = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         // Simple UI Layout
+        // ScrollView wrapper to support circular screens perfectly
+        val scrollView = android.widget.ScrollView(this).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(android.graphics.Color.BLACK)
+            isVerticalScrollBarEnabled = false
+        }
+
         val rootLayout = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             gravity = android.view.Gravity.CENTER
-            setPadding(16, 16, 16, 16)
-            setBackgroundColor(android.graphics.Color.BLACK)
+            setPadding(16, 24, 16, 24)
         }
 
         statusText = TextView(this).apply {
             text = "HealthPort Sync\n대기 중"
             setTextColor(android.graphics.Color.WHITE)
-            textSize = 14f
+            textSize = 13f
             gravity = android.view.Gravity.CENTER
         }
         rootLayout.addView(statusText)
 
         val spacer = android.view.View(this).apply {
-            layoutParams = android.widget.LinearLayout.LayoutParams(1, 16)
+            layoutParams = android.widget.LinearLayout.LayoutParams(1, 8)
         }
         rootLayout.addView(spacer)
 
         actionButton = Button(this).apply {
             text = "연동 시작"
+            textSize = 12f
             setBackgroundColor(android.graphics.Color.parseColor("#2E5BFF"))
             setTextColor(android.graphics.Color.WHITE)
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = android.view.Gravity.CENTER
+            }
         }
         rootLayout.addView(actionButton)
 
-        setContentView(rootLayout)
+        scrollView.addView(rootLayout)
+        setContentView(scrollView)
 
         actionButton.setOnClickListener {
             if (isServiceRunning) {
@@ -75,6 +93,27 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
 
         // Register Wearable Message Listener
         Wearable.getMessageClient(this).addListener(this)
+
+        // Process startup intent
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent != null && intent.action == "ACTION_TRIGGER_WIFI_JOIN") {
+            wifiJoinPending = true
+            isServiceRunning = SyncService.isRunning
+            if (!isServiceRunning) {
+                checkPermissionsAndStart()
+            } else {
+                sendWifiJoinToService()
+            }
+        }
     }
 
     override fun onResume() {
@@ -95,27 +134,33 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
     override fun onMessageReceived(messageEvent: MessageEvent) {
         if (messageEvent.path == "/request_wifi_join") {
             runOnUiThread {
-                Toast.makeText(this, "스마트폰으로부터 와이파이 자동 연결 명령 수신!", Toast.LENGTH_SHORT).show()
-            }
-            // 1. Ensure SyncService is running
-            if (!isServiceRunning) {
-                checkPermissionsAndStart()
-            }
-            
-            // 2. Trigger wifi join process via Service Intent
-            val serviceIntent = Intent(this, SyncService::class.java).apply {
-                action = "ACTION_TRIGGER_WIFI_JOIN"
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent)
-            } else {
-                startService(serviceIntent)
+                Toast.makeText(this, "WiFi 자동 연결 수신", Toast.LENGTH_SHORT).show()
+                // 액티비티가 포그라운드에 있을 때 직접 서비스에 와이파이 조인 요청
+                wifiJoinPending = true
+                isServiceRunning = SyncService.isRunning
+                if (!isServiceRunning) {
+                    checkPermissionsAndStart()
+                } else {
+                    sendWifiJoinToService()
+                }
             }
         }
     }
 
+    private fun sendWifiJoinToService() {
+        val serviceIntent = Intent(this, SyncService::class.java).apply {
+            action = "ACTION_TRIGGER_WIFI_JOIN"
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+        wifiJoinPending = false
+    }
+
     private fun checkAndUpdateServiceState() {
-        isServiceRunning = isServiceRunning(SyncService::class.java)
+        isServiceRunning = SyncService.isRunning
         if (isServiceRunning) {
             statusText.text = "HealthPort Sync\n작동 중..."
             actionButton.text = "연동 종료"
@@ -175,12 +220,17 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
     }
 
     private fun startSyncService() {
-        val intent = Intent(this, SyncService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
+        val serviceIntent = Intent(this, SyncService::class.java).apply {
+            if (wifiJoinPending) {
+                action = "ACTION_TRIGGER_WIFI_JOIN"
+            }
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+        wifiJoinPending = false
         isServiceRunning = true
         statusText.text = "HealthPort Sync\n작동 중..."
         actionButton.text = "연동 종료"
