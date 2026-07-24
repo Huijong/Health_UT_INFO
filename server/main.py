@@ -827,15 +827,75 @@ async def get_dashboard(request: Request):
                 margin-left: 10px;
                 text-decoration: underline;
             }
-            .delete-record-btn:hover {
-                color: #B91C1C;
-            }
             .no-data {
                 text-align: center;
                 padding: 50px;
                 color: var(--text-muted);
                 font-style: italic;
                 font-size: 15px;
+            }
+            /* 첨부파일 미니 배지 스타일 */
+            .attach-badge {
+                display: inline-block;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 10px;
+                font-weight: 700;
+                margin-right: 4px;
+                text-align: center;
+                letter-spacing: 0.3px;
+                user-select: none;
+            }
+            .attach-badge.present {
+                background-color: rgba(16, 185, 129, 0.1);
+                color: #10B981;
+                border: 1px solid rgba(16, 185, 129, 0.25);
+            }
+            .attach-badge.absent {
+                background-color: rgba(241, 245, 249, 0.05);
+                color: #94A3B8;
+                border: 1px solid rgba(226, 232, 240, 0.15);
+                font-weight: 500;
+                opacity: 0.5;
+            }
+            
+            /* 컬럼 선택 보드 스타일 */
+            .column-selector-board {
+                background-color: var(--card-bg);
+                border-radius: 14px;
+                box-shadow: 0 4px 20px rgba(148, 163, 184, 0.08);
+                border: 1px solid var(--border);
+                padding: 16px 20px;
+                margin-bottom: 20px;
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 16px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .column-selector-title {
+                font-size: 12px;
+                font-weight: 700;
+                color: var(--primary);
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+                margin-right: 8px;
+            }
+            .column-checkbox-item {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 13px;
+                color: var(--text);
+                cursor: pointer;
+                user-select: none;
+            }
+            .column-checkbox-item input {
+                cursor: pointer;
+                accent-color: var(--primary);
+                width: 16px;
+                height: 16px;
             }
         </style>
         <script>
@@ -1092,7 +1152,7 @@ async def get_dashboard(request: Request):
             function renderTable(data) {
                 const tbody = document.getElementById('table-body');
                 if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="15" class="no-data">조건에 맞는 수집 내역이 없습니다.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="16" class="no-data">조건에 맞는 수집 내역이 없습니다.</td></tr>`;
                     return;
                 }
                 
@@ -1119,23 +1179,50 @@ async def get_dashboard(request: Request):
                     const appVersion = item.app_version || '-';
                     const shealthVersion = item.shealth_version || '-';
  
+                    // 첨부파일 미니 배지 구성
+                    const fitBadge = item.has_fit === 'Y' 
+                        ? '<span class="attach-badge present" title="FIT 파일 첨부됨">FIT</span>' 
+                        : '<span class="attach-badge absent" title="FIT 파일 없음">FIT</span>';
+                    const garminBadge = item.has_garmin === 'Y' 
+                        ? '<span class="attach-badge present" title="Garmin FIT 파일 첨부됨">GAR</span>' 
+                        : '<span class="attach-badge absent" title="Garmin FIT 파일 없음">GAR</span>';
+                    const colaBadge = item.has_cola === 'Y' 
+                        ? '<span class="attach-badge present" title="COLA 파일 첨부됨">COLA</span>' 
+                        : '<span class="attach-badge absent" title="COLA 파일 없음">COLA</span>';
+                    const logBadge = item.has_log === 'Y' 
+                        ? '<span class="attach-badge present" title="로그 파일 첨부됨">LOG</span>' 
+                        : '<span class="attach-badge absent" title="로그 파일 없음">LOG</span>';
+                    const imgCount = item.capture_count || 0;
+                    const imgBadge = imgCount > 0 
+                        ? `<span class="attach-badge present" title="운동 캡처 ${imgCount}장 첨부됨">IMG (${imgCount})</span>` 
+                        : '<span class="attach-badge absent" title="운동 캡처 없음">IMG</span>';
+
+                    const attachmentsHtml = `<div style="display: flex; align-items: center; justify-content: center; white-space: nowrap;">${fitBadge}${garminBadge}${colaBadge}${logBadge}${imgBadge}</div>`;
+
+                    // 컬럼 가시성 체크박스 상태 읽기
+                    const showConsent = document.getElementById('col-show-consent')?.checked ? '' : 'display: none;';
+                    const showStrap = document.getElementById('col-show-strap')?.checked ? '' : 'display: none;';
+                    const showPosition = document.getElementById('col-show-position')?.checked ? '' : 'display: none;';
+                    const showTightness = document.getElementById('col-show-tightness')?.checked ? '' : 'display: none;';
+
                     html += `
                         <tr>
                             <td style="color: var(--text-muted); font-size: 12.5px; white-space: nowrap;">${item.received_at}</td>
                             <td><span style="font-size: 13.5px; white-space: nowrap;">${item.tester_name}</span></td>
-                            <td>${consentHtml}</td>
+                            <td class="col-consent" style="${showConsent}">${consentHtml}</td>
                             <td><span class="badge" style="background-color: #E8EBF5; color: #1429A0; white-space: nowrap;">${watch}</span></td>
-                            <td style="white-space: nowrap;">${strap}</td>
+                            <td class="col-strap" style="${showStrap} white-space: nowrap;">${strap}</td>
                             <td><span style="color: #10B981; white-space: nowrap;">${exercise}</span></td>
                             <td style="white-space: nowrap;">${training}</td>
                             <td style="white-space: nowrap;">${distance}</td>
-                            <td style="white-space: nowrap;">${position}</td>
-                            <td style="white-space: nowrap;">${tightness}</td>
+                            <td class="col-position" style="${showPosition} white-space: nowrap;">${position}</td>
+                            <td class="col-tightness" style="${showTightness} white-space: nowrap;">${tightness}</td>
                             <td style="white-space: nowrap;">${competitor}</td>
                             <td style="white-space: nowrap;">${location}</td>
                             <td style="min-width: 200px; max-width: 350px; font-size: 12.5px; color: #475569; word-break: break-all;">
                                 ${remarksHtml}
                             </td>
+                            <td style="text-align: center;">${attachmentsHtml}</td>
                             <td><span style="font-size: 13px; color: #475569; white-space: nowrap;">${appVersion} / ${shealthVersion}</span></td>
                             <td style="white-space: nowrap;">
                                 ${item.share_link ? `
@@ -1170,9 +1257,24 @@ async def get_dashboard(request: Request):
                 }
             }
 
+            function toggleColumn(colClass, checkboxId) {
+                const isChecked = document.getElementById(checkboxId).checked;
+                const headers = document.querySelectorAll('th.' + colClass);
+                headers.forEach(h => {
+                    h.style.display = isChecked ? '' : 'none';
+                });
+                applyFiltersAndRender();
+            }
+
             window.onload = () => {
                 fetchEmails();
                 setInterval(fetchEmails, 10000); // 10초마다 자동 새로고침
+                
+                // 초기 헤더 가시성 설정 (기본 숨김)
+                toggleColumn('col-consent', 'col-show-consent');
+                toggleColumn('col-strap', 'col-show-strap');
+                toggleColumn('col-position', 'col-show-position');
+                toggleColumn('col-tightness', 'col-show-tightness');
             }
         </script>
     </head>
@@ -1186,6 +1288,26 @@ async def get_dashboard(request: Request):
                     <button class="refresh-btn" onclick="fetchEmails()">데이터 새로고침</button>
                 </div>
             </header>
+
+            <div class="column-selector-board">
+                <span class="column-selector-title">표시할 컬럼 선택:</span>
+                <label class="column-checkbox-item">
+                    <input type="checkbox" id="col-show-consent" onchange="toggleColumn('col-consent', 'col-show-consent')">
+                    동의 여부
+                </label>
+                <label class="column-checkbox-item">
+                    <input type="checkbox" id="col-show-strap" onchange="toggleColumn('col-strap', 'col-show-strap')">
+                    착용 스트랩
+                </label>
+                <label class="column-checkbox-item">
+                    <input type="checkbox" id="col-show-position" onchange="toggleColumn('col-position', 'col-show-position')">
+                    착용 위치
+                </label>
+                <label class="column-checkbox-item">
+                    <input type="checkbox" id="col-show-tightness" onchange="toggleColumn('col-tightness', 'col-show-tightness')">
+                    착용 정도
+                </label>
+            </div>
 
             <div class="filter-board">
                 <div class="filter-item" id="filter-tester-name">
@@ -1231,24 +1353,25 @@ async def get_dashboard(request: Request):
                         <tr>
                             <th class="sortable" onclick="handleSort('received_at')">수신 일시 <span class="sort-indicator" id="sort-icon-received_at">▼</span></th>
                             <th class="sortable" onclick="handleSort('tester_name')">닉네임 <span class="sort-indicator" id="sort-icon-tester_name">↕</span></th>
-                            <th class="sortable" onclick="handleSort('consent_given')">동의 여부 <span class="sort-indicator" id="sort-icon-consent_given">↕</span></th>
+                            <th class="sortable col-consent" onclick="handleSort('consent_given')">동의 여부 <span class="sort-indicator" id="sort-icon-consent_given">↕</span></th>
                             <th class="sortable" onclick="handleSort('watch')">착용 워치 <span class="sort-indicator" id="sort-icon-watch">↕</span></th>
-                            <th class="sortable" onclick="handleSort('strap')">착용 스트랩 <span class="sort-indicator" id="sort-icon-strap">↕</span></th>
+                            <th class="sortable col-strap" onclick="handleSort('strap')">착용 스트랩 <span class="sort-indicator" id="sort-icon-strap">↕</span></th>
                             <th class="sortable" onclick="handleSort('exercise')">운동 종류 <span class="sort-indicator" id="sort-icon-exercise">↕</span></th>
                             <th class="sortable" onclick="handleSort('training_type')">훈련 종류 <span class="sort-indicator" id="sort-icon-training_type">↕</span></th>
                             <th class="sortable" onclick="handleSort('distance')">거리 (km) <span class="sort-indicator" id="sort-icon-distance">↕</span></th>
-                            <th class="sortable" onclick="handleSort('wearing_position')">착용 위치 <span class="sort-indicator" id="sort-icon-wearing_position">↕</span></th>
-                            <th class="sortable" onclick="handleSort('wearing_tightness')">착용 정도 <span class="sort-indicator" id="sort-icon-wearing_tightness">↕</span></th>
+                            <th class="sortable col-position" onclick="handleSort('wearing_position')">착용 위치 <span class="sort-indicator" id="sort-icon-wearing_position">↕</span></th>
+                            <th class="sortable col-tightness" onclick="handleSort('wearing_tightness')">착용 정도 <span class="sort-indicator" id="sort-icon-wearing_tightness">↕</span></th>
                             <th class="sortable" onclick="handleSort('competitor_watch')">동시착용 모델 <span class="sort-indicator" id="sort-icon-competitor_watch">↕</span></th>
                             <th class="sortable" onclick="handleSort('location')">운동 장소 <span class="sort-indicator" id="sort-icon-location">↕</span></th>
                             <th>특이 사항</th>
+                            <th style="text-align: center;">첨부파일</th>
                             <th class="sortable" onclick="handleSort('app_version')">버전 <span class="sort-indicator" id="sort-icon-app_version">↕</span></th>
                             <th>Quick Share</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
                         <tr>
-                            <td colspan="14" style="text-align: center; padding: 50px; color: var(--text-muted);">데이터를 불러오는 중입니다...</td>
+                            <td colspan="16" style="text-align: center; padding: 50px; color: var(--text-muted);">데이터를 불러오는 중입니다...</td>
                         </tr>
                     </tbody>
                 </table>

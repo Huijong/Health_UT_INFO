@@ -448,6 +448,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final response = await dio.get('${AppConfig.apiUrl}/api/devices?latest_apk=true');
       if (mounted) Navigator.pop(context); // Dismiss loading dialog
 
+      String? serverVersion;
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
         if (data['status'] == 'success') {
@@ -455,7 +456,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final regExp = RegExp(r'HealthPort_([0-9\.]+)\.apk');
           final match = regExp.firstMatch(filename);
           if (match != null) {
-            final serverVersion = match.group(1)!;
+            serverVersion = match.group(1)!;
             final localVersion = AppConfig.appVersion;
             
             if (serverVersion == localVersion) {
@@ -468,18 +469,109 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       }
       
-      _downloadAndInstallApk(
-        latestApkApiUrl: '${AppConfig.apiUrl}/api/devices?latest_apk=true',
-        defaultFileName: 'HealthPort_${AppConfig.appVersion}.apk',
-        defaultUrlPath: '/static/apks/HealthPort_${AppConfig.appVersion}.apk',
-      );
+      if (serverVersion != null) {
+        _showPlayStoreUpdateDialog(serverVersion);
+      } else {
+        _showPlayStoreErrorDialog();
+      }
     } catch (e) {
       if (mounted) Navigator.pop(context); // Dismiss loading if error
-      _downloadAndInstallApk(
-        latestApkApiUrl: '${AppConfig.apiUrl}/api/devices?latest_apk=true',
-        defaultFileName: 'HealthPort_${AppConfig.appVersion}.apk',
-        defaultUrlPath: '/static/apks/HealthPort_${AppConfig.appVersion}.apk',
-      );
+      _showPlayStoreErrorDialog();
+    }
+  }
+
+  void _showPlayStoreUpdateDialog(String serverVersion) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2020),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          '업데이트 안내',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          '새로운 버전(v$serverVersion)이 등록되었습니다.\n구글 플레이 스토어로 이동하여 업데이트를 진행해 주세요.',
+          style: const TextStyle(color: Color(0xFFE2E2E2)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              '취소',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _launchPlayStore();
+            },
+            child: const Text(
+              '업데이트',
+              style: TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPlayStoreErrorDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2020),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          '업데이트 안내',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          '최신 버전을 확인하지 못했습니다.\n구글 플레이 스토어로 이동하여 업데이트가 있는지 확인하시겠습니까?',
+          style: TextStyle(color: Color(0xFFE2E2E2)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              '취소',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _launchPlayStore();
+            },
+            child: const Text(
+              '확인',
+              style: TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchPlayStore() async {
+    const playStoreUrl = 'market://details?id=com.samsung.health.client';
+    const webUrl = 'https://play.google.com/store/apps/details?id=com.samsung.health.client';
+    try {
+      final Uri uri = Uri.parse(playStoreUrl);
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        await launchUrl(Uri.parse(webUrl), mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      try {
+        await launchUrl(Uri.parse(webUrl), mode: LaunchMode.externalApplication);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('스토어 링크를 열 수 없습니다.')),
+          );
+        }
+      }
     }
   }
 

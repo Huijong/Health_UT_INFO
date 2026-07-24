@@ -45,6 +45,19 @@ def parse_email_body(body_text):
     if distance_val.endswith(" km"):
         distance_val = distance_val[:-3].strip()
 
+    # 첨부파일 여부 파싱
+    has_fit_match = re.search(r"FIT 파일[ \t]*:[ \t]*(.*)", body_text)
+    has_garmin_match = re.search(r"Garmin FIT 파일[ \t]*:[ \t]*(.*)", body_text)
+    has_cola_match = re.search(r"COLA 파일[ \t]*:[ \t]*(.*)", body_text)
+    has_log_match = re.search(r"로그 파일[ \t]*:[ \t]*(.*)", body_text)
+    capture_count_match = re.search(r"운동 캡처[ \t]*:[ \t]*([0-9]+)", body_text)
+
+    has_fit = has_fit_match.group(1).strip() if has_fit_match else "N"
+    has_garmin = has_garmin_match.group(1).strip() if has_garmin_match else "N"
+    has_cola = has_cola_match.group(1).strip() if has_cola_match else "N"
+    has_log = has_log_match.group(1).strip() if has_log_match else "N"
+    capture_count = int(capture_count_match.group(1).strip()) if capture_count_match else 0
+
     return {
         "tester_name": name_match.group(1).strip() if name_match else "알 수 없음",
         "session_id": session_match.group(1).strip() if session_match else "알 수 없음",
@@ -65,6 +78,11 @@ def parse_email_body(body_text):
         "share_link": link_match.group(1).strip() if link_match else "",
         "consent_given": consent_given_match.group(1).strip() if consent_given_match else "N",
         "consent_date": consent_date_match.group(1).strip() if consent_date_match else "",
+        "has_fit": has_fit,
+        "has_garmin": has_garmin,
+        "has_cola": has_cola,
+        "has_log": has_log,
+        "capture_count": capture_count,
     }
 
 
