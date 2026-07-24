@@ -28,6 +28,11 @@ class EmailService {
     required String location,
     required String remarks,
     required String consentDate,
+    required bool hasFit,
+    required bool hasGarmin,
+    required bool hasCola,
+    required bool hasLog,
+    required int captureCount,
   }) async {
     final sender = AppConfig.emailSender;
     final password = AppConfig.emailAppPassword;
@@ -72,6 +77,13 @@ class EmailService {
 - 훈련 거리: $distance km
 - 장소: $location
 ${remarks.isNotEmpty ? '- 특이 사항: $remarks\n' : ''}
+■ 첨부파일 현황
+- FIT 파일: ${hasFit ? 'Y' : 'N'}
+- Garmin FIT 파일: ${hasGarmin ? 'Y' : 'N'}
+- COLA 파일: ${hasCola ? 'Y' : 'N'}
+- 로그 파일: ${hasLog ? 'Y' : 'N'}
+- 운동 캡처: $captureCount개
+
 ■ 수집 데이터 링크 (Quick Share)
 $link
 ''';

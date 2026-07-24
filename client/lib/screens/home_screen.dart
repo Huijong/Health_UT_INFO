@@ -631,19 +631,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton(
+                       child: ElevatedButton(
                         onPressed: () {
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (BuildContext context) {
-                              return DownloadDialog(
-                                latestApkApiUrl: '${AppConfig.apiUrl}/api/devices?latest_apk=true',
-                                defaultFileName: 'HealthPort_${AppConfig.appVersion}.apk',
-                                defaultUrlPath: '/static/apks/HealthPort_${AppConfig.appVersion}.apk',
-                              );
-                            },
-                          );
+                          Navigator.pop(ctx);
+                          _launchPlayStore();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF3DFFC1),
@@ -662,6 +653,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         ),
       ),
     );
+  }
+
+  Future<void> _launchPlayStore() async {
+    const playStoreUrl = 'market://details?id=com.samsung.health.client';
+    const webUrl = 'https://play.google.com/store/apps/details?id=com.samsung.health.client';
+    try {
+      final Uri uri = Uri.parse(playStoreUrl);
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        await launchUrl(Uri.parse(webUrl), mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      try {
+        await launchUrl(Uri.parse(webUrl), mode: LaunchMode.externalApplication);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('스토어 링크를 열 수 없습니다.')),
+          );
+        }
+      }
+    }
   }
 
   void _showQuickShareGuideDialog(VoidCallback onConfirm) {
@@ -1079,6 +1091,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         location: _locationCtrl.text.trim(),
         remarks: _memoCtrl.text.trim(),
         consentDate: _prefs?.consentDate ?? '',
+        hasFit: _fitFiles.isNotEmpty,
+        hasGarmin: _garminFiles.isNotEmpty,
+        hasCola: _colaFiles.isNotEmpty,
+        hasLog: _logFiles.isNotEmpty,
+        captureCount: _captureFiles.length,
       );
 
       if (mounted) {
