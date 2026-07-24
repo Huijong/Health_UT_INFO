@@ -217,6 +217,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   String _trainingType = '조깅'; // 조깅 / 인터벌 / LSD / 변속주 / 지속주 / 직접입력
   final _customTrainingCtrl = TextEditingController();
   final _distanceCtrl = TextEditingController();
+  final _distanceFocusNode = FocusNode();
 
   final _locationCtrl = TextEditingController();
   final _memoCtrl = TextEditingController(); // 특이 사항
@@ -1001,6 +1002,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     _customCompetitorCtrl.dispose();
     _customTrainingCtrl.dispose();
     _distanceCtrl.dispose();
+    _distanceFocusNode.dispose();
     _locationCtrl.dispose();
     _memoCtrl.dispose();
     _guidePulseController?.dispose();
@@ -2934,6 +2936,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 8),
           TextFormField(
             controller: _distanceCtrl,
+            focusNode: _distanceFocusNode,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
@@ -3285,6 +3288,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             child: ElevatedButton(
               onPressed: () async {
                 if (isStep5) {
+                  if (_selectedExercise != '근력 운동') {
+                    final distText = _distanceCtrl.text.trim();
+                    final parsedDist = double.tryParse(distText) ?? 0.0;
+                    if (distText.isEmpty || parsedDist <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('훈련 거리를 입력해 주세요 (0보다 커야 합니다)')),
+                      );
+                      _distanceFocusNode.requestFocus();
+                      return;
+                    }
+                  }
                   if (_prefs?.hideQuickShareGuide == true) {
                     _onSend();
                   } else {
