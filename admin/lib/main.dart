@@ -1160,8 +1160,9 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        int points = 1;
+        double points = 1.00;
         final memoCtrl = TextEditingController(text: '관리자 가산');
+        final pointsCtrl = TextEditingController(text: '1.00');
         final monthStr = DateTime.now().toString().substring(0, 7); // YYYY-MM
 
         return StatefulBuilder(
@@ -1190,27 +1191,54 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
                       IconButton(
                         onPressed: () {
                           setDialogState(() {
-                            points--;
+                            points -= 0.10;
+                            points = double.parse(points.toStringAsFixed(2));
+                            pointsCtrl.text = points.toStringAsFixed(2);
                           });
                         },
                         icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.redAccent, size: 28),
                       ),
                       const SizedBox(width: 16),
-                      Text(
-                        points >= 0 ? '+$points' : '$points',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: points > 0
-                              ? const Color(0xFF3DFFC1)
-                              : (points < 0 ? Colors.redAccent : Colors.white),
+                      SizedBox(
+                        width: 110,
+                        child: TextField(
+                          controller: pointsCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: points > 0
+                                ? const Color(0xFF3DFFC1)
+                                : (points < 0 ? Colors.redAccent : Colors.white),
+                          ),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                            prefixText: points >= 0 ? '+' : '',
+                            prefixStyle: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: points > 0
+                                  ? const Color(0xFF3DFFC1)
+                                  : (points < 0 ? Colors.redAccent : Colors.white),
+                            ),
+                            border: InputBorder.none,
+                          ),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              points = double.tryParse(val.replaceAll('+', '')) ?? 0.00;
+                            });
+                          },
                         ),
                       ),
                       const SizedBox(width: 16),
                       IconButton(
                         onPressed: () {
                           setDialogState(() {
-                            points++;
+                            points += 0.10;
+                            points = double.parse(points.toStringAsFixed(2));
+                            pointsCtrl.text = points.toStringAsFixed(2);
                           });
                         },
                         icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF3DFFC1), size: 28),
@@ -1218,24 +1246,79 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
+                  // Plus Buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       TextButton(
-                        onPressed: () => setDialogState(() => points += 5),
-                        child: const Text('+5', style: TextStyle(color: Color(0xFF3DFFC1))),
+                        onPressed: () => setDialogState(() {
+                          points += 1.00;
+                          points = double.parse(points.toStringAsFixed(2));
+                          pointsCtrl.text = points.toStringAsFixed(2);
+                        }),
+                        child: const Text('+1.00', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12)),
                       ),
                       TextButton(
-                        onPressed: () => setDialogState(() => points += 1),
-                        child: const Text('+1', style: TextStyle(color: Color(0xFF3DFFC1))),
+                        onPressed: () => setDialogState(() {
+                          points += 0.50;
+                          points = double.parse(points.toStringAsFixed(2));
+                          pointsCtrl.text = points.toStringAsFixed(2);
+                        }),
+                        child: const Text('+0.50', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12)),
                       ),
                       TextButton(
-                        onPressed: () => setDialogState(() => points -= 1),
-                        child: const Text('-1', style: TextStyle(color: Colors.redAccent)),
+                        onPressed: () => setDialogState(() {
+                          points += 0.10;
+                          points = double.parse(points.toStringAsFixed(2));
+                          pointsCtrl.text = points.toStringAsFixed(2);
+                        }),
+                        child: const Text('+0.10', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12)),
                       ),
                       TextButton(
-                        onPressed: () => setDialogState(() => points -= 5),
-                        child: const Text('-5', style: TextStyle(color: Colors.redAccent)),
+                        onPressed: () => setDialogState(() {
+                          points += 0.01;
+                          points = double.parse(points.toStringAsFixed(2));
+                          pointsCtrl.text = points.toStringAsFixed(2);
+                        }),
+                        child: const Text('+0.01', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                  // Minus Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () => setDialogState(() {
+                          points -= 1.00;
+                          points = double.parse(points.toStringAsFixed(2));
+                          pointsCtrl.text = points.toStringAsFixed(2);
+                        }),
+                        child: const Text('-1.00', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                      ),
+                      TextButton(
+                        onPressed: () => setDialogState(() {
+                          points -= 0.50;
+                          points = double.parse(points.toStringAsFixed(2));
+                          pointsCtrl.text = points.toStringAsFixed(2);
+                        }),
+                        child: const Text('-0.50', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                      ),
+                      TextButton(
+                        onPressed: () => setDialogState(() {
+                          points -= 0.10;
+                          points = double.parse(points.toStringAsFixed(2));
+                          pointsCtrl.text = points.toStringAsFixed(2);
+                        }),
+                        child: const Text('-0.10', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                      ),
+                      TextButton(
+                        onPressed: () => setDialogState(() {
+                          points -= 0.01;
+                          points = double.parse(points.toStringAsFixed(2));
+                          pointsCtrl.text = points.toStringAsFixed(2);
+                        }),
+                        child: const Text('-0.01', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
                       ),
                     ],
                   ),
@@ -1328,7 +1411,7 @@ class PointHistoryScreen extends StatefulWidget {
 class _PointHistoryScreenState extends State<PointHistoryScreen> {
   bool _isLoading = true;
   List<dynamic> _history = [];
-  int _totalPoints = 0;
+  double _totalPoints = 0.0;
   String? _errorMessage;
 
   @override
@@ -1351,9 +1434,9 @@ class _PointHistoryScreenState extends State<PointHistoryScreen> {
         final decoded = jsonDecode(response.body);
         if (decoded['status'] == 'success') {
           final data = decoded['data'] ?? [];
-          int total = 0;
+          double total = 0.0;
           for (var item in data) {
-            total += (item['points'] as num).toInt();
+            total += (item['points'] as num).toDouble();
           }
           setState(() {
             _history = data;
@@ -1437,7 +1520,7 @@ class _PointHistoryScreenState extends State<PointHistoryScreen> {
                                     style: TextStyle(fontSize: 16, color: Colors.white70, fontWeight: FontWeight.bold),
                                   ),
                                   Text(
-                                    '$_totalPoints 포인트',
+                                    '${_totalPoints.toStringAsFixed(2)} 포인트',
                                     style: const TextStyle(
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,
@@ -1462,7 +1545,7 @@ class _PointHistoryScreenState extends State<PointHistoryScreen> {
                                   itemCount: _history.length,
                                   itemBuilder: (context, index) {
                                     final item = _history[index];
-                                    final pts = (item['points'] as num).toInt();
+                                    final pts = (item['points'] as num).toDouble();
                                     final memo = item['memo'] ?? '';
                                     final date = item['created_at'] ?? '';
                                     final isPositive = pts > 0;
@@ -1487,7 +1570,7 @@ class _PointHistoryScreenState extends State<PointHistoryScreen> {
                                           ),
                                         ),
                                         trailing: Text(
-                                          isPositive ? '+$pts' : '$pts',
+                                          isPositive ? '+${pts.toStringAsFixed(2)}' : pts.toStringAsFixed(2),
                                           style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
