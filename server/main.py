@@ -142,7 +142,7 @@ class NoticeAck(BaseModel):
 
 class PointCreate(BaseModel):
     tester_name: Optional[str] = None
-    points: Optional[int] = None
+    points: Optional[float] = None
     memo: Optional[str] = None
     month: Optional[str] = None
     old_name: Optional[str] = None
@@ -270,6 +270,7 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
                             }
                         }
                     },
+                    {"$match": {"submissions": {"$gt": 0}}},
                     {"$sort": {"points": -1}}
                 ]
                 cursor = db["points_transactions"].aggregate(pipeline)
@@ -897,6 +898,212 @@ async def get_dashboard(request: Request):
                 width: 16px;
                 height: 16px;
             }
+            /* 드로어 및 모달 스타일 */
+            .drawer-overlay {
+                position: fixed;
+                z-index: 1999;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(15, 23, 42, 0.4);
+                backdrop-filter: blur(2px);
+                display: none;
+            }
+            .drawer {
+                position: fixed;
+                z-index: 2000;
+                right: -450px;
+                top: 0;
+                width: 420px;
+                height: 100%;
+                background-color: var(--card-bg);
+                box-shadow: -5px 0 25px rgba(15, 23, 42, 0.15);
+                border-left: 1px solid var(--border);
+                transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                display: flex;
+                flex-direction: column;
+                box-sizing: border-box;
+            }
+            .drawer.open {
+                right: 0;
+            }
+            .drawer-header {
+                padding: 20px 24px;
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background-color: #FAFAFA;
+            }
+            .drawer-header h2 {
+                font-family: var(--font-display);
+                font-size: 17px;
+                font-weight: 700;
+                margin: 0;
+                color: var(--text);
+            }
+            .close-drawer {
+                font-size: 24px;
+                font-weight: bold;
+                color: var(--text-muted);
+                cursor: pointer;
+                transition: color 0.2s;
+            }
+            .close-drawer:hover {
+                color: #EF4444;
+            }
+            .drawer-body {
+                padding: 24px;
+                flex: 1;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }
+            .tester-badge-container {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background-color: var(--primary-light);
+                padding: 16px;
+                border-radius: 12px;
+                border: 1px solid rgba(20, 41, 160, 0.1);
+            }
+            .tester-badge-title {
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--primary);
+            }
+            .tester-accumulated-points {
+                font-size: 20px;
+                font-weight: 800;
+                color: var(--primary);
+            }
+            .history-section {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+            .history-section h3 {
+                font-size: 14px;
+                font-weight: 700;
+                margin: 0 0 4px 0;
+                color: var(--text);
+            }
+            .history-list {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                max-height: 280px;
+                overflow-y: auto;
+                padding-right: 4px;
+            }
+            .history-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 10px 12px;
+                background-color: #F8FAFC;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                font-size: 12.5px;
+            }
+            .history-item-left {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+            }
+            .history-item-memo {
+                font-weight: 600;
+                color: var(--text);
+            }
+            .history-item-date {
+                font-size: 11px;
+                color: var(--text-muted);
+            }
+            .history-item-points {
+                font-weight: 700;
+            }
+            .history-item-points.plus {
+                color: var(--success);
+            }
+            .history-item-points.minus {
+                color: #EF4444;
+            }
+            .modal-adjust-btn {
+                background-color: #F1F5F9;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background-color 0.2s;
+            }
+            .modal-adjust-btn.plus {
+                color: var(--success);
+            }
+            .modal-adjust-btn.minus {
+                color: #EF4444;
+            }
+            .modal-adjust-btn:hover {
+                background-color: #E2E8F0;
+            }
+            .preset-btn {
+                background-color: #F8FAFC;
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .preset-btn.plus {
+                color: var(--success);
+            }
+            .preset-btn.plus:hover {
+                background-color: rgba(16, 185, 129, 0.08);
+                border-color: rgba(16, 185, 129, 0.3);
+            }
+            .preset-btn.minus {
+                color: #EF4444;
+            }
+            .preset-btn.minus:hover {
+                background-color: rgba(239, 68, 68, 0.08);
+                border-color: rgba(239, 68, 68, 0.3);
+            }
+            .modal-confirm-btn {
+                background-color: var(--primary);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+            .modal-confirm-btn:hover {
+                background-color: #0E1E7A;
+            }
+            .adjust-points-btn {
+                background: none;
+                border: none;
+                color: #10B981;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 600;
+                margin-left: 8px;
+                text-decoration: underline;
+                padding: 0;
+            }
+            .adjust-points-btn:hover {
+                color: #059669;
+            }
         </style>
         <script>
             let allData = [];
@@ -1229,6 +1436,7 @@ async def get_dashboard(request: Request):
                                     <a href="${item.share_link}" target="_blank" class="link-btn">다운로드</a>
                                     <button class="copy-btn" onclick="copyToClipboard('${item.share_link}')">복사</button>
                                 ` : '<span style="color: var(--text-muted);">링크 없음</span>'}
+                                <button class="adjust-points-btn" onclick="openPointsDrawer('${item.tester_name.replace(/'/g, "\\'")}')">P 가감</button>
                                 <button class="delete-record-btn" onclick="deleteRecord('${item._id}')">삭제</button>
                             </td>
                         </tr>
@@ -1275,6 +1483,143 @@ async def get_dashboard(request: Request):
                 toggleColumn('col-strap', 'col-show-strap');
                 toggleColumn('col-position', 'col-show-position');
                 toggleColumn('col-tightness', 'col-show-tightness');
+            }
+
+            let currentTargetTester = '';
+
+            async function openPointsDrawer(testerName) {
+                currentTargetTester = testerName;
+                document.getElementById('drawer-title').innerText = `${testerName}님 포인트 관리`;
+                document.getElementById('modal-points-input').value = "1.00";
+                document.getElementById('modal-memo-input').value = "관리자 가산";
+                updatePointsPreview();
+
+                // Open drawer UI
+                document.getElementById('drawer-overlay').style.display = 'block';
+                document.getElementById('points-drawer').classList.add('open');
+
+                // Load History & Cumulative points
+                await fetchTesterHistoryAndPoints(testerName);
+            }
+
+            function closePointsDrawer() {
+                document.getElementById('drawer-overlay').style.display = 'none';
+                document.getElementById('points-drawer').classList.remove('open');
+            }
+
+            async function fetchTesterHistoryAndPoints(testerName) {
+                const historyListDiv = document.getElementById('drawer-history-list');
+                const accumPointsSpan = document.getElementById('drawer-accumulated-points');
+
+                historyListDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px;">이력을 불러오는 중...</div>';
+                accumPointsSpan.innerText = '0.00 P';
+
+                try {
+                    const response = await fetch(`/api/points/${encodeURIComponent(testerName)}/history`);
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        const history = result.data || [];
+                        let total = 0.0;
+                        let html = '';
+
+                        if (history.length === 0) {
+                            html = '<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px;">이력이 없습니다.</div>';
+                        } else {
+                            history.forEach(item => {
+                                const pts = parseFloat(item.points) || 0.00;
+                                total += pts;
+                                const isPositive = pts > 0;
+                                const ptsStr = isPositive ? `+${pts.toFixed(2)}` : pts.toFixed(2);
+                                const ptsClass = isPositive ? 'plus' : 'minus';
+                                const dateStr = item.created_at ? item.created_at.substring(0, 10) : '';
+
+                                html += `
+                                    <div class="history-item">
+                                        <div class="history-item-left">
+                                            <span class="history-item-memo">${item.memo || ''}</span>
+                                            <span class="history-item-date">${dateStr}</span>
+                                        </div>
+                                        <span class="history-item-points ${ptsClass}">${ptsStr} P</span>
+                                    </div>
+                                `;
+                            });
+                        }
+                        historyListDiv.innerHTML = html;
+                        accumPointsSpan.innerText = `${total.toFixed(2)} P`;
+                    } else {
+                        historyListDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #EF4444; font-size: 12.5px;">이력을 가져오지 못했습니다.</div>';
+                    }
+                } catch (e) {
+                    historyListDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #EF4444; font-size: 12.5px;">네트워크 에러가 발생했습니다.</div>';
+                }
+            }
+
+            function updatePointsPreview() {
+                const input = document.getElementById('modal-points-input');
+                let val = parseFloat(input.value) || 0.00;
+                const sign = document.getElementById('points-sign');
+                if (val >= 0) {
+                    sign.innerText = '+';
+                    sign.style.color = 'var(--success)';
+                    input.style.color = 'var(--success)';
+                } else {
+                    sign.innerText = '';
+                    sign.style.color = '#EF4444';
+                    input.style.color = '#EF4444';
+                }
+            }
+
+            function stepPoints(step) {
+                const input = document.getElementById('modal-points-input');
+                let val = parseFloat(input.value) || 0.00;
+                val += step;
+                input.value = val.toFixed(2);
+                updatePointsPreview();
+            }
+
+            function adjustPointsPreset(preset) {
+                const input = document.getElementById('modal-points-input');
+                let val = parseFloat(input.value) || 0.00;
+                val += preset;
+                input.value = val.toFixed(2);
+                updatePointsPreview();
+            }
+
+            async function submitPointsAdjustment() {
+                const input = document.getElementById('modal-points-input');
+                const pointsVal = parseFloat(input.value) || 0.00;
+                const memoVal = document.getElementById('modal-memo-input').value.trim();
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const monthStr = `${year}-${month}`;
+
+                if (!currentTargetTester) return;
+
+                try {
+                    const response = await fetch('/api/points', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            tester_name: currentTargetTester,
+                            points: pointsVal,
+                            memo: memoVal,
+                            month: monthStr
+                        })
+                    });
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        alert("포인트가 정상적으로 반영되었습니다.");
+                        await fetchTesterHistoryAndPoints(currentTargetTester); // Refresh history and points total
+                        fetchEmails(); // 데이터 새로고침
+                    } else {
+                        alert("반영 실패: " + result.message);
+                    }
+                } catch (e) {
+                    alert("에러 발생: " + e);
+                }
             }
         </script>
     </head>
@@ -1366,7 +1711,7 @@ async def get_dashboard(request: Request):
                             <th>특이 사항</th>
                             <th style="text-align: center;">첨부파일</th>
                             <th class="sortable" onclick="handleSort('app_version')">버전 <span class="sort-indicator" id="sort-icon-app_version">↕</span></th>
-                            <th>Quick Share</th>
+                            <th>관리</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
@@ -1375,6 +1720,67 @@ async def get_dashboard(request: Request):
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- 드로어 오버레이 -->
+        <div id="drawer-overlay" class="drawer-overlay" onclick="closePointsDrawer()"></div>
+
+        <!-- 포인트 가감 드로어 -->
+        <div id="points-drawer" class="drawer">
+            <div class="drawer-header">
+                <h2 id="drawer-title">포인트 관리</h2>
+                <span class="close-drawer" onclick="closePointsDrawer()">&times;</span>
+            </div>
+            <div class="drawer-body">
+                <!-- 누적 포인트 카드 -->
+                <div class="tester-badge-container">
+                    <span class="tester-badge-title">누적 포인트</span>
+                    <span id="drawer-accumulated-points" class="tester-accumulated-points">0.00 P</span>
+                </div>
+
+                <!-- 포인트 가감 영역 -->
+                <div style="display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--border); padding: 16px; border-radius: 12px;">
+                    <span style="font-size: 13px; font-weight: 700; color: var(--text-muted);">포인트 조정</span>
+                    
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin: 8px 0;">
+                        <button class="modal-adjust-btn minus" onclick="stepPoints(-0.1)">-0.1</button>
+                        <div style="display: flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; background: #F8FAFC;">
+                            <span id="points-sign" style="font-size: 20px; font-weight: bold; color: var(--success);">+</span>
+                            <input type="number" id="modal-points-input" step="0.01" value="1.00" oninput="updatePointsPreview()" style="border: none; background: transparent; font-size: 20px; font-weight: bold; width: 80px; text-align: center; outline: none; margin-left: 4px;">
+                        </div>
+                        <button class="modal-adjust-btn plus" onclick="stepPoints(0.1)">+0.1</button>
+                    </div>
+
+                    <!-- 단축 버튼 -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                        <button class="preset-btn plus" onclick="adjustPointsPreset(1.00)">+1.00</button>
+                        <button class="preset-btn plus" onclick="adjustPointsPreset(0.50)">+0.50</button>
+                        <button class="preset-btn plus" onclick="adjustPointsPreset(0.10)">+0.10</button>
+                        <button class="preset-btn plus" onclick="adjustPointsPreset(0.01)">+0.01</button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px;">
+                        <button class="preset-btn minus" onclick="adjustPointsPreset(-1.00)">-1.00</button>
+                        <button class="preset-btn minus" onclick="adjustPointsPreset(-0.50)">-0.50</button>
+                        <button class="preset-btn minus" onclick="adjustPointsPreset(-0.10)">-0.10</button>
+                        <button class="preset-btn minus" onclick="adjustPointsPreset(-0.01)">-0.01</button>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase;">가감 사유 (메모)</label>
+                        <input type="text" id="modal-memo-input" value="관리자 가산" placeholder="사유를 입력해 주세요" style="padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; box-sizing: border-box; width: 100%;">
+                    </div>
+
+                    <button class="modal-confirm-btn" onclick="submitPointsAdjustment()" style="width: 100%; padding: 12px; font-size: 14px; margin-top: 8px;">포인트 반영하기</button>
+                </div>
+
+                <!-- 이력 리스트 영역 -->
+                <div class="history-section">
+                    <h3>포인트 지급 이력</h3>
+                    <div id="drawer-history-list" class="history-list">
+                        <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px;">이력을 불러오는 중...</div>
+                    </div>
+                </div>
             </div>
         </div>
     </body>
