@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 사용자 입력값 중 반복 사용하는 항목을 로컬에 저장/불러오기
@@ -54,6 +55,18 @@ class PrefsService {
   bool get hideQuickShareGuide => _prefs.getBool('hide_quick_share_guide') ?? false;
   String get deviceUuid => _prefs.getString(_keyDeviceUuid) ?? '';
 
+  /// 운동 종목별 디테일 설정 로드
+  Map<String, String>? getSportDetail(String sport) {
+    final raw = _prefs.getString('sport_detail_$sport');
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw) as Map<dynamic, dynamic>;
+      return decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> saveName(String value) => _prefs.setString(_keyName, value);
   Future<void> saveDeviceUuid(String value) => _prefs.setString(_keyDeviceUuid, value);
   Future<void> saveHeight(double value) => _prefs.setDouble(_keyHeight, value);
@@ -72,4 +85,9 @@ class PrefsService {
   Future<void> saveLastDismissedUpdateVersion(String value) => _prefs.setString('last_dismissed_update_version', value);
   Future<void> saveLastPopupDismissedVersion(String value) => _prefs.setString('last_popup_dismissed_version', value);
   Future<void> saveHideQuickShareGuide(bool value) => _prefs.setBool('hide_quick_share_guide', value);
+
+  /// 운동 종목별 디테일 설정 저장
+  Future<void> saveSportDetail(String sport, Map<String, String> details) {
+    return _prefs.setString('sport_detail_$sport', jsonEncode(details));
+  }
 }
