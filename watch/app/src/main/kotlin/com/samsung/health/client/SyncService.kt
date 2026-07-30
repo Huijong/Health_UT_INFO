@@ -27,6 +27,8 @@ import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.MessageDigest
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 class SyncService : Service() {
 
@@ -460,12 +462,114 @@ class SyncService : Service() {
         writeLog("CMD: $command")
         when {
             command == "GET_FILE_LIST" -> {
+                // Notify phone that compression is in progress
+                sendSocketLine("COMPRESSING")
+                // Compress any unzipped COLA folders into new naming format
+                compressColaFiles()
+                // Send the final file list
                 sendSocketLine("FILE_LIST:${getFileListJson()}")
             }
             command.startsWith("DOWNLOAD_FILE:") -> {
                 sendSocketFile(command.substring("DOWNLOAD_FILE:".length).trim())
             }
         }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // COLA FILE COMPRESSION
+    // ────────────────────────────────────────────────────────────────
+
+    /** Returns the watch firmware version string from Build.DISPLAY, safe for filenames. */
+    private fun getWatchSoftwareVersion(): String {
+        return Build.DISPLAY
+            .replace("/", "_")
+            .replace("\\", "_")
+            .replace(" ", "_")
+            .replace(":", "_")
+    }
+
+    /**
+     * Parses a folder name in YYMMDDHHMM format (10 digits) into
+     * a (YYYYMMDD, HHMMSS) pair suitable for the zip filename.
+     * Falls back to current time if the name doesn't match.
+     */
+    private fun parseColaDateTime(name: String): Pair<String, String> {
+        return if (name.length >= 10 && name.take(10).all { it.isDigit() }) {
+            val yy  = name.substring(0, 2)
+            val mon = name.substring(2, 4)
+            val dd  = name.substring(4, 6)
+            val hh  = name.substring(6, 8)
+            val min = name.substring(8, 10)
+            Pair("20${yy}${mon}${dd}", "${hh}${min}00")
+        } else {
+            val sdf = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US)
+            val parts = sdf.format(java.util.Date()).split("_")
+            Pair(parts[0], parts[1])
+        }
+    }
+
+    /** Builds the zip output filename from the source folder name. */
+    private fun buildColaZipName(folderName: String): String {
+        val version = getWatchSoftwareVersion()
+        val (dateStr, timeStr) = parseColaDateTime(folderName)
+        return "COLA_FILE_${version}_${dateStr}_${timeStr}.zip"
+    }
+
+    /**
+     * Scans /sdcard/Documents/COLA_FILE/ for directories whose names
+     * are 10-digit date-time strings (YYMMDDHHMM) and compresses each
+     * one into COLA_FILE_[version]_[date]_[time].zip.
+     * Already-compressed archives (COLA_FILE_*.zip) are skipped.
+     */
+    private fun compressColaFiles() {
+        val folder = File("/sdcard/Documents/COLA_FILE/")
+        if (!folder.exists()) { folder.mkdirs(); return }
+
+        val colaPattern = Regex("^\\d{10}$")
+        val targets = folder.listFiles { f ->
+            f.isDirectory && colaPattern.matches(f.name)
+        } ?: return
+
+        if (targets.isEmpty()) {
+            writeLog("COMPRESS: no unzipped COLA folders found.")
+            return
+        }
+
+        for (dir in targets) {
+            val zipName = buildColaZipName(dir.name)
+            val zipFile = File(folder, zipName)
+            if (zipFile.exists()) {
+                writeLog("COMPRESS: $zipName already exists, skipping.")
+                continue
+            }
+            writeLog("COMPRESS: ${dir.name} → $zipName")
+            try {
+                ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
+                    addFolderToZip(dir, dir.name, zos)
+                }
+                writeLog("COMPRESS: done → $zipName")
+            } catch (e: Exception) {
+                writeLog("COMPRESS error for ${dir.name}: ${e.message}")
+                try { zipFile.delete() } catch (_: Exception) {}
+            }
+        }
+    }
+
+    private fun addFolderToZip(folder: File, parentPath: String, zos: ZipOutputStream) {
+        val children = folder.listFiles() ?: return
+        for (child in children) {
+            if (child.isDirectory) {
+                addFolderToZip(child, "$parentPath/${child.name}", zos)
+            } else {
+                addFileToZip(child, "$parentPath/${child.name}", zos)
+            }
+        }
+    }
+
+    private fun addFileToZip(file: File, entryName: String, zos: ZipOutputStream) {
+        zos.putNextEntry(ZipEntry(entryName))
+        FileInputStream(file).use { it.copyTo(zos, bufferSize = 65536) }
+        zos.closeEntry()
     }
 
     private fun sendSocketFile(filename: String) {

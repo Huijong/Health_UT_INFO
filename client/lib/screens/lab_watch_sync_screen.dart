@@ -30,6 +30,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   // List of files fetched from watch
   List<Map<String, dynamic>> _files = [];
   bool _isLoadingFileList = false;
+  bool _isCompressing = false; // 워치에서 COLA 파일 압축 중 상태
 
   bool _isWatchAppInstalled = true; // Default to true
 
@@ -152,13 +153,23 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
               return map;
             }).toList();
             _isLoadingFileList = false;
+            _isCompressing = false;
           });
         } catch (e) {
           _addLog("JSON Parse error: $e");
           setState(() {
             _isLoadingFileList = false;
+            _isCompressing = false;
           });
         }
+        break;
+
+      case "compressing":
+        _addLog("워치에서 COLA 파일 압축 중...");
+        setState(() {
+          _isCompressing = true;
+          _isLoadingFileList = true;
+        });
         break;
 
       case "downloadProgress":
@@ -661,9 +672,26 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
             const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Color(0xFF3DFFC1))),
             const SizedBox(height: 16),
             Text(
-              '워치에서 운동 데이터 목록을 가져오는 중...',
+              _isCompressing
+                  ? 'COLA 파일 압축 중...\n잠시만 기다려 주세요.'
+                  : '워치에서 운동 데이터 목록을 가져오는 중...',
+              textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
             ),
+            if (_isCompressing) ...[  
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.compress_rounded, size: 14, color: Color(0xFF3DFFC1)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'COLA_FILE_[버전]_[날짜]_[시간].zip 형식으로 변환 중',
+                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       );

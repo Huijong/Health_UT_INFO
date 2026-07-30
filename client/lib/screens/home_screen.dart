@@ -1872,12 +1872,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   }
 
   Future<void> _launchUrl(String urlString) async {
-    final Uri url = Uri.parse(urlString);
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('링크를 열 수 없습니다: $urlString')),
-        );
+    try {
+      final String res = await _appChannel.invokeMethod('launchSamsungBrowser', {'url': urlString});
+      debugPrint('[LaunchUrl] Custom channel response: $res');
+    } catch (e) {
+      debugPrint('[LaunchUrl] Custom channel failed, falling back to url_launcher: $e');
+      final Uri url = Uri.parse(urlString);
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('링크를 열 수 없습니다: $urlString')),
+          );
+        }
       }
     }
   }
