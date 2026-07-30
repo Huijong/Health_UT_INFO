@@ -2848,78 +2848,167 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
           const SizedBox(height: 16),
 
-          GlassCard(
-            radius: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // 그룹 A + 그룹 B 가로 배치 (중간에 VerticalDivider 적용)
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('착용 상태', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('착용 위치', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.04),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
-                      ),
-                      padding: const EdgeInsets.all(4),
-                      child: Row(
-                        children: [
-                          _buildSwitchTab('왼쪽', _wearingPosition == '왼쪽'),
-                          _buildSwitchTab('오른쪽', _wearingPosition == '오른쪽'),
-                        ],
-                      ),
+                // 그룹 A: 착용 상태 및 디바이스 환경 카드
+                Expanded(
+                  child: GlassCard(
+                    radius: 16,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('착용 상태', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('착용 위치', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                              ),
+                              padding: const EdgeInsets.all(4),
+                              child: Row(
+                                children: [
+                                  _buildSwitchTab('왼쪽', _wearingPosition == '왼쪽'),
+                                  _buildSwitchTab('오른쪽', _wearingPosition == '오른쪽'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('착용 정도', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                              ),
+                              padding: const EdgeInsets.all(4),
+                              child: Row(
+                                children: [
+                                  _buildSegmentTab('충분히', _wearingTightness == '충분히'),
+                                  _buildSegmentTab('적당히', _wearingTightness == '적당히'),
+                                  _buildSegmentTab('느슨하게', _wearingTightness == '느슨하게'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 32, color: Colors.white10),
+                        const Text('동시 착용 타사 모델', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          value: _competitorWatch,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.compare_arrows_rounded, size: 20),
+                          ),
+                          items: ['가민', '애플', '크로스', '없음', '직접입력']
+                              .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _competitorWatch = val);
+                              _saveSportDetails();
+                            }
+                          },
+                        ),
+                        if (_competitorWatch == '직접입력') ...[
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            controller: _customCompetitorCtrl,
+                            decoration: const InputDecoration(
+                              labelText: '타사 기기 직접 입력 *',
+                            ),
+                          ),
+                        ]
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('착용 정도', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.04),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
-                      ),
-                      padding: const EdgeInsets.all(4),
-                      child: Row(
-                        children: [
-                          _buildSegmentTab('충분히', _wearingTightness == '충분히'),
-                          _buildSegmentTab('적당히', _wearingTightness == '적당히'),
-                          _buildSegmentTab('느슨하게', _wearingTightness == '느슨하게'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: VerticalDivider(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1,
+                    thickness: 1,
+                  ),
+                ),
+                // 그룹 B: 훈련 정보 카드
+                Expanded(
+                  child: GlassCard(
+                    radius: 16,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('훈련 정보', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
+                        const Text('훈련 거리', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _distanceCtrl,
+                          focusNode: _distanceFocusNode,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                          ],
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.linear_scale_rounded, size: 20),
+                            hintText: '예) 21.09',
+                            suffixText: 'km',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text('훈련 종류', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: _trainingType,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.sports_score_rounded, size: 20),
+                          ),
+                          items: ['조깅', '인터벌', 'LSD', '변속주', '지속주', '직접입력']
+                              .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _trainingType = val);
+                              _saveSportDetails();
+                            }
+                          },
+                        ),
+                        if (_trainingType == '직접입력') ...[
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            controller: _customTrainingCtrl,
+                            decoration: const InputDecoration(
+                              labelText: '훈련 종류 직접 입력 *',
+                            ),
+                          ),
                         ],
-                      ),
+                        const SizedBox(height: 16),
+                        const Text('운동 장소', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _locationCtrl,
+                          decoration: const InputDecoration(
+                            hintText: '예: 공원, 실내체육관 등 직접 입력',
+                            prefixIcon: Icon(Icons.place_outlined, size: 20),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 동시에 착용한 타사 모델
-          _buildCompetitorSection(),
-          const SizedBox(height: 16),
-
-          // 훈련 거리
-          _buildDistanceSection(),
-          const SizedBox(height: 16),
-
-          // 훈련 종류
-          _buildTrainingSection(),
-          const SizedBox(height: 16),
-
-          // 장소 입력
-          TextFormField(
-            controller: _locationCtrl,
-            decoration: const InputDecoration(
-              labelText: '운동 장소 직접 입력 (예: 공원, 실내체육관)',
-              prefixIcon: Icon(Icons.place_outlined, size: 20),
             ),
           ),
           const SizedBox(height: 16),
@@ -2929,13 +3018,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 16),
 
           // 특이 사항 TextArea
-          TextFormField(
-            controller: _memoCtrl,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              labelText: '특이 사항 및 메모',
-              alignLabelWithHint: true,
-              hintText: '특이 사항이 있다면 적어주세요. (착용감 흔들림, 센서 오작동 등)',
+          GlassCard(
+            radius: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('특이 사항 및 메모', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _memoCtrl,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: '특이 사항이 있다면 적어주세요. (착용감 흔들림, 센서 오작동 등)',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 30),
@@ -3279,107 +3377,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     );
   }
 
-  Widget _buildCompetitorSection() {
-    final List<String> compOptions = ['가민', '애플', '크로스', '없음', '직접입력'];
-    return GlassCard(
-      radius: 16,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('동시 착용 타사 모델', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _competitorWatch,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.compare_arrows_rounded, size: 20),
-            ),
-            items: compOptions
-                .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
-                .toList(),
-            onChanged: (val) {
-              if (val != null) {
-                setState(() => _competitorWatch = val);
-                _saveSportDetails();
-              }
-            },
-          ),
-          if (_competitorWatch == '직접입력') ...[
-            const SizedBox(height: 10),
-            TextFormField(
-              controller: _customCompetitorCtrl,
-              decoration: const InputDecoration(
-                labelText: '타사 기기 직접 입력 *',
-              ),
-            ),
-          ]
-        ],
-      ),
-    );
-  }
 
-  Widget _buildDistanceSection() {
-    return GlassCard(
-      radius: 16,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('훈련 거리', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _distanceCtrl,
-            focusNode: _distanceFocusNode,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-            ],
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.linear_scale_rounded, size: 20),
-              hintText: '예) 21.09',
-              suffixText: 'km',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTrainingSection() {
-    final List<String> trOptions = ['조깅', '인터벌', 'LSD', '변속주', '지속주', '직접입력'];
-    return GlassCard(
-      radius: 16,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('훈련 종류', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _trainingType,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.sports_score_rounded, size: 20),
-            ),
-            items: trOptions
-                .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
-                .toList(),
-            onChanged: (val) {
-              if (val != null) {
-                setState(() => _trainingType = val);
-                _saveSportDetails();
-              }
-            },
-          ),
-          if (_trainingType == '직접입력') ...[
-            const SizedBox(height: 10),
-            TextFormField(
-              controller: _customTrainingCtrl,
-              decoration: const InputDecoration(
-                labelText: '훈련 종류 직접 입력 *',
-              ),
-            ),
-          ]
-        ],
-      ),
-    );
-  }
 
   // ── Step 6: 압축 & 전송 완료 (Dashboard) ─────────────────────────
   Future<void> _onReshare() async {
