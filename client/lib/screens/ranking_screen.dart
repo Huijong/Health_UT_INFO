@@ -387,7 +387,7 @@ class _RankingScreenState extends State<RankingScreen> {
                       ),
                       // Tab Content
                       SizedBox(
-                        height: 380,
+                        height: 430,
                         child: TabBarView(
                           children: [
                             _buildGroupARules(),
@@ -429,15 +429,15 @@ class _RankingScreenState extends State<RankingScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _buildInfoBox('💡 아래 거리별 예시값은 건당 [기본 점수 1.0P (하이킹 3.0P)]가 미리 합산되어 최종 수령할 총 포인트 기준입니다.\n💡 모든 거리는 소수점 첫째 자리에서 반올림 적용'),
+        _buildInfoBox('💡 아래 거리별 예시값은 건당 [기본 점수 1.0P (하이킹 3.0P)]가 미리 합산되어 최종 수령할 총 포인트 기준입니다.'),
         const SizedBox(height: 16),
         _buildTableHeader(),
-        _buildTableItem('1 ~ 10 km', '1km당 +0.1P', '10km = 2.0P'),
-        _buildTableItem('11 ~ 20 km', '1km당 +0.15P', '20km = 3.5P'),
-        _buildTableItem('21 ~ 30 km', '1km당 +0.2P', '30km = 5.5P'),
-        _buildTableItem('31 ~ 40 km', '1km당 +0.3P', '40km = 8.5P'),
+        _buildTableItem('1 ~ 10 km', '1km당 +0.1P', '10km = 2.00P'),
+        _buildTableItem('11 ~ 20 km', '1km당 +0.15P', '20km = 3.50P'),
+        _buildTableItem('21 ~ 30 km', '1km당 +0.2P', '30km = 5.50P'),
+        _buildTableItem('31 ~ 40 km', '1km당 +0.3P', '40km = 8.50P'),
         _buildTableItem('41 ~ 99 km', '40~100km 구간 등간격 가산', '41km=8.71P ... 99km=20.79P'),
-        _buildTableItem('100 km 이상', '기본 20.0P + 1km당 +0.2P', '110km = 23.0P'),
+        _buildTableItem('100 km 이상', '기본 20.0P + 1km당 +0.2P', '110km = 23.00P'),
       ],
     );
   }
@@ -446,13 +446,13 @@ class _RankingScreenState extends State<RankingScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _buildInfoBox('💡 아래 거리별 예시값은 건당 [기본 점수 1.0P]가 미리 합산되어 최종 수령할 총 포인트 기준입니다.\n💡 모든 거리는 소수점 첫째 자리에서 반올림 적용'),
+        _buildInfoBox('💡 아래 거리별 예시값은 건당 [기본 점수 1.0P]가 미리 합산되어 최종 수령할 총 포인트 기준입니다.'),
         const SizedBox(height: 16),
         _buildTableHeader(),
-        _buildTableItem('1 ~ 40 km', '1km당 +0.1P', '40km = 5.0P'),
-        _buildTableItem('41 ~ 50 km', '1km당 +0.1P', '50km = 6.0P'),
+        _buildTableItem('1 ~ 40 km', '1km당 +0.1P', '40km = 5.00P'),
+        _buildTableItem('41 ~ 50 km', '1km당 +0.1P', '50km = 6.00P'),
         _buildTableItem('51 ~ 99 km', '50~100km 구간 등간격 가산', '51km=6.14P ... 99km=12.86P'),
-        _buildTableItem('100 km 이상', '기본 12.0P + 1km당 +0.16P', '110km = 14.6P'),
+        _buildTableItem('100 km 이상', '기본 12.0P + 1km당 +0.16P', '110km = 14.60P'),
       ],
     );
   }
@@ -464,9 +464,9 @@ class _RankingScreenState extends State<RankingScreen> {
         _buildInfoBox('💡 수영, 근력 운동, 요가 등 기타 종목 대상\n💡 기본 점수 외에 거리 가산은 제외됩니다.'),
         const SizedBox(height: 16),
         _buildTableHeader(),
-        _buildTableItem('수영 (실내/외)', '건당 +1.0P 고정', '활동당 1.0P'),
-        _buildTableItem('근력 운동', '건당 +1.0P 고정', '활동당 1.0P'),
-        _buildTableItem('기타 웰니스', '건당 +1.0P 고정', '활동당 1.0P'),
+        _buildTableItem('수영 (실내/외)', '건당 +1.00P 고정', '활동당 1.00P'),
+        _buildTableItem('근력 운동', '건당 +1.00P 고정', '활동당 1.00P'),
+        _buildTableItem('기타 웰니스', '건당 +1.00P 고정', '활동당 1.00P'),
         _buildTableItem('마스터 특별(JY)', '수동 가감에 따른 보너스', '지정된 가산P'),
       ],
     );
@@ -995,7 +995,7 @@ class _RankingScreenState extends State<RankingScreen> {
             left: 20,
             right: 20,
             top: 24,
-            bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+            bottom: 24 + MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom,
           ),
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.7,
