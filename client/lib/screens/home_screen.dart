@@ -1377,7 +1377,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
 
     if (action == 'yes') {
-      await _launchUrl('https://connect.garmin.com/app/');
+      // await _launchUrl('https://connect.garmin.com/app/');
+      await _launchUrl('https://connect.garmin.com/signin/');
     } else if (action == 'no') {
       if (_fileBusy) return;
       setState(() => _fileBusy = true);
