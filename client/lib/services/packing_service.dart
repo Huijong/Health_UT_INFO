@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/attached_file.dart';
@@ -122,11 +122,6 @@ class PackingService {
         'size_bytes': f.sizeBytes,
       };
 
-  /// tempPath 우선, 없으면 originalPath (두 경로 모두 로컬 파일 경로)
-  static Future<List<int>> _readFile(AttachedFile f) async {
-    final path = f.tempPath ?? f.originalPath;
-    return File(path).readAsBytes();
-  }
 
   static String _buildInfoText({
     required String name,
@@ -236,24 +231,28 @@ class _PackIsolateParams {
 
 /// 백그라운드 워커 스레드에서 동작하는 압축 및 파일 저장 로직 (UI 멈춤/ANR 차단)
 PackResult _packIsolateBody(_PackIsolateParams params) {
-  final archive = Archive();
+  final encoder = ZipFileEncoder();
+  encoder.create(params.zipPath);
 
   // 1. 메타 데이터 및 텍스트 추가
   final metaBytes = utf8.encode(params.metaJson);
   final infoBytes = utf8.encode(params.infoText);
-  archive.addFile(ArchiveFile('meta.json', metaBytes.length, metaBytes));
-  archive.addFile(ArchiveFile('info.txt', infoBytes.length, infoBytes));
 
-  // 로컬 파일 읽기 & 압축 파일 등록 헬퍼
+  final metaFile = ArchiveFile('meta.json', metaBytes.length, metaBytes);
+  metaFile.compress = true;
+  encoder.addArchiveFile(metaFile);
+
+  final infoFile = ArchiveFile('info.txt', infoBytes.length, infoBytes);
+  infoFile.compress = true;
+  encoder.addArchiveFile(infoFile);
+
+  // 로컬 파일 등록 헬퍼
   void addFile(String path, String archiveName, bool compress) {
     final file = File(path);
     if (!file.existsSync()) return;
-    final bytes = file.readAsBytesSync();
     
-    final archiveFile = ArchiveFile(archiveName, bytes.length, bytes);
-    // 이미 압축된 파일(.zip, .png, .jpg 등)은 재압축하지 않음 (compress = false) → 속도 대폭 개선
-    archiveFile.compress = compress;
-    archive.addFile(archiveFile);
+    // 이미 압축된 파일(.zip, .png, .jpg 등)은 압축 레벨 0 (NO_COMPRESSION) 지정하여 속도 향상 및 메모리 보존
+    encoder.addFile(file, archiveName, compress ? 9 : 0);
   }
 
   // 2. FIT 파일 추가 (FIT은 무압축 텍스트 데이터 계열이므로 압축률 적용 권장)
@@ -280,16 +279,15 @@ PackResult _packIsolateBody(_PackIsolateParams params) {
     addFile(path, 'captures/$name', false);
   }
 
-  // 6. Zip 인코딩 수행
-  final zipBytes = ZipEncoder().encode(archive);
-  if (zipBytes == null) throw Exception('ZIP 인코딩 실패');
+  // 6. Zip 인코딩 종료 및 파일 쓰기 완료
+  encoder.closeSync();
 
-  // 7. 디스크에 동기식 저장 (Isolate 내부이므로 Sync 메서드 사용으로 오버헤드 최소화)
-  File(params.zipPath).writeAsBytesSync(zipBytes);
+  final zipFile = File(params.zipPath);
+  final size = zipFile.existsSync() ? zipFile.lengthSync() : 0;
 
   return PackResult(
     zipPath: params.zipPath,
     zipName: params.zipName,
-    sizeBytes: zipBytes.length,
+    sizeBytes: size,
   );
 }
