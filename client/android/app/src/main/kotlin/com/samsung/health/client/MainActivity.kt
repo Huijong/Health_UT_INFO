@@ -56,6 +56,14 @@ class MainActivity : FlutterActivity() {
                 "openWatchSysDump" -> {
                     openWatchSysDump(result)
                 }
+                "launchSamsungBrowser" -> {
+                    val url = call.argument<String>("url")
+                    if (url != null) {
+                        launchSamsungBrowser(url, result)
+                    } else {
+                        result.error("BAD_ARGS", "URL is null", null)
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -282,5 +290,25 @@ class MainActivity : FlutterActivity() {
                 runOnUiThread { result.error("WEARABLE_MSG_ERROR", e.message, null) }
             }
         }.start()
+    }
+
+    private fun launchSamsungBrowser(url: String, result: MethodChannel.Result) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            intent.setPackage("com.sec.android.app.sbrowser")
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            result.success("SAMSUNG_BROWSER")
+        } catch (e: Exception) {
+            // Fallback to system default browser if Samsung Internet is not installed
+            try {
+                val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(fallbackIntent)
+                result.success("DEFAULT_BROWSER")
+            } catch (ex: Exception) {
+                result.error("LAUNCH_ERROR", ex.message, null)
+            }
+        }
     }
 }

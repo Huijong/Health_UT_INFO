@@ -64,7 +64,15 @@
             android:exported="true"
             android:enabled="true">
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.BIND_LISTENER" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/request_wifi_join" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/open_watch_sysdump" />
             </intent-filter>
         </service>
 

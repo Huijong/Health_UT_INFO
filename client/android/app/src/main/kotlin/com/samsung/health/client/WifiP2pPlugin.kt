@@ -235,6 +235,8 @@ class WifiP2pPlugin(private val context: Context) {
                                 "deviceName" to (socket.inetAddress.hostAddress ?: "Watch")
                             ))
                         }
+                        line == "COMPRESSING" ->
+                            sendEvent("compressing", null)
                         line.startsWith("FILE_LIST:") ->
                             sendEvent("fileListReceived", line.substring("FILE_LIST:".length))
                         line.startsWith("FILE_START:") -> {
