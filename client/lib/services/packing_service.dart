@@ -29,6 +29,14 @@ class PackingService {
     required String distance,
     required String location,
     required String memo,
+    required String gpsStatus,
+    required String gpsMemo,
+    required String hrStatus,
+    required String hrMemo,
+    required String paceStatus,
+    required String paceMemo,
+    required String altitudeStatus,
+    required String altitudeMemo,
     required DeviceSession session,
     required List<AttachedFile> fitFiles,
     required List<AttachedFile> colaFiles,
@@ -61,6 +69,12 @@ class PackingService {
         'distance': distance,
         'location': location,
       },
+      'verification': {
+        'gps': {'status': gpsStatus, 'memo': gpsMemo},
+        'hr': {'status': hrStatus, 'memo': hrMemo},
+        'pace': {'status': paceStatus, 'memo': paceMemo},
+        'altitude': {'status': altitudeStatus, 'memo': altitudeMemo},
+      },
       'device': {
         'model': session.deviceModel,
         'android': session.androidVersion,
@@ -92,6 +106,14 @@ class PackingService {
       distance: distance,
       location: location,
       memo: memo,
+      gpsStatus: gpsStatus,
+      gpsMemo: gpsMemo,
+      hrStatus: hrStatus,
+      hrMemo: hrMemo,
+      paceStatus: paceStatus,
+      paceMemo: paceMemo,
+      altitudeStatus: altitudeStatus,
+      altitudeMemo: altitudeMemo,
       session: session,
       fitFiles: fitFiles,
       colaFiles: colaFiles,
@@ -137,6 +159,14 @@ class PackingService {
     required String distance,
     required String location,
     required String memo,
+    required String gpsStatus,
+    required String gpsMemo,
+    required String hrStatus,
+    required String hrMemo,
+    required String paceStatus,
+    required String paceMemo,
+    required String altitudeStatus,
+    required String altitudeMemo,
     required DeviceSession session,
     required List<AttachedFile> fitFiles,
     required List<AttachedFile> colaFiles,
@@ -160,6 +190,25 @@ class PackingService {
     sb.writeln('착용 워치  : $watch');
     sb.writeln('착용 스트랩: $strap');
     sb.writeln('선택 운동  : $exercise');
+    sb.writeln();
+
+    sb.writeln('[ 정밀 검증 결과 ]');
+    sb.writeln('GPS        : $gpsStatus');
+    if (gpsStatus == '확인 필요' && gpsMemo.isNotEmpty) {
+      sb.writeln('  └ 메모  : $gpsMemo');
+    }
+    sb.writeln('심박수(HR)  : $hrStatus');
+    if (hrStatus == '확인 필요' && hrMemo.isNotEmpty) {
+      sb.writeln('  └ 메모  : $hrMemo');
+    }
+    sb.writeln('속도/페이스 : $paceStatus');
+    if (paceStatus == '확인 필요' && paceMemo.isNotEmpty) {
+      sb.writeln('  └ 메모  : $paceMemo');
+    }
+    sb.writeln('고도       : $altitudeStatus');
+    if (altitudeStatus == '확인 필요' && altitudeMemo.isNotEmpty) {
+      sb.writeln('  └ 메모  : $altitudeMemo');
+    }
     sb.writeln();
 
     sb.writeln('[ 검증 디테일 ]');

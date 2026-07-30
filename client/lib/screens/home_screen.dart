@@ -222,6 +222,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   final _locationCtrl = TextEditingController();
   final _memoCtrl = TextEditingController(); // 특이 사항
 
+  // 정밀 검증 4대 항목 상태 및 메모
+  String _gpsStatus = '정상'; // 정상 / 확인 필요 / N/A
+  final _gpsMemoCtrl = TextEditingController();
+  String _hrStatus = '정상'; // 정상 / 확인 필요 / N/A
+  final _hrMemoCtrl = TextEditingController();
+  String _paceStatus = '정상'; // 정상 / 확인 필요 / N/A
+  final _paceMemoCtrl = TextEditingController();
+  String _altitudeStatus = '정상'; // 정상 / 확인 필요 / N/A
+  final _altitudeMemoCtrl = TextEditingController();
+
+  final GlobalKey _precisionCardKey = GlobalKey();
+
   // 6단계 완료 정보 및 상태
   PackResult? _packResult;
   String? _lastProcessedLink;
@@ -245,8 +257,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     _customTrainingCtrl.addListener(_saveSportDetails);
   }
 
+  bool _isResettingOrLoading = false;
+
   void _loadSportDetails(String sport) {
     if (_prefs == null) return;
+    
+    // 정밀 검증 항목들은 저장소에서 불러오지 않고, 항상 진입할 때마다 디폴트로 초기화합니다.
+    final isGpsAltitudeNA = (sport == '러닝머신 걷기' ||
+        sport == '러닝머신 달리기' ||
+        sport == '실내 수영' ||
+        sport == '야외 수영' ||
+        sport == '근력 운동');
+
+    setState(() {
+      _isResettingOrLoading = true;
+      _gpsStatus = isGpsAltitudeNA ? 'N/A' : '정상';
+      _gpsMemoCtrl.clear();
+      _hrStatus = '정상';
+      _hrMemoCtrl.clear();
+      _paceStatus = '정상';
+      _paceMemoCtrl.clear();
+      _altitudeStatus = isGpsAltitudeNA ? 'N/A' : '정상';
+      _altitudeMemoCtrl.clear();
+      
+      // 훈련 거리는 진입 시마다 디폴트 값 (0)
+      _distanceCtrl.text = '0';
+    });
+
     final details = _prefs!.getSportDetail(sport);
     if (details != null) {
       setState(() {
@@ -267,10 +304,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         _customTrainingCtrl.clear();
       });
     }
+    setState(() {
+      _isResettingOrLoading = false;
+    });
   }
 
   void _saveSportDetails() {
-    if (_prefs == null) return;
+    if (_prefs == null || _isResettingOrLoading) return;
     final details = {
       'wearingPosition': _wearingPosition,
       'wearingTightness': _wearingTightness,
@@ -1176,9 +1216,163 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
+  // ── 데이터 정밀 검증 요약 컨펌 다이얼로그 ──────────────────────
+  // ── 데이터 정밀 검증 요약 컨펌 다이얼로그 ──────────────────────
+  Future<bool> _showVerificationConfirmDialog() async {
+    final hideGpsAltitude = (_selectedExercise == '러닝머신 걷기' ||
+        _selectedExercise == '러닝머신 달리기' ||
+        _selectedExercise == '실내 수영' ||
+        _selectedExercise == '야외 수영' ||
+        _selectedExercise == '근력 운동');
+
+    final bool? result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E243A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            '데이터 정밀 검증 재확인',
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '입력하신 정밀 검증 내용이 정확한지 확인해 주세요.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: Column(
+                    children: [
+                      if (!hideGpsAltitude) ...[
+                        _buildConfirmItem('GPS', _gpsStatus, _gpsMemoCtrl.text),
+                        const Divider(color: Colors.white12, height: 16),
+                      ],
+                      _buildConfirmItem('심박수(HR)', _hrStatus, _hrMemoCtrl.text),
+                      const Divider(color: Colors.white12, height: 16),
+                      _buildConfirmItem('속도/페이스', _paceStatus, _paceMemoCtrl.text),
+                      if (!hideGpsAltitude) ...[
+                        const Divider(color: Colors.white12, height: 16),
+                        _buildConfirmItem('고도', _altitudeStatus, _altitudeMemoCtrl.text),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx, false);
+                // 키보드나 다른 입력 필드 포커스를 해제하여 이전 포커스 위치로 되돌아가지 않도록 함
+                FocusManager.instance.primaryFocus?.unfocus();
+                // 다시 수정 버튼 클릭 시 정밀 검증 카드로 스크롤 포커스
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final ctx = _precisionCardKey.currentContext;
+                  if (ctx != null) {
+                    Scrollable.ensureVisible(
+                      ctx,
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeInOut,
+                    );
+                  }
+                });
+              },
+              child: const Text('다시 수정', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E5BFF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('확인 및 전송'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Widget _buildConfirmItem(String label, String status, String memo) {
+    final bool isNormal = status == '정상';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isNormal ? const Color(0xFF3DFFC1).withOpacity(0.12) : const Color(0xFFFFAE2E).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                status,
+                style: TextStyle(
+                  color: isNormal ? const Color(0xFF3DFFC1) : const Color(0xFFFFAE2E),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (!isNormal && memo.trim().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 4.0),
+            child: Text(
+              '└ $memo',
+              style: const TextStyle(color: Colors.white38, fontSize: 11),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   // ── 압축 및 전송 시작 ───────────────────────────────────────
   Future<void> _onSend() async {
     if (!_formKey5.currentState!.validate()) return;
+
+    final hideGpsAltitude = (_selectedExercise == '러닝머신 걷기' ||
+        _selectedExercise == '러닝머신 달리기' ||
+        _selectedExercise == '실내 수영' ||
+        _selectedExercise == '야외 수영' ||
+        _selectedExercise == '근력 운동');
+
+    // 사용자가 1개 이상 수정을 했는지 판별 (디폴트값인 '정상'에서 변경되었거나 '확인 필요' 상태가 되었는지 확인)
+    // N/A인 항목은 무시
+    bool isGpsModified = !hideGpsAltitude && _gpsStatus != '정상';
+    bool isHrModified = _hrStatus != '정상';
+    bool isPaceModified = _paceStatus != '정상';
+    bool isAltitudeModified = !hideGpsAltitude && _altitudeStatus != '정상';
+
+    bool anyModified = isGpsModified || isHrModified || isPaceModified || isAltitudeModified;
+
+    // 모든 항목이 디폴트 값('정상' 또는 숨김 항목인 경우)일 때만 확인 팝업을 보여줌.
+    // 1개라도 수정(정상이 아닌 상태, 즉 확인 필요 등)이 된 경우 팝업을 띄우지 않고 통과.
+    if (!anyModified) {
+      final bool isConfirmed = await _showVerificationConfirmDialog();
+      if (!isConfirmed) return;
+    }
 
     setState(() {
       _isPackaging = true;
@@ -1230,6 +1424,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         distance: _distanceCtrl.text.trim().isEmpty ? '-' : _distanceCtrl.text.trim(),
         location: _locationCtrl.text.trim(),
         memo: memo,
+        gpsStatus: _gpsStatus,
+        gpsMemo: _gpsMemoCtrl.text.trim(),
+        hrStatus: _hrStatus,
+        hrMemo: _hrMemoCtrl.text.trim(),
+        paceStatus: _paceStatus,
+        paceMemo: _paceMemoCtrl.text.trim(),
+        altitudeStatus: _altitudeStatus,
+        altitudeMemo: _altitudeMemoCtrl.text.trim(),
         session: _session!,
         fitFiles: [..._fitFiles, ..._garminFiles],
         colaFiles: _colaFiles,
@@ -2489,11 +2691,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
             return InkWell(
               onTap: () {
-                _loadSportDetails(name);
                 setState(() {
                   _selectedExercise = name;
                   _currentStep = 5; // 즉시 다음 단계 이동
                 });
+                _loadSportDetails(name);
               },
               borderRadius: BorderRadius.circular(16),
               child: GlassCard(
@@ -2715,28 +2917,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           // 장소 입력
           TextFormField(
             controller: _locationCtrl,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: '운동 장소 직접 입력 (예: 공원, 실내체육관)',
-              prefixIcon: const Icon(Icons.place_outlined, size: 20),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.gps_fixed_rounded, color: Color(0xFF3DFFC1), size: 20),
-                onPressed: () async {
-                  final selectedAddress = await Navigator.push<String>(
-                    context,
-                    InstantPageRoute(
-                      page: const LocationPickerScreen(),
-                    ),
-                  );
-                  if (selectedAddress != null && selectedAddress.isNotEmpty) {
-                    setState(() {
-                      _locationCtrl.text = selectedAddress;
-                    });
-                  }
-                },
-                tooltip: '지도에서 장소 선택',
-              ),
+              prefixIcon: Icon(Icons.place_outlined, size: 20),
             ),
           ),
+          const SizedBox(height: 16),
+
+          // 데이터 정밀 검증 영역 (GPS, HR, 속도/페이스, 고도)
+          _buildPrecisionVerificationSection(),
           const SizedBox(height: 16),
 
           // 특이 사항 TextArea
@@ -2751,6 +2940,149 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
           const SizedBox(height: 30),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPrecisionVerificationSection() {
+    final hideGpsAltitude = (_selectedExercise == '러닝머신 걷기' ||
+        _selectedExercise == '러닝머신 달리기' ||
+        _selectedExercise == '실내 수영' ||
+        _selectedExercise == '야외 수영' ||
+        _selectedExercise == '근력 운동');
+
+    return GlassCard(
+      key: _precisionCardKey,
+      radius: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('데이터 정밀 검증', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          if (!hideGpsAltitude) ...[
+            _buildVerificationRow(
+              'GPS',
+              _gpsStatus,
+              (val) => setState(() {
+                _gpsStatus = val;
+                _saveSportDetails();
+              }),
+              _gpsMemoCtrl,
+              'GPS 궤적 튐, 신호 이탈, 끊김 현상 등의 내용을 적어주세요.',
+            ),
+            const Divider(height: 24, color: Colors.white10),
+          ],
+          _buildVerificationRow(
+            'HR',
+            _hrStatus,
+            (val) => setState(() {
+              _hrStatus = val;
+              _saveSportDetails();
+            }),
+            _hrMemoCtrl,
+            '심박수 튀는 현상, 고정 현상, 측정 끊김 등의 내용을 적어주세요.',
+          ),
+          const Divider(height: 24, color: Colors.white10),
+          _buildVerificationRow(
+            '속도/페이스',
+            _paceStatus,
+            (val) => setState(() {
+              _paceStatus = val;
+              _saveSportDetails();
+            }),
+            _paceMemoCtrl,
+            '실제 속도와 앱에 표기된 페이스 간의 편차 등을 적어주세요.',
+          ),
+          if (!hideGpsAltitude) ...[
+            const Divider(height: 24, color: Colors.white10),
+            _buildVerificationRow(
+              '고도',
+              _altitudeStatus,
+              (val) => setState(() {
+                _altitudeStatus = val;
+                _saveSportDetails();
+              }),
+              _altitudeMemoCtrl,
+              '고도 데이터 누락이나 고도 수치 변화 이상 등의 내용을 적어주세요.',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerificationRow(
+    String label,
+    String currentStatus,
+    ValueChanged<String> onChanged,
+    TextEditingController controller,
+    String hint,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                children: [
+                  _buildVerifTab('정상', currentStatus == '정상', const Color(0xFF3DFFC1), () => onChanged('정상')),
+                  _buildVerifTab('확인 필요', currentStatus == '확인 필요', const Color(0xFFFFAE2E), () => onChanged('확인 필요')),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (currentStatus == '확인 필요') ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: controller,
+            maxLines: 2,
+            decoration: InputDecoration(
+              labelText: '$label 상세 메모 *',
+              hintText: hint,
+              labelStyle: const TextStyle(color: Color(0xFFFFAE2E)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFFFAE2E), width: 1.5),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildVerifTab(String text, bool active, Color activeColor, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? activeColor.withOpacity(0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: active ? activeColor.withOpacity(0.3) : Colors.transparent, width: 1),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            color: active ? activeColor : Colors.white54,
+          ),
+        ),
       ),
     );
   }
