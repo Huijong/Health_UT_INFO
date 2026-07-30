@@ -241,6 +241,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _init();
+    _customCompetitorCtrl.addListener(_saveSportDetails);
+    _customTrainingCtrl.addListener(_saveSportDetails);
+  }
+
+  void _loadSportDetails(String sport) {
+    if (_prefs == null) return;
+    final details = _prefs!.getSportDetail(sport);
+    if (details != null) {
+      setState(() {
+        _wearingPosition = details['wearingPosition'] ?? '왼쪽';
+        _wearingTightness = details['wearingTightness'] ?? '적당히';
+        _competitorWatch = details['competitorWatch'] ?? '없음';
+        _customCompetitorCtrl.text = details['customCompetitor'] ?? '';
+        _trainingType = details['trainingType'] ?? '조깅';
+        _customTrainingCtrl.text = details['customTraining'] ?? '';
+      });
+    } else {
+      setState(() {
+        _wearingPosition = '왼쪽';
+        _wearingTightness = '적당히';
+        _competitorWatch = '없음';
+        _customCompetitorCtrl.clear();
+        _trainingType = '조깅';
+        _customTrainingCtrl.clear();
+      });
+    }
+  }
+
+  void _saveSportDetails() {
+    if (_prefs == null) return;
+    final details = {
+      'wearingPosition': _wearingPosition,
+      'wearingTightness': _wearingTightness,
+      'competitorWatch': _competitorWatch,
+      'customCompetitor': _customCompetitorCtrl.text,
+      'trainingType': _trainingType,
+      'customTraining': _customTrainingCtrl.text,
+    };
+    _prefs!.saveSportDetail(_selectedExercise, details);
   }
 
   Future<void> _init() async {
@@ -390,6 +429,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
       // 앱 업데이트 가능 여부 체크
       _checkAppUpdate();
+
+      // 기본 선택된 운동 대상의 디테일 설정 불러오기
+      _loadSportDetails(_selectedExercise);
 
       // 펜딩된 히스토리 이동 요청 처리
       if (_pendingNoticeHistory) {
@@ -994,6 +1036,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   @override
   void dispose() {
+    _customCompetitorCtrl.removeListener(_saveSportDetails);
+    _customTrainingCtrl.removeListener(_saveSportDetails);
     _nameCtrl.dispose();
     _heightCtrl.dispose();
     _weightCtrl.dispose();
@@ -2445,6 +2489,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
             return InkWell(
               onTap: () {
+                _loadSportDetails(name);
                 setState(() {
                   _selectedExercise = name;
                   _currentStep = 5; // 즉시 다음 단계 이동
@@ -2712,7 +2757,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   Widget _buildSwitchTab(String text, bool active) {
     return GestureDetector(
-      onTap: () => setState(() => _wearingPosition = text),
+      onTap: () {
+        setState(() => _wearingPosition = text);
+        _saveSportDetails();
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
@@ -2733,7 +2781,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   Widget _buildSegmentTab(String text, bool active) {
     return GestureDetector(
-      onTap: () => setState(() => _wearingTightness = text),
+      onTap: () {
+        setState(() => _wearingTightness = text);
+        _saveSportDetails();
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -2916,6 +2967,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             onChanged: (val) {
               if (val != null) {
                 setState(() => _competitorWatch = val);
+                _saveSportDetails();
               }
             },
           ),
@@ -2979,6 +3031,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             onChanged: (val) {
               if (val != null) {
                 setState(() => _trainingType = val);
+                _saveSportDetails();
               }
             },
           ),
