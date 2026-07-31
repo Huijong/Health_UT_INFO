@@ -90,4 +90,21 @@ class PrefsService {
   Future<void> saveSportDetail(String sport, Map<String, String> details) {
     return _prefs.setString('sport_detail_$sport', jsonEncode(details));
   }
+
+  /// 최근 운동 장소 목록 조회 (최대 5개)
+  List<String> getRecentLocations() {
+    return _prefs.getStringList('recent_locations') ?? [];
+  }
+
+  /// 최근 운동 장소 추가
+  Future<void> saveRecentLocation(String location) async {
+    if (location.trim().isEmpty) return;
+    final list = getRecentLocations();
+    list.remove(location); // 중복 제거
+    list.insert(0, location); // 최근 항목을 맨 앞으로
+    if (list.length > 5) {
+      list.removeLast(); // 최대 5개 유지
+    }
+    await _prefs.setStringList('recent_locations', list);
+  }
 }

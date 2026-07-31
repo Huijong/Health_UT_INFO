@@ -73,8 +73,8 @@ class EmailService {
 - 착용 위치: $wearingPosition
 - 착용 정도: $wearingTightness
 - 동시착용 타사기기: $competitorWatch
-- 훈련 종류: $trainingType
-- 훈련 거리: $distance km
+- 운동 종류: $trainingType
+- 운동 거리: $distance km
 - 장소: $location
 ${remarks.isNotEmpty ? '- 특이 사항: $remarks\n' : ''}
 ■ 첨부파일 현황
