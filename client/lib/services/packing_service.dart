@@ -215,8 +215,8 @@ class PackingService {
     sb.writeln('착용 위치  : $wearingPosition');
     sb.writeln('착용 정도  : $wearingTightness');
     sb.writeln('동시착용 타사기기: $competitorWatch');
-    sb.writeln('훈련 종류  : $trainingType');
-    sb.writeln('훈련 거리  : $distance km');
+    sb.writeln('운동 종류  : $trainingType');
+    sb.writeln('운동 거리  : $distance km');
     sb.writeln('장소       : $location');
     if (memo.isNotEmpty) sb.writeln('특이 사항  : $memo');
     sb.writeln();

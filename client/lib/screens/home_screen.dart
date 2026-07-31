@@ -244,6 +244,60 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   String _step6State = 'waiting'; // waiting, sending, success
   DateTime? _shareSheetOpenTime;
 
+  void _showToast(String message) {
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).size.height * 0.45,
+        left: 24,
+        right: 24,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF23293F),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3), width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.info_outline_rounded, color: Color(0xFF3DFFC1), size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 2), () {
+      entry.remove();
+    });
+  }
+
   DeviceSession? _session;
   PrefsService? _prefs;
   bool _isLoading = true;
@@ -280,8 +334,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       _altitudeStatus = isGpsAltitudeNA ? 'N/A' : '정상';
       _altitudeMemoCtrl.clear();
       
-      // 훈련 거리는 진입 시마다 디폴트 값 (0)
-      _distanceCtrl.text = '0';
+      // 운동 거리는 진입 시마다 디폴트(비어있음, 내부적으론 0 또는 입력 필수 처리)
+      _distanceCtrl.clear();
+      // 운동 장소 역시 진입 시마다 빈 값 및 힌트 상태로 초기화
+      _locationCtrl.clear();
     });
 
     final details = _prefs!.getSportDetail(sport);
@@ -1438,6 +1494,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         logFiles: _logFiles,
         captureFiles: _captureFiles,
       );
+
+      final locationText = _locationCtrl.text.trim();
+      if (locationText.isNotEmpty) {
+        await _prefs?.saveRecentLocation(locationText);
+      }
 
       if (mounted) {
         setState(() {
@@ -2764,7 +2825,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
           // ── 파일 첨부 카드 섹션 ──
           const Text(
-            '1. 검증 데이터 첨부',
+            '1. 운동 데이터 첨부',
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
           ),
           const SizedBox(height: 10),
@@ -2843,171 +2904,187 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
           // ── 디테일 선택 영역 ──
           const Text(
-            '2. 착용 상태 및 환경 설정',
+            '2. 운동 종합 데이터 입력',
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
           ),
           const SizedBox(height: 16),
 
-          // 그룹 A + 그룹 B 가로 배치 (중간에 VerticalDivider 적용)
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          // 그룹 A: 착용 상태 및 디바이스 환경 카드
+          GlassCard(
+            radius: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 그룹 A: 착용 상태 및 디바이스 환경 카드
-                Expanded(
-                  child: GlassCard(
-                    radius: 16,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('착용 상태', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('착용 위치', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.04),
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(color: Colors.white.withOpacity(0.08)),
-                              ),
-                              padding: const EdgeInsets.all(4),
-                              child: Row(
-                                children: [
-                                  _buildSwitchTab('왼쪽', _wearingPosition == '왼쪽'),
-                                  _buildSwitchTab('오른쪽', _wearingPosition == '오른쪽'),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('착용 정도', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.04),
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(color: Colors.white.withOpacity(0.08)),
-                              ),
-                              padding: const EdgeInsets.all(4),
-                              child: Row(
-                                children: [
-                                  _buildSegmentTab('충분히', _wearingTightness == '충분히'),
-                                  _buildSegmentTab('적당히', _wearingTightness == '적당히'),
-                                  _buildSegmentTab('느슨하게', _wearingTightness == '느슨하게'),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 32, color: Colors.white10),
-                        const Text('동시 착용 타사 모델', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField<String>(
-                          value: _competitorWatch,
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.compare_arrows_rounded, size: 20),
-                          ),
-                          items: ['가민', '애플', '크로스', '없음', '직접입력']
-                              .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
-                              .toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _competitorWatch = val);
-                              _saveSportDetails();
-                            }
-                          },
-                        ),
-                        if (_competitorWatch == '직접입력') ...[
-                          const SizedBox(height: 10),
-                          TextFormField(
-                            controller: _customCompetitorCtrl,
-                            decoration: const InputDecoration(
-                              labelText: '타사 기기 직접 입력 *',
-                            ),
-                          ),
-                        ]
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: VerticalDivider(
-                    color: Colors.white.withOpacity(0.1),
-                    width: 1,
-                    thickness: 1,
-                  ),
-                ),
-                // 그룹 B: 훈련 정보 카드
-                Expanded(
-                  child: GlassCard(
-                    radius: 16,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('훈련 정보', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 16),
-                        const Text('훈련 거리', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _distanceCtrl,
-                          focusNode: _distanceFocusNode,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                          ],
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.linear_scale_rounded, size: 20),
-                            hintText: '예) 21.09',
-                            suffixText: 'km',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text('훈련 종류', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          value: _trainingType,
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.sports_score_rounded, size: 20),
-                          ),
-                          items: ['조깅', '인터벌', 'LSD', '변속주', '지속주', '직접입력']
-                              .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
-                              .toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _trainingType = val);
-                              _saveSportDetails();
-                            }
-                          },
-                        ),
-                        if (_trainingType == '직접입력') ...[
-                          const SizedBox(height: 10),
-                          TextFormField(
-                            controller: _customTrainingCtrl,
-                            decoration: const InputDecoration(
-                              labelText: '훈련 종류 직접 입력 *',
-                            ),
-                          ),
+                const Text('착용 상태', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('착용 위치', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          _buildSwitchTab('왼쪽', _wearingPosition == '왼쪽'),
+                          _buildSwitchTab('오른쪽', _wearingPosition == '오른쪽'),
                         ],
-                        const SizedBox(height: 16),
-                        const Text('운동 장소', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _locationCtrl,
-                          decoration: const InputDecoration(
-                            hintText: '예: 공원, 실내체육관 등 직접 입력',
-                            prefixIcon: Icon(Icons.place_outlined, size: 20),
-                          ),
-                        ),
-                      ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('착용 정도', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          _buildSegmentTab('충분히', _wearingTightness == '충분히'),
+                          _buildSegmentTab('적당히', _wearingTightness == '적당히'),
+                          _buildSegmentTab('느슨하게', _wearingTightness == '느슨하게'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 32, color: Colors.white10),
+                const Text('동시 착용 타사 모델', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: _competitorWatch,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.compare_arrows_rounded, size: 20),
+                  ),
+                  items: ['가민', '애플', '크로스', '없음', '직접입력']
+                      .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _competitorWatch = val);
+                      _saveSportDetails();
+                    }
+                  },
+                ),
+                if (_competitorWatch == '직접입력') ...[
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _customCompetitorCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '타사 기기 직접 입력 *',
                     ),
                   ),
+                ]
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 그룹 B: 운동 정보 카드 (내부에 Divider 구분선 적용)
+          GlassCard(
+            radius: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('운동 정보', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                const Text('운동 거리', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _distanceCtrl,
+                  focusNode: _distanceFocusNode,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  ],
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.linear_scale_rounded, size: 20),
+                    hintText: '예) 21.09',
+                    suffixText: 'km',
+                  ),
                 ),
+                const Divider(height: 32, color: Colors.white10),
+                const Text('운동 종류', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: _trainingType,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.sports_score_rounded, size: 20),
+                  ),
+                  items: ['조깅', '인터벌', 'LSD', '변속주', '지속주', '직접입력']
+                      .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _trainingType = val);
+                      _saveSportDetails();
+                    }
+                  },
+                ),
+                if (_trainingType == '직접입력') ...[
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _customTrainingCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '운동 종류 직접 입력 *',
+                    ),
+                  ),
+                ],
+                const Divider(height: 32, color: Colors.white10),
+                const Text('운동 장소', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _locationCtrl,
+                  decoration: const InputDecoration(
+                    hintText: '예: 금오산 X코스, 헬스장 등 직접 입력',
+                    prefixIcon: Icon(Icons.place_outlined, size: 20),
+                  ),
+                ),
+                if (_prefs != null && _prefs!.getRecentLocations().isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                    '최근 사용한 장소 (탭하여 자동 입력)',
+                    style: TextStyle(fontSize: 11, color: Colors.white38, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: _prefs!.getRecentLocations().map((loc) {
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _locationCtrl.text = loc;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.04),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withOpacity(0.08)),
+                          ),
+                          child: Text(
+                            loc,
+                            style: const TextStyle(color: Color(0xFF3DFFC1), fontSize: 11),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
             ),
           ),
@@ -3682,9 +3759,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     final distText = _distanceCtrl.text.trim();
                     final parsedDist = double.tryParse(distText) ?? 0.0;
                     if (distText.isEmpty || parsedDist <= 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('훈련 거리를 입력해 주세요 (0보다 커야 합니다)')),
-                      );
+                      _showToast('운동 거리를 입력해 주세요 (0보다 커야 합니다)');
                       _distanceFocusNode.requestFocus();
                       return;
                     }
