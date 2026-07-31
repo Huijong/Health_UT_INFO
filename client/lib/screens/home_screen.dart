@@ -1289,7 +1289,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           backgroundColor: const Color(0xFF1E243A),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text(
-            '데이터 정밀 검증 재확인',
+            '센서/데이터 이슈 메모',
             style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
           ),
           content: SingleChildScrollView(
@@ -1298,7 +1298,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '입력하신 정밀 검증 내용이 정확한지 확인해 주세요.',
+                  '입력하신 센서/데이터 이슈 메모를 확인해 주세요.',
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
@@ -1414,22 +1414,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         _selectedExercise == '야외 수영' ||
         _selectedExercise == '근력 운동');
 
-    // 사용자가 1개 이상 수정을 했는지 판별 (디폴트값인 '정상'에서 변경되었거나 '확인 필요' 상태가 되었는지 확인)
-    // N/A인 항목은 무시
-    bool isGpsModified = !hideGpsAltitude && _gpsStatus != '정상';
+    // 사용자가 1개 이상 수정을 했는지 판별 (디폴트값인 '정상' 또는 'N/A'에서 변경되었거나 '확인 필요' 상태가 되었는지 확인)
+    final String defaultGpsAltitude = hideGpsAltitude ? 'N/A' : '정상';
+    bool isGpsModified = _gpsStatus != defaultGpsAltitude;
     bool isHrModified = _hrStatus != '정상';
     bool isPaceModified = _paceStatus != '정상';
-    bool isAltitudeModified = !hideGpsAltitude && _altitudeStatus != '정상';
+    bool isAltitudeModified = _altitudeStatus != defaultGpsAltitude;
 
     bool anyModified = isGpsModified || isHrModified || isPaceModified || isAltitudeModified;
 
-    // 모든 항목이 디폴트 값('정상' 또는 숨김 항목인 경우)일 때만 확인 팝업을 보여줌.
-    // 1개라도 수정(정상이 아닌 상태, 즉 확인 필요 등)이 된 경우 팝업을 띄우지 않고 통과.
+    // 모든 항목이 디폴트 값('정상' 또는 'N/A')일 때만 확인 팝업을 보여줌.
+    // 1개라도 수정(정상/NA가 아닌 상태, 즉 확인 필요 등)이 된 경우 팝업을 띄우지 않고 통과.
     if (!anyModified) {
       final bool isConfirmed = await _showVerificationConfirmDialog();
       if (!isConfirmed) return;
     }
 
+    // 팝업 통과(혹은 확인 완료) 후 퀵 쉐어 가이드를 보여주거나 바로 패키징을 실행합니다.
+    if (_prefs?.hideQuickShareGuide == true) {
+      _executePackaging();
+    } else {
+      _showQuickShareGuideDialog(_executePackaging);
+    }
+  }
+
+  Future<void> _executePackaging() async {
     setState(() {
       _isPackaging = true;
       _currentStep = 6;
@@ -3132,7 +3141,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('데이터 정밀 검증', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const Text('센서/데이터 이슈 메모', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           if (!hideGpsAltitude) ...[
             _buildVerificationRow(
@@ -3764,11 +3773,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                       return;
                     }
                   }
-                  if (_prefs?.hideQuickShareGuide == true) {
-                    _onSend();
-                  } else {
-                    _showQuickShareGuideDialog(_onSend);
-                  }
+                  _onSend();
                 } else if (canNext) {
                   if (_currentStep == 1) {
                     if (!_formKey1.currentState!.validate()) return;

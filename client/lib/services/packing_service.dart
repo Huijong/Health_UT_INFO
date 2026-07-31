@@ -192,7 +192,7 @@ class PackingService {
     sb.writeln('선택 운동  : $exercise');
     sb.writeln();
 
-    sb.writeln('[ 정밀 검증 결과 ]');
+    sb.writeln('[ 센서/데이터 이슈 결과 ]');
     sb.writeln('GPS        : $gpsStatus');
     if (gpsStatus == '확인 필요' && gpsMemo.isNotEmpty) {
       sb.writeln('  └ 메모  : $gpsMemo');
