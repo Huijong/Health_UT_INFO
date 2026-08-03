@@ -6,13 +6,13 @@ import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:client/services/prefs_service.dart';
-import 'package:client/screens/home_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:client/config/app_config.dart';
 import 'package:client/screens/lab_watch_sync_screen.dart';
+import 'package:client/config/options.dart';
 
 ThemeData getSettingsTheme(BuildContext context) {
   return ThemeData.dark().copyWith(
@@ -232,14 +232,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 initialName: _name,
                                 initialHeight: _height,
                                 initialWeight: _weight,
+                                initialEmail: widget.prefs.googleEmail,
                               ),
                             ),
                           );
                           if (result != null) {
                             final newName = result['name'].toString().trim();
                             final oldName = _name.trim();
+                            final newEmail = (result['email'] ?? '').toString().trim();
+                            final oldEmail = widget.prefs.googleEmail.trim();
 
-                            if (newName.isNotEmpty && oldName.isNotEmpty && oldName != newName) {
+                            if (newName.isNotEmpty && oldName.isNotEmpty && (oldName != newName || oldEmail != newEmail)) {
                               try {
                                 final dio = Dio();
                                 final response = await dio.post(
@@ -248,17 +251,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   data: {
                                     'old_name': oldName,
                                     'new_name': newName,
+                                    'email': newEmail,
                                   },
                                 );
-                                debugPrint('[Rename] Server response: ${response.data}');
+                                debugPrint('[Rename/EmailUpdate] Server response: ${response.data}');
                               } catch (e) {
-                                debugPrint('[Rename] Failed to rename nickname on server: $e');
+                                debugPrint('[Rename/EmailUpdate] Failed to update profile on server: $e');
                               }
                             }
 
                             await widget.prefs.saveName(newName);
                             await widget.prefs.saveHeight(result['height'] ?? 0.0);
                             await widget.prefs.saveWeight(result['weight'] ?? 0.0);
+                            await widget.prefs.saveGoogleEmail(newEmail);
 
                             setState(() {
                               _name = newName;
@@ -762,12 +767,14 @@ class ProfileEditPage extends StatefulWidget {
   final String initialName;
   final double? initialHeight;
   final double? initialWeight;
+  final String initialEmail;
 
   const ProfileEditPage({
     super.key,
     required this.initialName,
     required this.initialHeight,
     required this.initialWeight,
+    required this.initialEmail,
   });
 
   @override
@@ -779,6 +786,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   late TextEditingController _nameCtrl;
   late TextEditingController _heightCtrl;
   late TextEditingController _weightCtrl;
+  late TextEditingController _emailCtrl;
 
   @override
   void initState() {
@@ -788,6 +796,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         text: widget.initialHeight != null ? widget.initialHeight!.toStringAsFixed(1) : '');
     _weightCtrl = TextEditingController(
         text: widget.initialWeight != null ? widget.initialWeight!.toStringAsFixed(1) : '');
+    _emailCtrl = TextEditingController(text: widget.initialEmail);
   }
 
   @override
@@ -795,6 +804,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _nameCtrl.dispose();
     _heightCtrl.dispose();
     _weightCtrl.dispose();
+    _emailCtrl.dispose();
     super.dispose();
   }
 
@@ -827,6 +837,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       if (mounted) {
         Navigator.pop(context, {
           'name': nickname,
+          'email': _emailCtrl.text.trim(),
           'height': double.tryParse(_heightCtrl.text) ?? 0.0,
           'weight': double.tryParse(_weightCtrl.text) ?? 0.0,
         });
@@ -898,8 +909,89 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                '닉네임 수정',
+                                '프로필 정보 수정',
                                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _emailCtrl,
+                                      decoration: const InputDecoration(
+                                        labelText: '이메일 주소(Gmail) *',
+                                        hintText: '예) tester@gmail.com',
+                                        prefixIcon: Icon(Icons.email_outlined, size: 20),
+                                      ),
+                                      keyboardType: TextInputType.emailAddress,
+                                      validator: (v) {
+                                        if (v == null || v.trim().isEmpty) {
+                                          return '이메일을 입력해 주세요';
+                                        }
+                                        final clean = v.trim();
+                                        if (!clean.contains('@') || !clean.endsWith('.com')) {
+                                          return '올바른 이메일 주소를 입력해 주세요';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    height: 56,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF2E5BFF),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      onPressed: () async {
+                                        try {
+                                          const appChannel = MethodChannel('com.samsung.health.client/app_info');
+                                          final email = await appChannel.invokeMethod<String>('getGoogleEmail');
+                                          if (email != null && email.isNotEmpty) {
+                                            setState(() {
+                                              _emailCtrl.text = email;
+                                            });
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('이메일을 성공적으로 가져왔습니다!'),
+                                                  backgroundColor: Color(0xFF3DFFC1),
+                                                ),
+                                              );
+                                            }
+                                          } else {
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('등록된 구글 계정이 없습니다. 직접 입력해 주세요.'),
+                                                  backgroundColor: Colors.orangeAccent,
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        } catch (e) {
+                                          debugPrint('[getGoogleEmail Error] $e');
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('이메일을 가져오지 못했습니다. 직접 입력해 주세요.'),
+                                                backgroundColor: Colors.redAccent,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                      child: const Text('자동조회', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 16),
                               TextFormField(
@@ -1238,8 +1330,9 @@ class _StrapEditPageState extends State<StrapEditPage> {
                             ),
                           ),
                         ),
-                        GlassCard(
-                          padding: EdgeInsets.zero,
+                        _GlassCard(
+                          borderColor: Colors.white.withOpacity(0.08),
+                          backgroundColor: Colors.white.withOpacity(0.04),
                           child: Column(
                             children: [
                               ...kStrapOptions
@@ -1283,7 +1376,9 @@ class _StrapEditPageState extends State<StrapEditPage> {
                         ),
                         if (_selectedStrap == '직접입력') ...[
                           const SizedBox(height: 12),
-                          GlassCard(
+                          _GlassCard(
+                            borderColor: Colors.white.withOpacity(0.08),
+                            backgroundColor: Colors.white.withOpacity(0.04),
                             child: Padding(
                               padding: const EdgeInsets.all(16),
                               child: TextField(
@@ -1299,6 +1394,7 @@ class _StrapEditPageState extends State<StrapEditPage> {
 
                         const SizedBox(height: 24),
 
+                        /*
                         // 2안 카드
                         Padding(
                           padding: const EdgeInsets.only(left: 4, top: 8, bottom: 8),
@@ -1311,8 +1407,9 @@ class _StrapEditPageState extends State<StrapEditPage> {
                             ),
                           ),
                         ),
-                        GlassCard(
-                          padding: EdgeInsets.zero,
+                        _GlassCard(
+                          borderColor: Colors.white.withOpacity(0.08),
+                          backgroundColor: Colors.white.withOpacity(0.04),
                           child: Column(
                             children: [
                               ...kStrapOptions
@@ -1357,6 +1454,7 @@ class _StrapEditPageState extends State<StrapEditPage> {
                             ],
                           ),
                         ),
+                        */
                       ],
                     ),
                   ),

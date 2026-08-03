@@ -134,8 +134,10 @@ class NoticeCreate(BaseModel):
 class DevicePing(BaseModel):
     tester_name: str
     watch: str
+    strap: Optional[str] = None
     os_version: str
     device_uuid: Optional[str] = None
+    email: Optional[str] = None
 
 class NoticeAck(BaseModel):
     tester_name: str
@@ -147,6 +149,7 @@ class PointCreate(BaseModel):
     month: Optional[str] = None
     old_name: Optional[str] = None
     new_name: Optional[str] = None
+    email: Optional[str] = None
 
 @app.post("/api/devices/ping")
 async def device_ping(ping: DevicePing):
@@ -160,14 +163,26 @@ async def device_ping(ping: DevicePing):
             "os_version": ping.os_version,
             "last_active_at": datetime.utcnow()
         }
+        if ping.strap:
+            device_dict["strap"] = ping.strap
         if ping.device_uuid:
             device_dict["device_uuid"] = ping.device_uuid.strip()
+        if ping.email:
+            device_dict["email"] = ping.email.strip()
         
-        await db["devices"].update_one(
-            {"tester_name": ping.tester_name},
-            {"$set": device_dict},
-            upsert=True
-        )
+        # 만약 이메일 정보가 들어왔다면 이메일 기준으로 기기(유저) 식별 및 업데이트
+        if ping.email:
+            await db["devices"].update_one(
+                {"email": ping.email.strip()},
+                {"$set": device_dict},
+                upsert=True
+            )
+        else:
+            await db["devices"].update_one(
+                {"tester_name": ping.tester_name},
+                {"$set": device_dict},
+                upsert=True
+            )
         return JSONResponse(content={"status": "success", "message": "Ping received"})
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
@@ -184,15 +199,43 @@ async def create_point_adjustment_alt(pc: PointCreate, rename: bool = False):
             
             old_name = pc.old_name.strip()
             new_name = pc.new_name.strip()
+            email = pc.email.strip() if pc.email else ""
             
-            # 1. Update devices
-            await db["devices"].update_many({"tester_name": old_name}, {"$set": {"tester_name": new_name}})
+            # 1. Update devices (이메일이 있다면 이메일 기준으로 최우선 업데이트)
+            updated = False
+            resolved_old_name = old_name # 기본값
             
-            # 2. Update points_transactions
-            await db["points_transactions"].update_many({"tester_name": old_name}, {"$set": {"tester_name": new_name}})
+            if email:
+                # 닉네임 변경 전에 현재 등록되어 있는 tester_name 백업
+                device = await db["devices"].find_one({"email": email})
+                if device:
+                    resolved_old_name = device.get("tester_name", old_name)
+                
+                res = await db["devices"].update_one(
+                    {"email": email}, 
+                    {"$set": {"tester_name": new_name}}
+                )
+                if res.modified_count > 0 or res.matched_count > 0:
+                    updated = True
             
-            # 3. Update verification_emails
-            await db["verification_emails"].update_many({"tester_name": old_name}, {"$set": {"tester_name": new_name}})
+            # 이메일로 매칭되는 다큐먼트가 없었거나 이메일이 없는 경우, 기존 닉네임(old_name) 기준으로 업데이트 수행
+            if not updated:
+                await db["devices"].update_many(
+                    {"tester_name": old_name}, 
+                    {"$set": {"tester_name": new_name}}
+                )
+                # 만약 이메일 정보가 왔는데 DB에 email 필드가 없어서 매치되지 않았던 것이라면, email 필드도 같이 set해 줍니다.
+                if email:
+                    await db["devices"].update_many(
+                        {"tester_name": new_name},
+                        {"$set": {"email": email}}
+                    )
+            
+            # 2. Update points_transactions (실제 매칭된 resolved_old_name 기준으로 랭킹 테이블 일괄 변경)
+            await db["points_transactions"].update_many({"tester_name": resolved_old_name}, {"$set": {"tester_name": new_name}})
+            
+            # 3. Update verification_emails (실제 매칭된 resolved_old_name 기준으로 대시보드 테이블 일괄 변경)
+            await db["verification_emails"].update_many({"tester_name": resolved_old_name}, {"$set": {"tester_name": new_name}})
             
             return JSONResponse(content={"status": "success", "message": "Nickname renamed successfully"})
             
@@ -210,11 +253,24 @@ async def create_point_adjustment_alt(pc: PointCreate, rename: bool = False):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/devices")
-async def get_devices(summary: bool = False, latest_apk: bool = False, rankings: bool = False, points_history: bool = False, check_nickname: Optional[str] = None, check_uuid: Optional[str] = None, month: Optional[str] = None, tester_name: Optional[str] = None):
+async def get_devices(summary: bool = False, latest_apk: bool = False, rankings: bool = False, points_history: bool = False, check_nickname: Optional[str] = None, check_uuid: Optional[str] = None, check_email: Optional[str] = None, email: Optional[str] = None, month: Optional[str] = None, tester_name: Optional[str] = None):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
             
+        if check_email:
+            device = await db["devices"].find_one({"email": check_email.strip()})
+            if device:
+                return JSONResponse(content={
+                    "status": "success", 
+                    "exists": True, 
+                    "tester_name": device.get("tester_name", ""),
+                    "watch": device.get("watch", ""),
+                    "strap": device.get("strap", "")
+                })
+            else:
+                return JSONResponse(content={"status": "success", "exists": False})
+
         if check_uuid:
             device = await db["devices"].find_one({"device_uuid": check_uuid.strip()})
             if device:
@@ -223,8 +279,15 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
                 return JSONResponse(content={"status": "success", "exists": False})
 
         if check_nickname:
-            device = await db["devices"].find_one({"tester_name": check_nickname.strip()})
-            return JSONResponse(content={"status": "success", "exists": device is not None})
+            # 닉네임 중복 검사 시, 동일 기기(이메일)가 소유한 닉네임인 경우에는 중복(exists=true)이 아니라고 판단해 줘야 합니다.
+            query = {"tester_name": check_nickname.strip()}
+            device = await db["devices"].find_one(query)
+            if device:
+                # 찾은 기기의 이메일이 현재 요청 보낸 이메일과 같다면 자신의 닉네임이므로 중복 아님 처리
+                if email and device.get("email") == email.strip():
+                    return JSONResponse(content={"status": "success", "exists": False})
+                return JSONResponse(content={"status": "success", "exists": True})
+            return JSONResponse(content={"status": "success", "exists": False})
 
         if points_history:
             if not tester_name:
@@ -743,7 +806,7 @@ async def get_dashboard(request: Request):
                 width: 100%;
                 border-collapse: collapse;
                 text-align: left;
-                min-width: 100%; /* 대화면에서 전체 가로폭을 채우도록 백분율로 변경 */
+                min-width: 1400px; /* 열이 많을 때 구겨지지 않고 가로 스크롤바가 화면 단위에서 생성되도록 강제 설정 */
             }
             th, td {
                 padding: 16px 20px;
@@ -858,6 +921,65 @@ async def get_dashboard(request: Request):
                 border: 1px solid rgba(226, 232, 240, 0.15);
                 font-weight: 500;
                 opacity: 0.5;
+            }
+            
+            /* 센서/데이터 검증 이슈 배지 스타일 */
+            .sensor-badge {
+                display: inline-block;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 10.5px;
+                font-weight: 700;
+                margin-right: 4px;
+                text-align: center;
+                cursor: default;
+                position: relative;
+                user-select: none;
+            }
+            .sensor-badge.normal {
+                background-color: rgba(241, 245, 249, 0.05);
+                color: #94A3B8;
+                border: 1px solid rgba(226, 232, 240, 0.15);
+                font-weight: 500;
+                opacity: 0.5;
+            }
+            .sensor-badge.issue {
+                background-color: rgba(239, 68, 68, 0.1);
+                color: #EF4444;
+                border: 1px solid rgba(239, 68, 68, 0.25);
+            }
+            .sensor-badge.na {
+                background-color: rgba(148, 163, 184, 0.05);
+                color: #94A3B8;
+                border: 1px solid rgba(226, 232, 240, 0.15);
+                font-weight: 500;
+                opacity: 0.5;
+            }
+            
+            /* CSS 툴팁 처리 */
+            .sensor-badge[data-tooltip]::after {
+                content: attr(data-tooltip);
+                position: absolute;
+                bottom: 125%;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: #1E293B;
+                color: #F8FAFC;
+                padding: 6px 10px;
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: 500;
+                white-space: pre-wrap;
+                width: 180px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                display: none;
+                z-index: 100;
+                text-align: left;
+                line-height: 1.4;
+            }
+            .sensor-badge[data-tooltip]:hover::after {
+                display: block;
             }
             
             /* 컬럼 선택 보드 스타일 */
@@ -1120,7 +1242,9 @@ async def get_dashboard(request: Request):
                 strap: '',
                 exercise: '',
                 wearing_position: '',
-                wearing_tightness: ''
+                wearing_tightness: '',
+                location: '',
+                training_type: ''
             };
 
             async function fetchEmails() {
@@ -1193,6 +1317,8 @@ async def get_dashboard(request: Request):
                 const uniqueExercises = new Set();
                 const uniquePositions = new Set();
                 const uniqueTightnesses = new Set();
+                const uniqueLocations = new Set();
+                const uniqueTrainingTypes = new Set();
 
                 allData.forEach(item => {
                     if (item.watch) uniqueWatches.add(item.watch.trim());
@@ -1200,6 +1326,8 @@ async def get_dashboard(request: Request):
                     if (item.exercise) uniqueExercises.add(item.exercise.trim());
                     if (item.wearing_position) uniquePositions.add(item.wearing_position.trim());
                     if (item.wearing_tightness) uniqueTightnesses.add(item.wearing_tightness.trim());
+                    if (item.location) uniqueLocations.add(item.location.trim());
+                    if (item.training_type) uniqueTrainingTypes.add(item.training_type.trim());
                 });
 
                 updateSelectOptions('select-watch', uniqueWatches, activeFilters.watch);
@@ -1207,6 +1335,8 @@ async def get_dashboard(request: Request):
                 updateSelectOptions('select-exercise', uniqueExercises, activeFilters.exercise);
                 updateSelectOptions('select-position', uniquePositions, activeFilters.wearing_position);
                 updateSelectOptions('select-tightness', uniqueTightnesses, activeFilters.wearing_tightness);
+                updateSelectOptions('select-location', uniqueLocations, activeFilters.location);
+                updateSelectOptions('select-training-type', uniqueTrainingTypes, activeFilters.training_type);
             }
 
             function updateSelectOptions(elementId, uniqueSet, currentValue) {
@@ -1261,7 +1391,9 @@ async def get_dashboard(request: Request):
                     strap: '',
                     exercise: '',
                     wearing_position: '',
-                    wearing_tightness: ''
+                    wearing_tightness: '',
+                    location: '',
+                    training_type: ''
                 };
                 
                 // UI 초기화
@@ -1271,6 +1403,8 @@ async def get_dashboard(request: Request):
                 document.getElementById('select-exercise').value = '';
                 document.getElementById('select-position').value = '';
                 document.getElementById('select-tightness').value = '';
+                document.getElementById('select-location').value = '';
+                document.getElementById('select-training-type').value = '';
 
                 // 비주얼 클래스 제거
                 const items = document.querySelectorAll('.filter-item');
@@ -1304,6 +1438,12 @@ async def get_dashboard(request: Request):
                 }
                 if (activeFilters.wearing_tightness !== '') {
                     data = data.filter(item => item.wearing_tightness && item.wearing_tightness.trim() === activeFilters.wearing_tightness);
+                }
+                if (activeFilters.location !== '') {
+                    data = data.filter(item => item.location && item.location.trim() === activeFilters.location);
+                }
+                if (activeFilters.training_type !== '') {
+                    data = data.filter(item => item.training_type && item.training_type.trim() === activeFilters.training_type);
                 }
 
                 // 2. 정렬
@@ -1406,11 +1546,42 @@ async def get_dashboard(request: Request):
 
                     const attachmentsHtml = `<div style="display: flex; align-items: center; justify-content: center; white-space: nowrap;">${fitBadge}${garminBadge}${colaBadge}${logBadge}${imgBadge}</div>`;
 
+                    // 센서/데이터 이슈 검증 배지 세트 구성
+                    const gpsStat = item.gps_status || '정상';
+                    const gpsMem = item.gps_memo || '';
+                    const gpsClass = gpsStat === 'N/A' ? 'na' : (gpsStat === '확인 필요' ? 'issue' : 'normal');
+                    const gpsTooltip = gpsMem ? `data-tooltip="GPS 메모: ${gpsMem}"` : '';
+
+                    const hrStat = item.hr_status || '정상';
+                    const hrMem = item.hr_memo || '';
+                    const hrClass = hrStat === 'N/A' ? 'na' : (hrStat === '확인 필요' ? 'issue' : 'normal');
+                    const hrTooltip = hrMem ? `data-tooltip="심박수 메모: ${hrMem}"` : '';
+
+                    const paceStat = item.pace_status || '정상';
+                    const paceMem = item.pace_memo || '';
+                    const paceClass = paceStat === 'N/A' ? 'na' : (paceStat === '확인 필요' ? 'issue' : 'normal');
+                    const paceTooltip = paceMem ? `data-tooltip="페이스 메모: ${paceMem}"` : '';
+
+                    const altStat = item.altitude_status || '정상';
+                    const altMem = item.altitude_memo || '';
+                    const altClass = altStat === 'N/A' ? 'na' : (altStat === '확인 필요' ? 'issue' : 'normal');
+                    const altTooltip = altMem ? `data-tooltip="고도 메모: ${altMem}"` : '';
+
+                    const verificationBadgesHtml = `
+                        <div style="display: flex; gap: 4px; justify-content: center; align-items: center; white-space: nowrap;">
+                            <span class="sensor-badge ${gpsClass}" ${gpsTooltip}>GPS</span>
+                            <span class="sensor-badge ${hrClass}" ${hrTooltip}>HR</span>
+                            <span class="sensor-badge ${paceClass}" ${paceTooltip}>페이스</span>
+                            <span class="sensor-badge ${altClass}" ${altTooltip}>고도</span>
+                        </div>
+                    `;
+
                     // 컬럼 가시성 체크박스 상태 읽기
                     const showConsent = document.getElementById('col-show-consent')?.checked ? '' : 'display: none;';
                     const showStrap = document.getElementById('col-show-strap')?.checked ? '' : 'display: none;';
                     const showPosition = document.getElementById('col-show-position')?.checked ? '' : 'display: none;';
                     const showTightness = document.getElementById('col-show-tightness')?.checked ? '' : 'display: none;';
+                    const showVersion = document.getElementById('col-show-version')?.checked ? '' : 'display: none;';
 
                     html += `
                         <tr>
@@ -1426,11 +1597,12 @@ async def get_dashboard(request: Request):
                             <td class="col-tightness" style="${showTightness} white-space: nowrap;">${tightness}</td>
                             <td style="white-space: nowrap;">${competitor}</td>
                             <td style="white-space: nowrap;">${location}</td>
+                            <td style="text-align: center;">${verificationBadgesHtml}</td>
                             <td style="min-width: 200px; max-width: 350px; font-size: 12.5px; color: #475569; word-break: break-all;">
                                 ${remarksHtml}
                             </td>
                             <td style="text-align: center;">${attachmentsHtml}</td>
-                            <td><span style="font-size: 13px; color: #475569; white-space: nowrap;">${appVersion} / ${shealthVersion}</span></td>
+                            <td class="col-version" style="${showVersion}"><span style="font-size: 13px; color: #475569; white-space: nowrap;">${appVersion} / ${shealthVersion}</span></td>
                             <td style="white-space: nowrap;">
                                 ${item.share_link ? `
                                     <a href="${item.share_link}" target="_blank" class="link-btn">다운로드</a>
@@ -1478,11 +1650,15 @@ async def get_dashboard(request: Request):
                 fetchEmails();
                 setInterval(fetchEmails, 10000); // 10초마다 자동 새로고침
                 
-                // 초기 헤더 가시성 설정 (기본 숨김)
+                // 버전 체크박스는 기본 꺼짐(checked = false) 상태로 설정
+                document.getElementById('col-show-version').checked = false;
+
+                // 초기 헤더 가시성 설정
                 toggleColumn('col-consent', 'col-show-consent');
                 toggleColumn('col-strap', 'col-show-strap');
                 toggleColumn('col-position', 'col-show-position');
                 toggleColumn('col-tightness', 'col-show-tightness');
+                toggleColumn('col-version', 'col-show-version');
             }
 
             let currentTargetTester = '';
@@ -1652,6 +1828,10 @@ async def get_dashboard(request: Request):
                     <input type="checkbox" id="col-show-tightness" onchange="toggleColumn('col-tightness', 'col-show-tightness')">
                     착용 정도
                 </label>
+                <label class="column-checkbox-item">
+                    <input type="checkbox" id="col-show-version" onchange="toggleColumn('col-version', 'col-show-version')">
+                    버전
+                </label>
             </div>
 
             <div class="filter-board">
@@ -1689,6 +1869,18 @@ async def get_dashboard(request: Request):
                         <option value="">전체</option>
                     </select>
                 </div>
+                <div class="filter-item" id="filter-location">
+                    <label>운동 장소</label>
+                    <select id="select-location" onchange="handleSelectFilter('location', this.value, 'filter-location')">
+                        <option value="">전체</option>
+                    </select>
+                </div>
+                <div class="filter-item" id="filter-training-type">
+                    <label>세부 운동 종류</label>
+                    <select id="select-training-type" onchange="handleSelectFilter('training_type', this.value, 'filter-training-type')">
+                        <option value="">전체</option>
+                    </select>
+                </div>
             </div>
 
             <!-- 데이터 테이블 카드 -->
@@ -1702,15 +1894,16 @@ async def get_dashboard(request: Request):
                             <th class="sortable" onclick="handleSort('watch')">착용 워치 <span class="sort-indicator" id="sort-icon-watch">↕</span></th>
                             <th class="sortable col-strap" onclick="handleSort('strap')">착용 스트랩 <span class="sort-indicator" id="sort-icon-strap">↕</span></th>
                             <th class="sortable" onclick="handleSort('exercise')">운동 종류 <span class="sort-indicator" id="sort-icon-exercise">↕</span></th>
-                            <th class="sortable" onclick="handleSort('training_type')">훈련 종류 <span class="sort-indicator" id="sort-icon-training_type">↕</span></th>
+                            <th class="sortable" onclick="handleSort('training_type')">세부 운동 종류 <span class="sort-indicator" id="sort-icon-training_type">↕</span></th>
                             <th class="sortable" onclick="handleSort('distance')">거리 (km) <span class="sort-indicator" id="sort-icon-distance">↕</span></th>
                             <th class="sortable col-position" onclick="handleSort('wearing_position')">착용 위치 <span class="sort-indicator" id="sort-icon-wearing_position">↕</span></th>
                             <th class="sortable col-tightness" onclick="handleSort('wearing_tightness')">착용 정도 <span class="sort-indicator" id="sort-icon-wearing_tightness">↕</span></th>
                             <th class="sortable" onclick="handleSort('competitor_watch')">동시착용 모델 <span class="sort-indicator" id="sort-icon-competitor_watch">↕</span></th>
                             <th class="sortable" onclick="handleSort('location')">운동 장소 <span class="sort-indicator" id="sort-icon-location">↕</span></th>
+                            <th style="text-align: center;">센서/데이터 이슈 메모</th>
                             <th>특이 사항</th>
                             <th style="text-align: center;">첨부파일</th>
-                            <th class="sortable" onclick="handleSort('app_version')">버전 <span class="sort-indicator" id="sort-icon-app_version">↕</span></th>
+                            <th class="sortable col-version" onclick="handleSort('app_version')">버전 <span class="sort-indicator" id="sort-icon-app_version">↕</span></th>
                             <th>관리</th>
                         </tr>
                     </thead>

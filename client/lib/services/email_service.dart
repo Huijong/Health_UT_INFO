@@ -33,6 +33,14 @@ class EmailService {
     required bool hasCola,
     required bool hasLog,
     required int captureCount,
+    required String gpsStatus,
+    required String gpsMemo,
+    required String hrStatus,
+    required String hrMemo,
+    required String paceStatus,
+    required String paceMemo,
+    required String altitudeStatus,
+    required String altitudeMemo,
   }) async {
     final sender = AppConfig.emailSender;
     final password = AppConfig.emailAppPassword;
@@ -77,6 +85,12 @@ class EmailService {
 - 운동 거리: $distance km
 - 장소: $location
 ${remarks.isNotEmpty ? '- 특이 사항: $remarks\n' : ''}
+■ 센서/데이터 이슈 결과
+- GPS: $gpsStatus
+${gpsMemo.isNotEmpty ? '  └ 메모: $gpsMemo\n' : ''}- 심박수(HR): $hrStatus
+${hrMemo.isNotEmpty ? '  └ 메모: $hrMemo\n' : ''}- 속도/페이스: $paceStatus
+${paceMemo.isNotEmpty ? '  └ 메모: $paceMemo\n' : ''}- 고도: $altitudeStatus
+${altitudeMemo.isNotEmpty ? '  └ 메모: $altitudeMemo\n' : ''}
 ■ 첨부파일 현황
 - FIT 파일: ${hasFit ? 'Y' : 'N'}
 - Garmin FIT 파일: ${hasGarmin ? 'Y' : 'N'}
