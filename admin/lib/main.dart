@@ -615,10 +615,12 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
             onTap: () {
+              final now = DateTime.now();
+              final currentMonth = "${now.year}-${now.month.toString().padLeft(2, '0')}";
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => PointHistoryScreen(testerName: name),
+                  builder: (context) => PointHistoryScreen(testerName: name, month: currentMonth),
                 ),
               );
             },
@@ -1493,8 +1495,9 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
 
 class PointHistoryScreen extends StatefulWidget {
   final String testerName;
+  final String? month;
 
-  const PointHistoryScreen({super.key, required this.testerName});
+  const PointHistoryScreen({super.key, required this.testerName, this.month});
 
   @override
   State<PointHistoryScreen> createState() => _PointHistoryScreenState();
@@ -1519,9 +1522,11 @@ class _PointHistoryScreenState extends State<PointHistoryScreen> {
     });
 
     try {
-      final response = await http.get(
-        Uri.parse('https://health-port.work/api/devices?points_history=true&tester_name=${Uri.encodeComponent(widget.testerName)}'),
-      );
+      var url = 'https://health-port.work/api/devices?points_history=true&tester_name=${Uri.encodeComponent(widget.testerName)}';
+      if (widget.month != null) {
+        url += '&month=${widget.month}';
+      }
+      final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded['status'] == 'success') {
@@ -1551,7 +1556,7 @@ class _PointHistoryScreenState extends State<PointHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.testerName}님 포인트 이력'),
+        title: Text(widget.month != null ? '${widget.month} ${widget.testerName}님 포인트 이력' : '${widget.testerName}님 포인트 이력'),
         backgroundColor: const Color(0xFF1429A0),
       ),
       body: Container(

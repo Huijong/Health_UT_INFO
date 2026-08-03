@@ -318,7 +318,12 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
         if points_history:
             if not tester_name:
                 return JSONResponse(content={"status": "error", "message": "tester_name is required for points history"}, status_code=400)
-            cursor = db["points_transactions"].find({"tester_name": tester_name}).sort("created_at", -1)
+            
+            query = {"tester_name": tester_name}
+            if month:
+                query["month"] = month
+                
+            cursor = db["points_transactions"].find(query).sort("created_at", -1)
             history = await cursor.to_list(length=1000)
             for h in history:
                 h["_id"] = str(h["_id"])
@@ -588,12 +593,16 @@ async def create_point_adjustment(pc: PointCreate):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/points/{tester_name}/history")
-async def get_tester_points_history(tester_name: str):
+async def get_tester_points_history(tester_name: str, month: Optional[str] = None):
     try:
         if db is None:
             return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
             
-        cursor = db["points_transactions"].find({"tester_name": tester_name}).sort("created_at", -1)
+        query = {"tester_name": tester_name}
+        if month:
+            query["month"] = month
+            
+        cursor = db["points_transactions"].find(query).sort("created_at", -1)
         history = await cursor.to_list(length=1000)
         for h in history:
             h["_id"] = str(h["_id"])

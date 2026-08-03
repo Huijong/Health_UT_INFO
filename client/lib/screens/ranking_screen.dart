@@ -965,6 +965,7 @@ class _RankingScreenState extends State<RankingScreen> {
         queryParameters: {
           'points_history': 'true',
           'tester_name': testerName.trim(),
+          'month': _selectedMonth,
         },
       );
       if (response.statusCode == 200 && response.data != null) {
@@ -1020,7 +1021,7 @@ class _RankingScreenState extends State<RankingScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      '$testerName님의 포인트 내역',
+                      '$_selectedMonth $testerName님의 포인트 내역',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
