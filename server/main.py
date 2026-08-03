@@ -152,6 +152,12 @@ class PointCreate(BaseModel):
     old_name: Optional[str] = None
     new_name: Optional[str] = None
     email: Optional[str] = None
+    watch: Optional[str] = None
+    custom_watch: Optional[str] = None
+    strap: Optional[str] = None
+    custom_strap: Optional[str] = None
+    height: Optional[float] = None
+    weight: Optional[float] = None
 
 @app.post("/api/devices/ping")
 async def device_ping(ping: DevicePing):
@@ -211,6 +217,14 @@ async def create_point_adjustment_alt(pc: PointCreate, rename: bool = False):
             updated = False
             resolved_old_name = old_name # 기본값
             
+            set_data = {"tester_name": new_name}
+            if pc.watch is not None: set_data["watch"] = pc.watch
+            if pc.custom_watch is not None: set_data["custom_watch"] = pc.custom_watch
+            if pc.strap is not None: set_data["strap"] = pc.strap
+            if pc.custom_strap is not None: set_data["custom_strap"] = pc.custom_strap
+            if pc.height is not None: set_data["height"] = pc.height
+            if pc.weight is not None: set_data["weight"] = pc.weight
+            
             if email:
                 # 닉네임 변경 전에 현재 등록되어 있는 tester_name 백업
                 device = await db["devices"].find_one({"email": email})
@@ -219,7 +233,7 @@ async def create_point_adjustment_alt(pc: PointCreate, rename: bool = False):
                 
                 res = await db["devices"].update_one(
                     {"email": email}, 
-                    {"$set": {"tester_name": new_name}}
+                    {"$set": set_data}
                 )
                 if res.modified_count > 0 or res.matched_count > 0:
                     updated = True
@@ -228,7 +242,7 @@ async def create_point_adjustment_alt(pc: PointCreate, rename: bool = False):
             if not updated:
                 await db["devices"].update_many(
                     {"tester_name": old_name}, 
-                    {"$set": {"tester_name": new_name}}
+                    {"$set": set_data}
                 )
                 # 만약 이메일 정보가 왔는데 DB에 email 필드가 없어서 매치되지 않았던 것이라면, email 필드도 같이 set해 줍니다.
                 if email:

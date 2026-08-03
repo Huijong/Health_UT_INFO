@@ -2600,6 +2600,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty) ? '닉네임을 입력해 주세요' : null,
                 ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: RichText(
+                    text: TextSpan(
+                      style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7), height: 1.5),
+                      children: [
+                        const TextSpan(text: '💡 닉네임은 언제든 자유롭게 변경할 수 있으며 포인트와 기록도 유지돼요!\n\n단, 기준이 되는 구글 이메일을 변경할 경우 '),
+                        TextSpan(
+                          text: '모든 데이터가 초기화',
+                          style: TextStyle(
+                            color: const Color(0xFFFF6B6B),
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.underline,
+                            decorationColor: const Color(0xFFFF6B6B),
+                          ),
+                        ),
+                        const TextSpan(text: '되니 주의해 주세요.'),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
