@@ -166,38 +166,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Theme(
       data: getSettingsTheme(context),
-      child: Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF1429A0),
-                Color(0xFF0A0F24),
-                Color(0xFF05060C),
-              ],
-              stops: [0.0, 0.6, 1.0],
+      child: PopScope(
+        canPop: false,
+        onPopInvoked: (didPop) {
+          if (didPop) return;
+          Navigator.pop(context, true);
+        },
+        child: Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1429A0),
+                  Color(0xFF0A0F24),
+                  Color(0xFF05060C),
+                ],
+                stops: [0.0, 0.6, 1.0],
+              ),
             ),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                // 헤더
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                        onPressed: () => Navigator.pop(context),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // 헤더
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
                       ),
-                      const Expanded(
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                          onPressed: () => Navigator.pop(context, true),
+                        ),
+                        const Expanded(
                         child: Text(
                           '설정',
                           textAlign: TextAlign.center,
@@ -415,6 +421,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

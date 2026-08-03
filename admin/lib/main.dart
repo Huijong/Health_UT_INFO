@@ -354,6 +354,7 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
 
   String _searchQuery = '';
   String _sortBy = 'recent';
+  String _latestServerVersion = '';
 
   @override
   void initState() {
@@ -374,6 +375,8 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
       final noticeRes = await http.get(Uri.parse('https://health-port.work/api/notices'));
       // 3. 테스터 데이터 수신 현황 가져오기
       final statusRes = await http.get(Uri.parse('https://health-port.work/api/devices?summary=true'));
+      // 4. 최신 APK 정보 가져오기
+      final apkRes = await http.get(Uri.parse('https://health-port.work/api/devices?latest_apk=true'));
 
       if (devRes.statusCode == 200 && noticeRes.statusCode == 200 && statusRes.statusCode == 200) {
         final devDecoded = json.decode(utf8.decode(devRes.bodyBytes));
@@ -383,6 +386,19 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
         if (devDecoded['status'] == 'success' && 
             noticeDecoded['status'] == 'success' &&
             statusDecoded['status'] == 'success') {
+          
+          if (apkRes.statusCode == 200) {
+            final apkDecoded = json.decode(utf8.decode(apkRes.bodyBytes));
+            if (apkDecoded['status'] == 'success') {
+              final String filename = apkDecoded['filename'] ?? '';
+              final regExp = RegExp(r'HealthPort_([0-9\.]+)\.apk');
+              final match = regExp.firstMatch(filename);
+              if (match != null) {
+                _latestServerVersion = match.group(1) ?? '';
+              }
+            }
+          }
+
           setState(() {
             _devices = devDecoded['data'] as List<dynamic>;
             _notices = noticeDecoded['data'] as List<dynamic>;
@@ -429,6 +445,53 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
       return difference.inMinutes < 10; // 10분 이내 신호 도달 시 Active
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<void> _deleteDevice(String deviceId, String testerName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2336),
+        title: const Text('기기 삭제', style: TextStyle(color: Colors.white)),
+        content: Text(
+          '$testerName 유저의 단말 기기 접속 기록을 정말로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소', style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('삭제', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final response = await http.delete(
+        Uri.parse('https://health-port.work/api/devices/$deviceId'),
+      );
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('삭제되었습니다.'), backgroundColor: Color(0xFF10B981)),
+        );
+        _fetchData();
+      } else {
+        throw Exception('서버 에러 (${response.statusCode})');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('삭제 실패: $e'), backgroundColor: Colors.redAccent),
+      );
     }
   }
 
@@ -533,8 +596,14 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
         final name = dev['tester_name'] ?? '이름없음';
         final watch = dev['watch'] ?? '미지정';
         final os = dev['os_version'] ?? '알 수 없음';
+        final appVersion = dev['app_version'] ?? '알 수 없음';
         final lastActive = dev['last_active_at'] ?? '';
         final active = lastActive.isNotEmpty && _isActive(lastActive);
+
+        bool isOutdated = false;
+        if (appVersion != '알 수 없음' && _latestServerVersion.isNotEmpty) {
+          isOutdated = appVersion != _latestServerVersion;
+        }
 
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
@@ -557,36 +626,51 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
-                  // 접속등 표시
-                  Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: active ? const Color(0xFF10B981) : Colors.grey,
-                      shape: BoxShape.circle,
-                      boxShadow: active
-                          ? [
-                              BoxShadow(
-                                color: const Color(0xFF10B981).withOpacity(0.5),
-                                blurRadius: 8,
-                                spreadRadius: 2,
-                              )
-                            ]
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isOutdated 
+                                    ? Colors.redAccent.withOpacity(0.2) 
+                                    : Colors.white.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                                border: isOutdated 
+                                    ? Border.all(color: Colors.redAccent.withOpacity(0.5)) 
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isOutdated) ...[
+                                    const Icon(Icons.warning_amber_rounded, size: 12, color: Colors.redAccent),
+                                    const SizedBox(width: 4),
+                                  ],
+                                  Text(
+                                    'v$appVersion',
+                                    style: TextStyle(
+                                      fontSize: 12, 
+                                      color: isOutdated ? Colors.redAccent : Colors.white70,
+                                      fontWeight: isOutdated ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 6),
                         Text(
@@ -600,38 +684,46 @@ class _TesterStatusScreenState extends State<TesterStatusScreen> {
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        active ? '접속 중' : '오프라인',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: active ? const Color(0xFF10B981) : Colors.white54,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.notification_add_rounded, size: 18),
+                              color: const Color(0xFF3DFFC1),
+                              constraints: const BoxConstraints(),
+                              padding: const EdgeInsets.all(4),
+                              onPressed: () => _showNudgeConfirmDialog(name),
+                              tooltip: '독려 푸시 전송',
+                            ),
+                            const SizedBox(width: 12),
+                            IconButton(
+                              onPressed: () => _deleteDevice(dev['_id'], name),
+                              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                              color: Colors.redAccent,
+                              constraints: const BoxConstraints(),
+                              padding: const EdgeInsets.all(4),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        lastActive.isNotEmpty ? _getRelativeTime(lastActive) : '신호 없음',
-                        style: const TextStyle(fontSize: 11, color: Colors.white38),
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton.icon(
-                        onPressed: () => _showPointAdjustmentDialog(context, name),
-                        icon: const Icon(Icons.add_circle_outline_rounded, size: 14),
-                        label: const Text('포인트', style: TextStyle(fontSize: 11)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E5BFF),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(64, 28),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        const SizedBox(height: 8),
+                        ElevatedButton.icon(
+                          onPressed: () => _showPointAdjustmentDialog(context, name),
+                          icon: const Icon(Icons.add_circle_outline_rounded, size: 14),
+                          label: const Text('포인트', style: TextStyle(fontSize: 11)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E5BFF),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(64, 28),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
               ),
             ),
           ),
