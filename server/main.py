@@ -139,6 +139,7 @@ class DevicePing(BaseModel):
     device_uuid: Optional[str] = None
     email: Optional[str] = None
     last_seen_fame_month: Optional[str] = None
+    app_version: Optional[str] = None
 
 class NoticeAck(BaseModel):
     tester_name: str
@@ -172,6 +173,8 @@ async def device_ping(ping: DevicePing):
             device_dict["email"] = ping.email.strip()
         if ping.last_seen_fame_month:
             device_dict["last_seen_fame_month"] = ping.last_seen_fame_month.strip()
+        if ping.app_version:
+            device_dict["app_version"] = ping.app_version.strip()
         
         # 만약 이메일 정보가 들어왔다면 이메일 기준으로 기기(유저) 식별 및 업데이트
         if ping.email:
@@ -290,7 +293,12 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
                 # 찾은 기기의 이메일이 현재 요청 보낸 이메일과 같다면 자신의 닉네임이므로 중복 아님 처리
                 if email and device.get("email") == email.strip():
                     return JSONResponse(content={"status": "success", "exists": False})
-                return JSONResponse(content={"status": "success", "exists": True})
+                return JSONResponse(content={
+                    "status": "success", 
+                    "exists": True,
+                    "watch": device.get("watch", ""),
+                    "strap": device.get("strap", "")
+                })
             return JSONResponse(content={"status": "success", "exists": False})
 
         if points_history:
@@ -484,12 +492,44 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
             return JSONResponse(content={"status": "success", "data": result})
 
         cursor = db["devices"].find({}).sort("last_active_at", -1)
-        devices = await cursor.to_list(length=100)
-        for d in devices:
+        raw_devices = await cursor.to_list(length=200)
+        
+        devices = []
+        seen_names = set()
+        
+        for d in raw_devices:
+            t_name = d.get("tester_name")
+            # 닉네임이 같으면 최신 기록(먼저 나온 것)만 남기고 건너뜀
+            if t_name and t_name in seen_names:
+                continue
+            if t_name:
+                seen_names.add(t_name)
+                
             d["_id"] = str(d["_id"])
             if isinstance(d.get("last_active_at"), datetime):
-                d["last_active_at"] = d["last_active_at"].isoformat()
+                d["last_active_at"] = d["last_active_at"].isoformat() + "Z"
+            devices.append(d)
+            
         return JSONResponse(content={"status": "success", "data": devices})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.delete("/api/devices/{device_id}")
+async def delete_device(device_id: str):
+    try:
+        if db is None:
+            return JSONResponse(content={"status": "error", "message": "Database not initialized"}, status_code=500)
+        from bson import ObjectId
+        try:
+            obj_id = ObjectId(device_id)
+        except Exception:
+            return JSONResponse(content={"status": "error", "message": "Invalid device ID format"}, status_code=400)
+            
+        result = await db["devices"].delete_one({"_id": obj_id})
+        if result.deleted_count == 1:
+            return JSONResponse(content={"status": "success", "message": "Device deleted"})
+        else:
+            return JSONResponse(content={"status": "error", "message": "Device not found"}, status_code=404)
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 

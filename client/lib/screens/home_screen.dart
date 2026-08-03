@@ -724,6 +724,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     if (testerName.isEmpty) return;
 
     try {
+      final appVersion = AppConfig.appVersion;
+
       final watchName = _selectedWatch == '직접입력'
           ? _customWatchCtrl.text.trim()
           : _selectedWatch;
@@ -742,6 +744,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           'strap': strapName.isEmpty ? '미지정' : strapName,
           'os_version': 'Android ${_session!.androidVersion} (Model: ${_session!.deviceModel})',
           'device_uuid': _prefs!.deviceUuid,
+          'app_version': appVersion,
         }),
       );
       debugPrint("[PING] Device ping sent successfully for $testerName");
@@ -4333,6 +4336,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                               ),
                             );
                             if (reuse != true) return;
+                            
+                            final String savedWatch = res['watch'] ?? '미지정';
+                            final String savedStrap = res['strap'] ?? '미지정';
+                            
+                            String cleanWatch = savedWatch.trim();
+                            bool isWatchInList = kWatchOptions.any((opt) => opt.trim() == cleanWatch);
+                            if (!isWatchInList && cleanWatch != '미지정' && cleanWatch.isNotEmpty) {
+                              _prefs?.saveWatch('직접입력');
+                              _prefs?.saveCustomWatch(cleanWatch);
+                              _selectedWatch = '직접입력';
+                              _customWatchCtrl.text = cleanWatch;
+                            } else {
+                              _prefs?.saveWatch(cleanWatch);
+                              _selectedWatch = cleanWatch;
+                            }
+
+                            String cleanStrap = savedStrap.trim();
+                            bool isStrapInList = kStrapOptions.any((opt) => opt['name']?.trim() == cleanStrap);
+                            if (!isStrapInList && cleanStrap != '미지정' && cleanStrap.isNotEmpty) {
+                              _prefs?.saveStrap('직접입력');
+                              _prefs?.saveCustomStrap(cleanStrap);
+                              _selectedStrap = '직접입력';
+                              _customStrapCtrl.text = cleanStrap;
+                            } else {
+                              _prefs?.saveStrap(cleanStrap);
+                              _selectedStrap = cleanStrap;
+                            }
+                            
+                            _prefs?.saveOnboardingComplete(true);
+                            setState(() {
+                              _currentStep = 4;
+                            });
                           } else {
                             return;
                           }
@@ -4348,6 +4383,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     _sendDevicePing(); // Bind UUID immediately
                     _prefs?.saveHeight(double.tryParse(_heightCtrl.text) ?? 0.0);
                     _prefs?.saveWeight(double.tryParse(_weightCtrl.text) ?? 0.0);
+                    
+                    if (_currentStep == 4) return;
                   } else if (_currentStep == 2) {
                     if (_selectedWatch == '직접입력' && _customWatchCtrl.text.trim().isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
