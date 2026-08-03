@@ -51,7 +51,13 @@ ThemeData getSettingsTheme(BuildContext context) {
 class SettingsScreen extends StatefulWidget {
   final PrefsService prefs;
   final bool highlightUpdate;
-  const SettingsScreen({super.key, required this.prefs, this.highlightUpdate = false});
+  final bool showEmailGuide;
+  const SettingsScreen({
+    super.key, 
+    required this.prefs, 
+    this.highlightUpdate = false,
+    this.showEmailGuide = false,
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -85,6 +91,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_watch.isEmpty) _watch = kWatchOptions.first;
     if (_strap.isEmpty) _strap = kStrapOptions.first['name']!;
     
+    if (widget.showEmailGuide) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openProfileEditPage(showGuide: true);
+      });
+    }
+
     _checkForUpdate();
 
     _blinkHighlightActive = widget.highlightUpdate;
@@ -113,6 +125,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _blinkTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _openProfileEditPage({bool showGuide = false}) async {
+    final result = await Navigator.push(
+      context,
+      InstantPageRoute(
+        page: ProfileEditPage(
+          initialName: _name,
+          initialHeight: _height,
+          initialWeight: _weight,
+          initialEmail: widget.prefs.googleEmail,
+          showEmailGuide: showGuide,
+          prefs: widget.prefs,
+        ),
+      ),
+    );
+    if (result != null) {
+      final newName = result['name'].toString().trim();
+      final oldName = _name.trim();
+      final newEmail = (result['email'] ?? '').toString().trim();
+      final oldEmail = widget.prefs.googleEmail.trim();
+
+      if (newName.isNotEmpty && oldName.isNotEmpty && (oldName != newName || oldEmail != newEmail)) {
+        try {
+          final dio = Dio();
+          final response = await dio.post(
+            '${AppConfig.apiUrl}/api/devices',
+            queryParameters: {'rename': 'true'},
+            data: {
+              'old_name': oldName,
+              'new_name': newName,
+              'email': newEmail,
+            },
+          );
+          if (response.data['status'] == 'success') {
+            await widget.prefs.saveName(newName);
+            await widget.prefs.saveGoogleEmail(newEmail);
+            setState(() {
+              _name = newName;
+            });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('프로필이 성공적으로 변경되었습니다.'),
+                  backgroundColor: Color(0xFF3DFFC1),
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('[Rename Error] $e');
+        }
+      } else {
+        await widget.prefs.saveHeight(double.tryParse(result['height'].toString()) ?? 0.0);
+        await widget.prefs.saveWeight(double.tryParse(result['weight'].toString()) ?? 0.0);
+        setState(() {
+          _height = double.tryParse(result['height'].toString());
+          _weight = double.tryParse(result['weight'].toString());
+        });
+      }
+    }
   }
 
   Future<void> _checkForUpdate() async {
@@ -230,65 +303,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: '프로필 설정',
                         subtitle: '닉네임 정보를 수정합니다.',
                         icon: Icons.person_rounded,
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            InstantPageRoute(
-                              page: ProfileEditPage(
-                                initialName: _name,
-                                initialHeight: _height,
-                                initialWeight: _weight,
-                                initialEmail: widget.prefs.googleEmail,
-                              ),
-                            ),
-                          );
-                          if (result != null) {
-                            final newName = result['name'].toString().trim();
-                            final oldName = _name.trim();
-                            final newEmail = (result['email'] ?? '').toString().trim();
-                            final oldEmail = widget.prefs.googleEmail.trim();
-
-                            if (newName.isNotEmpty && oldName.isNotEmpty && (oldName != newName || oldEmail != newEmail)) {
-                              try {
-                                final dio = Dio();
-                                final response = await dio.post(
-                                  '${AppConfig.apiUrl}/api/devices',
-                                  queryParameters: {'rename': 'true'},
-                                  data: {
-                                    'old_name': oldName,
-                                    'new_name': newName,
-                                    'email': newEmail,
-                                  },
-                                );
-                                debugPrint('[Rename/EmailUpdate] Server response: ${response.data}');
-                              } catch (e) {
-                                debugPrint('[Rename/EmailUpdate] Failed to update profile on server: $e');
-                              }
-                            }
-
-                            await widget.prefs.saveName(newName);
-                            await widget.prefs.saveHeight(result['height'] ?? 0.0);
-                            await widget.prefs.saveWeight(result['weight'] ?? 0.0);
-                            await widget.prefs.saveGoogleEmail(newEmail);
-
-                            setState(() {
-                              _name = newName;
-                              _height = result['height'];
-                              _weight = result['weight'];
-                            });
-
-                            if (mounted && context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('프로필 정보가 저장되었습니다.'),
-                                  backgroundColor: Color(0xFF3DFFC1),
-                                  duration: Duration(seconds: 1),
-                                ),
-                              );
-                            }
-                          }
-                        },
+                        onTap: () => _openProfileEditPage(),
                       ),
+
                       const SizedBox(height: 16),
                       _buildMenuCard(
                         title: '착용 워치 설정',
@@ -775,6 +792,8 @@ class ProfileEditPage extends StatefulWidget {
   final double? initialHeight;
   final double? initialWeight;
   final String initialEmail;
+  final bool showEmailGuide;
+  final PrefsService? prefs;
 
   const ProfileEditPage({
     super.key,
@@ -782,18 +801,24 @@ class ProfileEditPage extends StatefulWidget {
     required this.initialHeight,
     required this.initialWeight,
     required this.initialEmail,
+    this.showEmailGuide = false,
+    this.prefs,
   });
 
   @override
   State<ProfileEditPage> createState() => _ProfileEditPageState();
 }
 
-class _ProfileEditPageState extends State<ProfileEditPage> {
+class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameCtrl;
   late TextEditingController _heightCtrl;
   late TextEditingController _weightCtrl;
   late TextEditingController _emailCtrl;
+
+  late AnimationController _bounceCtrl;
+  late Animation<double> _bounceAnim;
+  late bool _showEmailTooltip;
 
   @override
   void initState() {
@@ -804,6 +829,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _weightCtrl = TextEditingController(
         text: widget.initialWeight != null ? widget.initialWeight!.toStringAsFixed(1) : '');
     _emailCtrl = TextEditingController(text: widget.initialEmail);
+    
+    _showEmailTooltip = widget.showEmailGuide;
+    _bounceCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _bounceAnim = Tween<double>(begin: 0, end: 10).animate(CurvedAnimation(parent: _bounceCtrl, curve: Curves.easeInOut));
+    if (_showEmailTooltip) {
+      _bounceCtrl.repeat(reverse: true);
+    }
   }
 
   @override
@@ -812,8 +844,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _heightCtrl.dispose();
     _weightCtrl.dispose();
     _emailCtrl.dispose();
+    _bounceCtrl.dispose();
     super.dispose();
   }
+
 
   void _onSave() async {
     if (_formKey.currentState!.validate()) {
@@ -945,58 +979,112 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  SizedBox(
-                                    height: 56,
-                                    child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF2E5BFF),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                  Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      SizedBox(
+                                        height: 56,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF2E5BFF),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            elevation: 0,
+                                          ),
+                                          onPressed: () async {
+                                            if (_showEmailTooltip) {
+                                              setState(() => _showEmailTooltip = false);
+                                              if (widget.prefs != null) {
+                                                widget.prefs!.saveEmailMigrationDone(true);
+                                              }
+                                            }
+                                            try {
+                                              const appChannel = MethodChannel('com.samsung.health.client/app_info');
+                                              final email = await appChannel.invokeMethod<String>('getGoogleEmail');
+                                              if (email != null && email.isNotEmpty) {
+                                                setState(() {
+                                                  _emailCtrl.text = email;
+                                                });
+                                                if (mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text('이메일을 성공적으로 가져왔습니다! 저장해주세요!'),
+                                                      backgroundColor: Color(0xFF3DFFC1),
+                                                    ),
+                                                  );
+                                                }
+                                              } else {
+                                                if (mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text('등록된 구글 계정이 없습니다. 직접 입력해 주세요.'),
+                                                      backgroundColor: Colors.orangeAccent,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            } catch (e) {
+                                              debugPrint('[getGoogleEmail Error] $e');
+                                              if (mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('이메일을 가져오지 못했습니다. 직접 입력해 주세요.'),
+                                                    backgroundColor: Colors.redAccent,
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          },
+                                          child: const Text('자동조회', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                                         ),
-                                        elevation: 0,
                                       ),
-                                      onPressed: () async {
-                                        try {
-                                          const appChannel = MethodChannel('com.samsung.health.client/app_info');
-                                          final email = await appChannel.invokeMethod<String>('getGoogleEmail');
-                                          if (email != null && email.isNotEmpty) {
-                                            setState(() {
-                                              _emailCtrl.text = email;
-                                            });
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('이메일을 성공적으로 가져왔습니다!'),
-                                                  backgroundColor: Color(0xFF3DFFC1),
-                                                ),
+                                      if (_showEmailTooltip)
+                                        Positioned(
+                                          top: -45,
+                                          right: -10,
+                                          child: AnimatedBuilder(
+                                            animation: _bounceAnim,
+                                            builder: (context, child) {
+                                              return Transform.translate(
+                                                offset: Offset(0, -_bounceAnim.value),
+                                                child: child,
                                               );
-                                            }
-                                          } else {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('등록된 구글 계정이 없습니다. 직접 입력해 주세요.'),
-                                                  backgroundColor: Colors.orangeAccent,
-                                                ),
-                                              );
-                                            }
-                                          }
-                                        } catch (e) {
-                                          debugPrint('[getGoogleEmail Error] $e');
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('이메일을 가져오지 못했습니다. 직접 입력해 주세요.'),
-                                                backgroundColor: Colors.redAccent,
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF3DFFC1),
+                                                borderRadius: BorderRadius.circular(12),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: const Color(0xFF3DFFC1).withOpacity(0.3),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ],
                                               ),
-                                            );
-                                          }
-                                        }
-                                      },
-                                      child: const Text('자동조회', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                    ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.touch_app, size: 16, color: Color(0xFF0C0F0F)),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    '여기를 눌러 연동!',
+                                                    style: TextStyle(
+                                                      color: Color(0xFF0C0F0F),
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ],
                               ),
