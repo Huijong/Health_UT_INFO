@@ -21,6 +21,7 @@ class PrefsService {
   static const _keyGoogleEmail = 'google_email';
   static const _keyLastSeenFameMonth = 'last_seen_fame_month';
   static const _keyFavoriteSports = 'favorite_sports';
+  static const _keyEmailMigrationDone = 'email_migration_done';
 
   final SharedPreferences _prefs;
 
@@ -60,6 +61,7 @@ class PrefsService {
   String get lastDismissedUpdateVersion => _prefs.getString('last_dismissed_update_version') ?? '';
   String get lastPopupDismissedVersion => _prefs.getString('last_popup_dismissed_version') ?? '';
   bool get hideQuickShareGuide => _prefs.getBool('hide_quick_share_guide') ?? false;
+  bool get emailMigrationDone => _prefs.getBool(_keyEmailMigrationDone) ?? false;
   String get deviceUuid => _prefs.getString(_keyDeviceUuid) ?? '';
 
   /// 운동 종목별 디테일 설정 로드
@@ -95,6 +97,7 @@ class PrefsService {
   Future<void> saveLastDismissedUpdateVersion(String value) => _prefs.setString('last_dismissed_update_version', value);
   Future<void> saveLastPopupDismissedVersion(String value) => _prefs.setString('last_popup_dismissed_version', value);
   Future<void> saveHideQuickShareGuide(bool value) => _prefs.setBool('hide_quick_share_guide', value);
+  Future<void> saveEmailMigrationDone(bool value) => _prefs.setBool(_keyEmailMigrationDone, value);
 
   /// 운동 종목별 디테일 설정 저장
   Future<void> saveSportDetail(String sport, Map<String, String> details) {

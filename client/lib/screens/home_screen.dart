@@ -543,13 +543,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       // 기기 접속 핑 전송
       _sendDevicePing();
 
-      // 접속 시 이미 메인 화면(Step 4)이라면 팝업 체크
-      if (_currentStep == 4) {
-        _checkMonthlyResultPopup();
-      }
+      // 1. 앱 업데이트 체크 및 팝업 대기
+      await _checkAppUpdate();
 
-      // 앱 업데이트 가능 여부 체크
-      _checkAppUpdate();
+      // 2. 메인 화면(Step 4)일 경우 명예의 전당 -> 이메일 팝업 체이닝 대기
+      if (_currentStep == 4) {
+        await _checkMonthlyResultPopup();
+      }
 
       // 기본 선택된 운동 대상의 디테일 설정 불러오기
       _loadSportDetails(_selectedExercise);
@@ -753,9 +753,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
-  void _showForceUpdateDialog(String serverVersion) {
+  Future<void> _showForceUpdateDialog(String serverVersion) async {
     if (!mounted) return;
-    showDialog(
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => PopScope(
@@ -1119,7 +1119,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               final lastDismissed = _prefs?.lastDismissedUpdateVersion ?? '';
               final lastPopupDismissed = _prefs?.lastPopupDismissedVersion ?? '';
               if (lastDismissed != serverVersion && lastPopupDismissed != serverVersion) {
-                _showForceUpdateDialog(serverVersion);
+                await _showForceUpdateDialog(serverVersion);
               }
             }
           }
@@ -1145,6 +1145,65 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
+  Future<void> _checkEmailMigrationPopup() async {
+    if (!mounted || _prefs == null) return;
+    if (_prefs!.emailMigrationDone) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E2128).withOpacity(0.95),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: Colors.white.withOpacity(0.1)),
+          ),
+          title: const Text(
+            '🔔 앱 업데이트 필수 안내 🔔',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '소중한 포인트와 기록을 안전하게 보호를 위해\n구글 이메일 연동이 필수로 변경되었습니다.\n\n지금 바로 연동하고 기록을 안전하게 보관하세요!',
+                style: TextStyle(fontSize: 14, color: Colors.white, height: 1.4),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Icon(Icons.security_rounded, size: 40, color: const Color(0xFF3DFFC1).withOpacity(0.8)),
+            ],
+          ),
+          actions: [
+            Center(
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    InstantPageRoute(
+                      page: SettingsScreen(prefs: _prefs!, showEmailGuide: true),
+                    ),
+                  ).then((_) {
+                    _reloadPrefs();
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E5BFF),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+                ),
+                child: const Text('이메일 연동하러 가기', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _checkMonthlyResultPopup() async {
     if (!mounted || _prefs == null) return;
     
@@ -1152,7 +1211,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     final currentMonthStr = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     
     // 이미 이번 달 팝업을 봤다면 스킵
-    if (_prefs!.lastSeenFameMonth == currentMonthStr) return;
+    if (_prefs!.lastSeenFameMonth == currentMonthStr) {
+      _checkEmailMigrationPopup();
+      return;
+    }
     
     // 이전 달 계산
     final prevYear = now.month == 1 ? now.year - 1 : now.year;
@@ -1161,7 +1223,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     
     // 이름이 있어야 순위 검색 가능
     final testerName = _prefs!.name.trim();
-    if (testerName.isEmpty) return;
+    if (testerName.isEmpty) {
+      _checkEmailMigrationPopup();
+      return;
+    }
 
     try {
       final url = Uri.parse('${AppConfig.apiUrl}/api/devices?rankings=true&month=$prevMonthStr&tester_name=$testerName');
@@ -1174,16 +1239,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           
           final meta = data['data']['meta'];
           if (meta != null && mounted) {
-            _showFameResultDialog(meta, top3, prevMonthStr, currentMonthStr);
+            await _showFameResultDialog(meta, top3, prevMonthStr, currentMonthStr);
+            _checkEmailMigrationPopup();
+            return;
           }
         }
       }
     } catch (e) {
       debugPrint('[FAME] 팝업 조회 실패: $e');
     }
+    
+    _checkEmailMigrationPopup();
   }
 
-  void _showFameResultDialog(Map<String, dynamic> meta, List<dynamic> top3, String prevMonth, String currentMonth) {
+  Future<void> _showFameResultDialog(Map<String, dynamic> meta, List<dynamic> top3, String prevMonth, String currentMonth) async {
     final myRank = meta['my_rank'];
     final myPoints = meta['my_count'] ?? 0;
     
@@ -1205,7 +1274,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       feedbackText = '👟 꾸준함이 생명! 이번 달도 힘차게 달려볼까요? 화이팅!';
     }
     
-    showDialog(
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
