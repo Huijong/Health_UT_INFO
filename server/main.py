@@ -138,6 +138,7 @@ class DevicePing(BaseModel):
     os_version: str
     device_uuid: Optional[str] = None
     email: Optional[str] = None
+    last_seen_fame_month: Optional[str] = None
 
 class NoticeAck(BaseModel):
     tester_name: str
@@ -169,6 +170,8 @@ async def device_ping(ping: DevicePing):
             device_dict["device_uuid"] = ping.device_uuid.strip()
         if ping.email:
             device_dict["email"] = ping.email.strip()
+        if ping.last_seen_fame_month:
+            device_dict["last_seen_fame_month"] = ping.last_seen_fame_month.strip()
         
         # 만약 이메일 정보가 들어왔다면 이메일 기준으로 기기(유저) 식별 및 업데이트
         if ping.email:
@@ -266,7 +269,8 @@ async def get_devices(summary: bool = False, latest_apk: bool = False, rankings:
                     "exists": True, 
                     "tester_name": device.get("tester_name", ""),
                     "watch": device.get("watch", ""),
-                    "strap": device.get("strap", "")
+                    "strap": device.get("strap", ""),
+                    "last_seen_fame_month": device.get("last_seen_fame_month", "")
                 })
             else:
                 return JSONResponse(content={"status": "success", "exists": False})

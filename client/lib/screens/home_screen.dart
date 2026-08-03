@@ -23,6 +23,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
+import 'package:confetti/confetti.dart';
 
 /// Galaxy Watch 드롭다운 선택지 (2단계 전용)
 const List<String> kWatchOptions = [
@@ -163,6 +164,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   // 가이드 영상 관련 상태 변수 및 애니메이션 컨트롤러
   AnimationController? _guidePulseController;
   bool _hasWatchedGuide = false;
+  late ConfettiController _confettiController;
 
   // 공지사항 관련 상태 변수 및 애니메이션 컨트롤러
   Map<String, dynamic>? _latestNotice;
@@ -202,6 +204,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   // 4단계 운동
   String _selectedExercise = kExerciseOptions.first['name'];
+  List<String> _favoriteSports = [];
+
+  void _toggleFavorite(String sportName) {
+    setState(() {
+      if (_favoriteSports.contains(sportName)) {
+        _favoriteSports.remove(sportName);
+      } else {
+        _favoriteSports.add(sportName);
+      }
+    });
+    _prefs?.saveFavoriteSports(_favoriteSports);
+  }
 
   // 5단계 디테일 및 첨부파일
   final List<AttachedFile> _fitFiles = [];
@@ -308,6 +322,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
     _init();
     _customCompetitorCtrl.addListener(_saveSportDetails);
     _customTrainingCtrl.addListener(_saveSportDetails);
@@ -514,6 +529,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         _prefs = prefs;
         _session = session;
         _hasWatchedGuide = hasWatched;
+        _favoriteSports = List.from(prefs.favoriteSports);
         _currentStep = prefs.onboardingComplete ? 4 : 1;
         _isLoading = false;
       });
@@ -526,6 +542,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
       // 기기 접속 핑 전송
       _sendDevicePing();
+
+      // 접속 시 이미 메인 화면(Step 4)이라면 팝업 체크
+      if (_currentStep == 4) {
+        _checkMonthlyResultPopup();
+      }
 
       // 앱 업데이트 가능 여부 체크
       _checkAppUpdate();
@@ -716,6 +737,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         body: jsonEncode({
           'tester_name': testerName,
           'email': _emailCtrl.text.trim(),
+          'last_seen_fame_month': _prefs!.lastSeenFameMonth,
           'watch': watchName.isEmpty ? '미지정' : watchName,
           'strap': strapName.isEmpty ? '미지정' : strapName,
           'os_version': 'Android ${_session!.androidVersion} (Model: ${_session!.deviceModel})',
@@ -1120,6 +1142,202 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
+  Future<void> _checkMonthlyResultPopup() async {
+    if (!mounted || _prefs == null) return;
+    
+    final now = DateTime.now();
+    final currentMonthStr = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    
+    // 이미 이번 달 팝업을 봤다면 스킵
+    if (_prefs!.lastSeenFameMonth == currentMonthStr) return;
+    
+    // 이전 달 계산
+    final prevYear = now.month == 1 ? now.year - 1 : now.year;
+    final prevMonthNum = now.month == 1 ? 12 : now.month - 1;
+    final prevMonthStr = '$prevYear-${prevMonthNum.toString().padLeft(2, '0')}';
+    
+    // 이름이 있어야 순위 검색 가능
+    final testerName = _prefs!.name.trim();
+    if (testerName.isEmpty) return;
+
+    try {
+      final url = Uri.parse('${AppConfig.apiUrl}/api/devices?rankings=true&month=$prevMonthStr&tester_name=$testerName');
+      final res = await http.get(url).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['status'] == 'success' && data['data'] != null) {
+          final rankingsList = data['data']['rankings'] as List<dynamic>? ?? [];
+          final top3 = rankingsList.take(3).toList();
+          
+          final meta = data['data']['meta'];
+          if (meta != null && mounted) {
+            _showFameResultDialog(meta, top3, prevMonthStr, currentMonthStr);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[FAME] 팝업 조회 실패: $e');
+    }
+  }
+
+  void _showFameResultDialog(Map<String, dynamic> meta, List<dynamic> top3, String prevMonth, String currentMonth) {
+    final myRank = meta['my_rank'];
+    final myPoints = meta['my_count'] ?? 0;
+    
+    final bool hasParticipated = myRank != null;
+    
+    // 폭죽 무조건 실행 (참여 여부 관계없이 1~3등 축하용)
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _confettiController.play();
+    });
+    
+    String feedbackText = '';
+    if (!hasParticipated) {
+      feedbackText = '👀 남들 점수 올릴 때 뭐 하셨나요!(농담) 이번 달은 주인공이 되어보세요! 화이팅!!';
+    } else if (myRank <= 3) {
+      feedbackText = '🎊 명예의 전당 최상위권 등극! 당신이 진정한 챔피언입니다! 🎊';
+    } else if (myRank <= 10) {
+      feedbackText = '🔥 아깝다! 조금만 더 뛰면 TOP 3 진입 가능! 이번 달은 왕관을 노려보세요!';
+    } else {
+      feedbackText = '👟 꾸준함이 생명! 이번 달도 힘차게 달려볼까요? 화이팅!';
+    }
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(color: Colors.black.withOpacity(0.4)),
+            ),
+            AlertDialog(
+              backgroundColor: const Color(0xFF1E2128).withOpacity(0.95),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: Colors.white.withOpacity(0.1)),
+              ),
+              title: Text(
+                '🏆 $prevMonth 명예의 전당 결과 🏆',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('지난달의 영웅들', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white70)),
+                  const SizedBox(height: 10),
+                  // Top 3 Podium
+                  if (top3.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      ),
+                      child: Column(
+                        children: [
+                          if (top3.isNotEmpty) _buildPodiumRow(1, '🥇', top3[0]),
+                          if (top3.length > 1) const SizedBox(height: 6),
+                          if (top3.length > 1) _buildPodiumRow(2, '🥈', top3[1]),
+                          if (top3.length > 2) const SizedBox(height: 6),
+                          if (top3.length > 2) _buildPodiumRow(3, '🥉', top3[2]),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  Divider(color: Colors.white.withOpacity(0.2)),
+                  const SizedBox(height: 10),
+                  // My Result
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.person, color: Colors.white, size: 20),
+                      const SizedBox(width: 5),
+                      const Text('나의 성적표', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (hasParticipated) ...[
+                    Text('총 $myPoints P 획득', style: const TextStyle(fontSize: 15, color: Colors.white)),
+                    const SizedBox(height: 5),
+                    Text('순위: $myRank 위', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF3DFFC1))),
+                    const SizedBox(height: 15),
+                  ],
+                  Text(
+                    feedbackText,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFFFFB74D)),
+                  ),
+                ],
+              ),
+              actions: [
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _confettiController.stop();
+                      _prefs?.saveLastSeenFameMonth(currentMonth);
+                      _sendDevicePing();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E5BFF),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+                    ),
+                    child: const Text('확인', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+            // 폭죽 무조건 렌더링
+            Align(
+                alignment: Alignment.topCenter,
+                child: ConfettiWidget(
+                  confettiController: _confettiController,
+                  blastDirectionality: BlastDirectionality.explosive,
+                  shouldLoop: true,
+                  colors: const [Colors.green, Colors.blue, Colors.pink, Colors.orange, Colors.purple],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildPodiumRow(int rank, String medal, dynamic user) {
+    // 폰트 크기 및 메달 크기를 15px로 동일하게 통일
+    const double baseSize = 15;
+    final bool isFirst = rank == 1;
+    
+    // 1등은 두껍게(w900) + 흰색, 나머지는 얇게(w500) + 살짝 투명하게
+    final FontWeight fontWeight = isFirst ? FontWeight.w900 : FontWeight.w500;
+    final Color textColor = isFirst ? Colors.white : Colors.white70;
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(medal, style: const TextStyle(fontSize: baseSize)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            user['tester_name'] ?? '알 수 없음',
+            style: TextStyle(fontWeight: fontWeight, fontSize: baseSize, color: textColor),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Text(
+          '${user['points']} P',
+          style: TextStyle(fontWeight: fontWeight, fontSize: baseSize, color: textColor),
+        ),
+      ],
+    );
+  }
+
   void _reloadPrefs() {
     if (_prefs == null) return;
     _updateNotificationTopic(_prefs!.name);
@@ -1144,6 +1362,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   @override
   void dispose() {
+    _confettiController.dispose();
     _customCompetitorCtrl.removeListener(_saveSportDetails);
     _customTrainingCtrl.removeListener(_saveSportDetails);
     _emailCtrl.dispose();
@@ -2261,6 +2480,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                           _currentStep = 4;
                                         });
                                         _sendDevicePing();
+                                        _checkMonthlyResultPopup();
                                       } else {
                                         setState(() {
                                           _nameCtrl.clear();
@@ -2966,62 +3186,117 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
         ),
         const SizedBox(height: 12),
+        // 1. 내 즐겨찾기 영역 (상단 고정 및 순서 변경 가능)
+        if (_favoriteSports.isNotEmpty) ...[
+          const Row(
+            children: [
+              Icon(Icons.star_rounded, color: Color(0xFFFFB74D), size: 18),
+              SizedBox(width: 6),
+              Text('즐겨찾는 운동', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+              Spacer(),
+              Text('길게 눌러서 순서 변경', style: TextStyle(fontSize: 11, color: Colors.white38)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ReorderableListView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            onReorder: (oldIndex, newIndex) {
+              setState(() {
+                if (newIndex > oldIndex) newIndex -= 1;
+                final item = _favoriteSports.removeAt(oldIndex);
+                _favoriteSports.insert(newIndex, item);
+              });
+              _prefs?.saveFavoriteSports(_favoriteSports);
+            },
+            children: _favoriteSports.map((sportName) {
+              final ex = kExerciseOptions.firstWhere((e) => e['name'] == sportName, orElse: () => kExerciseOptions.first);
+              return Padding(
+                key: ValueKey(sportName),
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildExerciseCard(ex, true),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Colors.white10),
+          const SizedBox(height: 16),
+        ],
+        
+        // 2. 전체 운동 영역
+        const Text('모든 운동', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+        const SizedBox(height: 10),
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: kExerciseOptions.length,
+          itemCount: kExerciseOptions.where((e) => !_favoriteSports.contains(e['name'])).length,
           separatorBuilder: (ctx, idx) => const SizedBox(height: 10),
           itemBuilder: (ctx, idx) {
-            final ex = kExerciseOptions[idx];
-            final name = ex['name'] as String;
-            final icon = ex['icon'] as IconData;
-            final isSel = _selectedExercise == name;
-
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedExercise = name;
-                  _currentStep = 5; // 즉시 다음 단계 이동
-                });
-                _loadSportDetails(name);
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: GlassCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                radius: 16,
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isSel ? const Color(0xFF3DFFC1).withOpacity(0.15) : Colors.white.withOpacity(0.04),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: isSel ? const Color(0xFF3DFFC1) : Colors.white60, size: 22),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                          color: isSel ? const Color(0xFF3DFFC1) : Colors.white,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 14,
-                      color: isSel ? const Color(0xFF3DFFC1) : Colors.white30,
-                    ),
-                  ],
-                ),
-              ),
-            );
+            final otherSports = kExerciseOptions.where((e) => !_favoriteSports.contains(e['name'])).toList();
+            return _buildExerciseCard(otherSports[idx], false, key: ValueKey(otherSports[idx]['name']));
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildExerciseCard(Map<String, dynamic> ex, bool isFavorite, {Key? key}) {
+    final name = ex['name'] as String;
+    final icon = ex['icon'] as IconData;
+    final isSel = _selectedExercise == name;
+
+    return InkWell(
+      key: key,
+      onTap: () {
+        setState(() {
+          _selectedExercise = name;
+          _currentStep = 5; // 즉시 다음 단계 이동
+        });
+        _loadSportDetails(name);
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        radius: 16,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSel ? const Color(0xFF3DFFC1).withOpacity(0.15) : Colors.white.withOpacity(0.04),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: isSel ? const Color(0xFF3DFFC1) : Colors.white60, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                name,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                  color: isSel ? const Color(0xFF3DFFC1) : Colors.white,
+                ),
+              ),
+            ),
+            // 즐겨찾기 토글 버튼 (별모양)
+            IconButton(
+              icon: Icon(
+                isFavorite ? Icons.star_rounded : Icons.star_outline_rounded,
+                color: isFavorite ? const Color(0xFFFFB74D) : Colors.white30,
+              ),
+              onPressed: () => _toggleFavorite(name),
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            ),
+            if (isFavorite) ...[
+              const Icon(Icons.drag_handle_rounded, size: 20, color: Colors.white30),
+            ] else ...[
+              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: isSel ? const Color(0xFF3DFFC1) : Colors.white30),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
