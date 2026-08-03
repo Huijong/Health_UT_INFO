@@ -3677,9 +3677,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: Colors.white.withOpacity(0.08)),
                           ),
-                          child: Text(
-                            loc,
-                            style: const TextStyle(color: Color(0xFF3DFFC1), fontSize: 11),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                loc,
+                                style: const TextStyle(color: Color(0xFF3DFFC1), fontSize: 11),
+                              ),
+                              const SizedBox(width: 6),
+                              GestureDetector(
+                                onTap: () async {
+                                  await _prefs!.removeRecentLocation(loc);
+                                  setState(() {});
+                                },
+                                child: const Icon(Icons.close, size: 13, color: Colors.white54),
+                              ),
+                            ],
                           ),
                         ),
                       );
