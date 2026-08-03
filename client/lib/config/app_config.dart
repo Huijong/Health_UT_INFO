@@ -50,6 +50,6 @@ class AppConfig {
   /// HealthPort 앱 버전
   static const appVersion = String.fromEnvironment(
     'APP_VERSION',
-    defaultValue: '1.030',
+    defaultValue: '1.031',
   );
 }

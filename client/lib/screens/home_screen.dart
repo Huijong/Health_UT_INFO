@@ -186,7 +186,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   int _currentTab = 0;
 
   // 1단계 컨트롤러
+  final _emailCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
+  final _nameFocusNode = FocusNode();
   final _heightCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
 
@@ -398,11 +400,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       }
       await prefs.saveDeviceUuid(uuidStr);
 
+      /*
       if (prefs.consentGiven && !prefs.onboardingComplete) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _checkDeviceUuidAndPrompt();
         });
       }
+      */
 
       _nameCtrl.text = prefs.name;
       final h = prefs.height;
@@ -702,13 +706,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       final watchName = _selectedWatch == '직접입력'
           ? _customWatchCtrl.text.trim()
           : _selectedWatch;
+      final strapName = _selectedStrap == '직접입력'
+          ? _customStrapCtrl.text.trim()
+          : _selectedStrap;
       final url = Uri.parse('${AppConfig.apiUrl}/api/devices/ping');
       await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'tester_name': testerName,
+          'email': _emailCtrl.text.trim(),
           'watch': watchName.isEmpty ? '미지정' : watchName,
+          'strap': strapName.isEmpty ? '미지정' : strapName,
           'os_version': 'Android ${_session!.androidVersion} (Model: ${_session!.deviceModel})',
           'device_uuid': _prefs!.deviceUuid,
         }),
@@ -1128,13 +1137,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       if (savedStrap.isNotEmpty) _selectedStrap = savedStrap;
       _customStrapCtrl.text = _prefs!.customStrap;
     });
+    
+    // 로컬 저장소가 갱신되었으므로 서버 쪽에도 변경된 워치/스트랩 정보를 전송하여 동기화
+    _sendDevicePing();
   }
 
   @override
   void dispose() {
     _customCompetitorCtrl.removeListener(_saveSportDetails);
     _customTrainingCtrl.removeListener(_saveSportDetails);
+    _emailCtrl.dispose();
     _nameCtrl.dispose();
+    _nameFocusNode.dispose();
     _heightCtrl.dispose();
     _weightCtrl.dispose();
     _customWatchCtrl.dispose();
@@ -1238,6 +1252,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         hasCola: _colaFiles.isNotEmpty,
         hasLog: _logFiles.isNotEmpty,
         captureCount: _captureFiles.length,
+        gpsStatus: _gpsStatus,
+        gpsMemo: _gpsMemoCtrl.text.trim(),
+        hrStatus: _hrStatus,
+        hrMemo: _hrMemoCtrl.text.trim(),
+        paceStatus: _paceStatus,
+        paceMemo: _paceMemoCtrl.text.trim(),
+        altitudeStatus: _altitudeStatus,
+        altitudeMemo: _altitudeMemoCtrl.text.trim(),
       );
 
       if (mounted) {
@@ -1477,6 +1499,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
       final result = await PackingService.pack(
         name: name,
+        email: _emailCtrl.text.trim(),
         heightCm: height,
         weightKg: weight,
         watch: watchName,
@@ -2072,7 +2095,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'HealthPort 서비스 이용을 위한 닉네임을 입력해 주세요.\n※ 설정 > 프로필 설정에서 닉네임을 수정할 수 있습니다.',
+            'HealthPort 서비스 이용을 위해 구글 이메일과 닉네임을 입력해 주세요.\n※ 설정 > 프로필 설정에서도 수정할 수 있습니다.',
             style: TextStyle(
               fontSize: 13,
               color: const Color(0xFFE2E2E2).withOpacity(0.7),
@@ -2083,8 +2106,201 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           GlassCard(
             child: Column(
               children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _emailCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '구글 이메일 주소(Gmail) *',
+                          hintText: '예) tester@gmail.com',
+                          prefixIcon: Icon(Icons.email_outlined, size: 20),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return '이메일을 입력해 주세요';
+                          }
+                          final clean = v.trim();
+                          if (!clean.contains('@') || !clean.endsWith('.com')) {
+                            return '올바른 이메일 주소를 입력해 주세요';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 56,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E5BFF),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        onPressed: () async {
+                          try {
+                            final email = await _appChannel.invokeMethod<String>('getGoogleEmail');
+                            if (email != null && email.isNotEmpty) {
+                              setState(() {
+                                _emailCtrl.text = email;
+                              });
+
+                              // 이메일로 닉네임 조회
+                              try {
+                                final emailUrl = Uri.parse('${AppConfig.apiUrl}/api/devices?check_email=${Uri.encodeComponent(email)}');
+                                final emailResponse = await http.get(emailUrl);
+                                if (emailResponse.statusCode == 200) {
+                                  final emailRes = jsonDecode(emailResponse.body);
+                                  if (emailRes['status'] == 'success' && emailRes['exists'] == true) {
+                                    final String savedName = emailRes['tester_name'] ?? '';
+                                    final String savedWatch = emailRes['watch'] ?? '미지정';
+                                    final String savedStrap = emailRes['strap'] ?? '미지정';
+
+                                    if (savedName.isNotEmpty && mounted) {
+                                      final bool? reuse = await showDialog<bool>(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (ctx) => Dialog(
+                                          backgroundColor: Colors.transparent,
+                                          child: GlassCard(
+                                            padding: const EdgeInsets.all(24),
+                                            radius: 20,
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.account_circle_rounded, color: Color(0xFF3DFFC1), size: 48),
+                                                const SizedBox(height: 16),
+                                                const Text(
+                                                  '기존 닉네임 발견',
+                                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                                                ),
+                                                const SizedBox(height: 16),
+                                                Text(
+                                                  '이 구글 계정에 등록된 닉네임("$savedName")이 존재합니다.\n해당 닉네임으로 계속하시겠습니까, 아니면 새 프로필을 만드시겠습니까?',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.7), height: 1.5),
+                                                ),
+                                                const SizedBox(height: 24),
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: OutlinedButton(
+                                                        onPressed: () => Navigator.pop(ctx, false),
+                                                        style: OutlinedButton.styleFrom(
+                                                          foregroundColor: Colors.white60,
+                                                          side: const BorderSide(color: Colors.white30),
+                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                                        ),
+                                                        child: const Text('새로 만들기', style: TextStyle(fontSize: 13)),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: ElevatedButton(
+                                                        onPressed: () => Navigator.pop(ctx, true),
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor: const Color(0xFF3DFFC1),
+                                                          foregroundColor: const Color(0xFF0F172A),
+                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                                          elevation: 0,
+                                                        ),
+                                                        child: const Text('기존 닉네임 사용', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+
+                                      if (reuse == true) {
+                                        _prefs?.saveGoogleEmail(email);
+                                        _prefs?.saveName(savedName);
+                                        
+                                        // 워치가 공식 리스트에 없으면 '직접입력' 처리
+                                        String cleanWatch = savedWatch.trim();
+                                        bool isWatchInList = kWatchOptions.any((opt) => opt.trim() == cleanWatch);
+                                        if (!isWatchInList && cleanWatch != '미지정' && cleanWatch.isNotEmpty) {
+                                          _prefs?.saveWatch('직접입력');
+                                          _prefs?.saveCustomWatch(cleanWatch);
+                                          _selectedWatch = '직접입력';
+                                          _customWatchCtrl.text = cleanWatch;
+                                        } else {
+                                          _prefs?.saveWatch(cleanWatch);
+                                          _selectedWatch = cleanWatch;
+                                        }
+
+                                        // 스트랩이 공식 리스트에 없으면 '직접입력' 처리
+                                        String cleanStrap = savedStrap.trim();
+                                        bool isStrapInList = kStrapOptions.any((opt) => opt['name']?.trim() == cleanStrap);
+                                        if (!isStrapInList && cleanStrap != '미지정' && cleanStrap.isNotEmpty) {
+                                          _prefs?.saveStrap('직접입력');
+                                          _prefs?.saveCustomStrap(cleanStrap);
+                                          _selectedStrap = '직접입력';
+                                          _customStrapCtrl.text = cleanStrap;
+                                        } else {
+                                          _prefs?.saveStrap(cleanStrap);
+                                          _selectedStrap = cleanStrap;
+                                        }
+                                        
+                                        // 기존 정보를 재사용했으므로 초기 설정(온보딩)을 마친 것으로 간주
+                                        _prefs?.saveOnboardingComplete(true);
+
+                                        setState(() {
+                                          _nameCtrl.text = savedName;
+                                          _currentStep = 4;
+                                        });
+                                        _sendDevicePing();
+                                      } else {
+                                        setState(() {
+                                          _nameCtrl.clear();
+                                        });
+                                        _nameFocusNode.requestFocus();
+                                      }
+                                    }
+                                  } else {
+                                    setState(() {
+                                      _nameCtrl.clear();
+                                    });
+                                    _nameFocusNode.requestFocus();
+                                  }
+                                }
+                              } catch (apiError) {
+                                debugPrint('[check_email Error] $apiError');
+                                setState(() {
+                                  _nameCtrl.clear();
+                                });
+                                _nameFocusNode.requestFocus();
+                              }
+                            }
+                          } catch (e) {
+                            debugPrint('[getGoogleEmail Error] $e');
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('구글 이메일을 가져올 수 없습니다.')),
+                              );
+                            }
+                          }
+                        },
+                        child: const Text('자동조회', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _nameCtrl,
+                  focusNode: _nameFocusNode,
                   decoration: const InputDecoration(
                     labelText: '닉네임',
                     hintText: '예) 기안84',
@@ -2417,6 +2633,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
         const SizedBox(height: 24),
 
+        /*
         // 2안 카드
         Padding(
           padding: const EdgeInsets.only(left: 4, top: 8, bottom: 8),
@@ -2473,6 +2690,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             ],
           ),
         ),
+        */
       ],
     );
   }
@@ -3850,6 +4068,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     }
 
                     _prefs?.saveName(nickname);
+                    _prefs?.saveGoogleEmail(_emailCtrl.text.trim());
                     _updateNotificationTopic(nickname);
                     _sendDevicePing(); // Bind UUID immediately
                     _prefs?.saveHeight(double.tryParse(_heightCtrl.text) ?? 0.0);
@@ -4041,7 +4260,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     await _prefs!.saveConsentGiven(true);
                     await _prefs!.saveConsentDate(nowStr);
                     setState(() {});
-                    _checkDeviceUuidAndPrompt(); // Prompt immediately after consent is given!
+                    // _checkDeviceUuidAndPrompt(); // 불필요해진 UUID 기반 복원 팝업 주석 처리
                   }
                 : null,
             style: ElevatedButton.styleFrom(

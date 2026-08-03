@@ -27,13 +27,26 @@ def parse_email_body(body_text):
     position_match = re.search(r"착용[ \t]*위치[ \t]*:[ \t]*(.*)", body_text)
     tightness_match = re.search(r"착용[ \t]*정도[ \t]*:[ \t]*(.*)", body_text)
     competitor_match = re.search(r"동시착용[ \t]*타사기기[ \t]*:[ \t]*(.*)", body_text)
-    training_match = re.search(r"훈련[ \t]*종류[ \t]*:[ \t]*(.*)", body_text)
-    distance_match = re.search(r"훈련[ \t]*거리[ \t]*:[ \t]*(.*)", body_text)
+    training_match = re.search(r"(?:훈련|운동)[ \t]*종류[ \t]*:[ \t]*(.*)", body_text)
+    distance_match = re.search(r"(?:훈련|운동)[ \t]*거리[ \t]*:[ \t]*(.*)", body_text)
     location_match = re.search(r"장소[ \t]*:[ \t]*(.*)", body_text)
     remarks_match = re.search(r"특이[ \t]*사항[ \t]*:[ \t]*(.*)", body_text)
     
     consent_given_match = re.search(r"동의[ \t]*여부[ \t]*:[ \t]*(.*)", body_text)
     consent_date_match = re.search(r"동의[ \t]*일시[ \t]*:[ \t]*(.*)", body_text)
+
+    # 센서 및 데이터 이슈 파싱 추가
+    gps_status_match = re.search(r"GPS[ \t]*:[ \t]*(.*)", body_text)
+    gps_memo_match = re.search(r"GPS[ \t]*:.*?\n\s*└\s*메모[ \t]*:[ \t]*(.*)", body_text)
+    
+    hr_status_match = re.search(r"심박수\(HR\)[ \t]*:[ \t]*(.*)", body_text)
+    hr_memo_match = re.search(r"심박수\(HR\)[ \t]*:.*?\n\s*└\s*메모[ \t]*:[ \t]*(.*)", body_text)
+
+    pace_status_match = re.search(r"속도/페이스[ \t]*:[ \t]*(.*)", body_text)
+    pace_memo_match = re.search(r"속도/페이스[ \t]*:.*?\n\s*└\s*메모[ \t]*:[ \t]*(.*)", body_text)
+
+    alt_status_match = re.search(r"고도[ \t]*:[ \t]*(.*)", body_text)
+    alt_memo_match = re.search(r"고도[ \t]*:.*?\n\s*└\s*메모[ \t]*:[ \t]*(.*)", body_text)
     
     # http로 시작하는 다운로드 링크 추출 (보통 가장 마지막 줄 부근)
     # 뒤쪽에서부터 매칭하거나 본문 아래쪽의 link를 정확하게 잡도록 함
@@ -83,6 +96,14 @@ def parse_email_body(body_text):
         "has_cola": has_cola,
         "has_log": has_log,
         "capture_count": capture_count,
+        "gps_status": gps_status_match.group(1).strip() if gps_status_match else "정상",
+        "gps_memo": gps_memo_match.group(1).strip() if gps_memo_match else "",
+        "hr_status": hr_status_match.group(1).strip() if hr_status_match else "정상",
+        "hr_memo": hr_memo_match.group(1).strip() if hr_memo_match else "",
+        "pace_status": pace_status_match.group(1).strip() if pace_status_match else "정상",
+        "pace_memo": pace_memo_match.group(1).strip() if pace_memo_match else "",
+        "altitude_status": alt_status_match.group(1).strip() if alt_status_match else "정상",
+        "altitude_memo": alt_memo_match.group(1).strip() if alt_memo_match else "",
     }
 
 

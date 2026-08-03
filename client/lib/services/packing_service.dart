@@ -17,6 +17,7 @@ class PackingService {
 
   static Future<PackResult> pack({
     required String name,
+    required String email,
     required double heightCm,
     required double weightKg,
     required String watch,
@@ -57,6 +58,7 @@ class PackingService {
       'created_at': session.createdAt,
       'user': {
         'name': name,
+        'email': email,
         'height_cm': heightCm,
         'weight_kg': weightKg,
         'watch': watch,
@@ -94,6 +96,7 @@ class PackingService {
     // ── info.txt (사람용) ──────────────────────────────────────
     final infoText = _buildInfoText(
       name: name,
+      email: email,
       heightCm: heightCm,
       weightKg: weightKg,
       watch: watch,
@@ -147,6 +150,7 @@ class PackingService {
 
   static String _buildInfoText({
     required String name,
+    required String email,
     required double heightCm,
     required double weightKg,
     required String watch,
@@ -185,6 +189,9 @@ class PackingService {
 
     sb.writeln('[ 사용자 정보 ]');
     sb.writeln('이름       : $name');
+    if (email.isNotEmpty) {
+      sb.writeln('이메일     : $email');
+    }
     sb.writeln('키         : $heightCm cm');
     sb.writeln('몸무게     : $weightKg kg');
     sb.writeln('착용 워치  : $watch');
@@ -194,19 +201,19 @@ class PackingService {
 
     sb.writeln('[ 센서/데이터 이슈 결과 ]');
     sb.writeln('GPS        : $gpsStatus');
-    if (gpsStatus == '확인 필요' && gpsMemo.isNotEmpty) {
+    if (gpsMemo.isNotEmpty) {
       sb.writeln('  └ 메모  : $gpsMemo');
     }
     sb.writeln('심박수(HR)  : $hrStatus');
-    if (hrStatus == '확인 필요' && hrMemo.isNotEmpty) {
+    if (hrMemo.isNotEmpty) {
       sb.writeln('  └ 메모  : $hrMemo');
     }
     sb.writeln('속도/페이스 : $paceStatus');
-    if (paceStatus == '확인 필요' && paceMemo.isNotEmpty) {
+    if (paceMemo.isNotEmpty) {
       sb.writeln('  └ 메모  : $paceMemo');
     }
     sb.writeln('고도       : $altitudeStatus');
-    if (altitudeStatus == '확인 필요' && altitudeMemo.isNotEmpty) {
+    if (altitudeMemo.isNotEmpty) {
       sb.writeln('  └ 메모  : $altitudeMemo');
     }
     sb.writeln();

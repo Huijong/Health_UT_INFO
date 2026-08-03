@@ -13,12 +13,15 @@ import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.CapabilityClient
 import androidx.wear.remote.interactions.RemoteActivityHelper
+import android.accounts.AccountManager
 
 class MainActivity : FlutterActivity() {
 
     private val fileChannel = FileChannelPlugin { this }
     private val wifiP2pPlugin by lazy { WifiP2pPlugin(this) }
     private val CHANNEL = "com.samsung.health.client/app_info"
+    private var pendingEmailResult: MethodChannel.Result? = null
+    private val REQUEST_CODE_PICK_ACCOUNT = 1001
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -34,6 +37,9 @@ class MainActivity : FlutterActivity() {
                 "getAndroidId" -> {
                     val androidId = android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
                     result.success(androidId ?: "")
+                }
+                "getGoogleEmail" -> {
+                    pickGoogleAccount(result)
                 }
                 "checkWatchAppInstalled" -> {
                     checkWatchAppInstalled(result)
@@ -213,6 +219,16 @@ class MainActivity : FlutterActivity() {
 
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_CODE_PICK_ACCOUNT) {
+            if (resultCode == android.app.Activity.RESULT_OK && data != null) {
+                val email = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME) ?: ""
+                pendingEmailResult?.success(email)
+            } else {
+                pendingEmailResult?.success("")
+            }
+            pendingEmailResult = null
+            return
+        }
         if (!fileChannel.onActivityResult(requestCode, resultCode, data)) {
             super.onActivityResult(requestCode, resultCode, data)
         }
@@ -309,6 +325,26 @@ class MainActivity : FlutterActivity() {
             } catch (ex: Exception) {
                 result.error("LAUNCH_ERROR", ex.message, null)
             }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun pickGoogleAccount(result: MethodChannel.Result) {
+        pendingEmailResult = result
+        try {
+            val intent = AccountManager.newChooseAccountIntent(
+                null,
+                null,
+                arrayOf("com.google"),
+                null,
+                null,
+                null,
+                null
+            )
+            startActivityForResult(intent, REQUEST_CODE_PICK_ACCOUNT)
+        } catch (e: Exception) {
+            pendingEmailResult = null
+            result.success("")
         }
     }
 }

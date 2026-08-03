@@ -18,6 +18,7 @@ class PrefsService {
   static const _keyConsentDate = 'consent_date';
   static const _keyDeletedNoticeIds = 'deleted_notice_ids';
   static const _keyDeviceUuid = 'device_uuid';
+  static const _keyGoogleEmail = 'google_email';
 
   final SharedPreferences _prefs;
 
@@ -29,6 +30,7 @@ class PrefsService {
   }
 
   String get name => _prefs.getString(_keyName) ?? '';
+  String get googleEmail => _prefs.getString(_keyGoogleEmail) ?? '';
   double? get height {
     final v = _prefs.getDouble(_keyHeight);
     return v == 0.0 ? null : v;
@@ -68,6 +70,7 @@ class PrefsService {
   }
 
   Future<void> saveName(String value) => _prefs.setString(_keyName, value);
+  Future<void> saveGoogleEmail(String value) => _prefs.setString(_keyGoogleEmail, value);
   Future<void> saveDeviceUuid(String value) => _prefs.setString(_keyDeviceUuid, value);
   Future<void> saveHeight(double value) => _prefs.setDouble(_keyHeight, value);
   Future<void> saveWeight(double value) => _prefs.setDouble(_keyWeight, value);
@@ -106,5 +109,23 @@ class PrefsService {
       list.removeLast(); // 최대 5개 유지
     }
     await _prefs.setStringList('recent_locations', list);
+  }
+
+  /// 최근 운동 장소 삭제
+  Future<void> removeRecentLocation(String location) async {
+    final list = getRecentLocations();
+    list.remove(location);
+    await _prefs.setStringList('recent_locations', list);
+  }
+
+  /// 운동 종목 선택 횟수 획득
+  int getSportSelectionCount(String sport) {
+    return _prefs.getInt('sport_selection_count_$sport') ?? 0;
+  }
+
+  /// 운동 종목 선택 횟수 증가 및 기록
+  Future<void> incrementSportSelectionCount(String sport) async {
+    final count = getSportSelectionCount(sport);
+    await _prefs.setInt('sport_selection_count_$sport', count + 1);
   }
 }
