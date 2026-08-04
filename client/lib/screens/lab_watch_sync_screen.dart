@@ -5,6 +5,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:client/services/prefs_service.dart';
+import 'package:archive/archive_io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 class LabWatchSyncScreen extends StatefulWidget {
@@ -28,14 +30,19 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   String _syncMode = 'AP'; 
 
   // List of files fetched from watch
-  List<Map<String, dynamic>> _files = [];
-  bool _isLoadingFileList = false;
-  bool _isCompressing = false; // 워치에서 COLA 파일 압축 중 상태
+  int _autoSyncStage = 0; // 0: 대기, 1: 연결 중, 2: COLA 수신 중, 3: Log 수신 중, 4: 압축 최적화, 5: 완료
+  double _syncProgress = 0.0;
+  int? _syncStartTimeMs;
+  int _syncTransferredBytes = 0;
+  int _syncTotalBytes = 0;
+  String? _targetColaFilename;
+  String? _targetLogFilename;
 
   bool _isWatchAppInstalled = true; // Default to true
 
   // Animation controller for radar pulsing effect
   AnimationController? _radarController;
+  AnimationController? _spinController;
   StreamSubscription? _wifiP2pSubscription;
 
   final List<String> _logs = [];
@@ -84,6 +91,10 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       vsync: this,
       duration: const Duration(seconds: 2),
     );
+    _spinController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat();
     _checkPermissions();
     _checkWatchAppInstalled();
     _setupWifiP2pEventSubscription();
@@ -92,6 +103,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   @override
   void dispose() {
     _radarController?.dispose();
+    _spinController?.dispose();
     _wifiP2pSubscription?.cancel();
     _wifiP2pChannel.invokeMethod("stopServer");
     super.dispose();
@@ -127,7 +139,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
           setState(() {
             _connectedEndpointId = null;
             _connectedEndpointName = null;
-            _files.clear();
+            _autoSyncStage = 0;
           });
         }
         break;
@@ -144,66 +156,53 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         _addLog("Received file list JSON.");
         try {
           final decoded = jsonDecode(jsonStr) as List<dynamic>;
+          final fileNames = decoded.map((e) => e['name'] as String).toList();
+          fileNames.sort();
+          
           setState(() {
-            _files = decoded.map((e) {
-              final map = Map<String, dynamic>.from(e);
-              map['selected'] = false;
-              map['progress'] = 0.0;
-              map['status'] = "대기";
-              return map;
-            }).toList();
-            _isLoadingFileList = false;
-            _isCompressing = false;
+            _targetColaFilename = fileNames.where((n) => n.startsWith("COLA_FILE_")).lastOrNull;
+            _targetLogFilename = fileNames.where((n) => n.startsWith("log_")).lastOrNull;
           });
+          _startNextAutoSyncPhase();
         } catch (e) {
           _addLog("JSON Parse error: $e");
-          setState(() {
-            _isLoadingFileList = false;
-            _isCompressing = false;
-          });
+          setState(() => _autoSyncStage = 0);
         }
         break;
 
       case "compressing":
-        _addLog("워치에서 COLA 파일 압축 중...");
-        setState(() {
-          _isCompressing = true;
-          _isLoadingFileList = true;
-        });
+        _addLog("워치에서 데이터 패키징 중...");
         break;
 
       case "downloadProgress":
         final progressMap = Map<String, dynamic>.from(data);
-        final filename = progressMap["filename"] as String;
         final progress = progressMap["progress"] as double;
-        final transferred = progressMap["transferred"] as int;
-        final total = progressMap["total"] as int;
-
-        _updateFileStatus(
-          filename,
-          "다운로드 중...",
-          progress,
-          transferredBytes: transferred,
-          totalBytes: total,
-        );
+        final transferred = progressMap["transferred"] as int?;
+        final total = progressMap["total"] as int?;
+        
+        setState(() {
+          _syncProgress = progress;
+          if (transferred != null) _syncTransferredBytes = transferred;
+          if (total != null) _syncTotalBytes = total;
+          _syncStartTimeMs ??= DateTime.now().millisecondsSinceEpoch;
+        });
         break;
 
       case "downloadComplete":
         final completeMap = Map<String, dynamic>.from(data);
         final filename = completeMap["filename"] as String;
         final tempPath = completeMap["path"] as String;
-        _addLog("Download finished for $filename. Processing...");
-        _processDownloadedFile(filename, tempPath);
+        _addLog("Download finished for $filename.");
+        _moveToColaFolder(filename, tempPath).then((_) {
+          _startNextAutoSyncPhase();
+        });
         break;
 
       case "downloadFailure":
         final failMap = Map<String, dynamic>.from(data);
-        final filename = failMap["filename"] as String?;
         final error = failMap["error"] as String? ?? "Unknown error";
         _addLog("Download failed: $error");
-        if (filename != null) {
-          _updateFileStatus(filename, "실패", 0.0);
-        }
+        setState(() => _autoSyncStage = 0);
         break;
 
       case "error":
@@ -348,7 +347,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   void _sendFileListRequest() async {
     if (_connectedEndpointId == null) return;
     setState(() {
-      _isLoadingFileList = true;
+      _autoSyncStage = 1;
     });
     _addLog("Requesting file list from Watch...");
     try {
@@ -356,95 +355,102 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     } catch (e) {
       _addLog("Failed to request file list: $e");
       setState(() {
-        _isLoadingFileList = false;
+        _autoSyncStage = 0;
       });
     }
   }
 
-  Future<void> _processDownloadedFile(String filename, String tempPath) async {
+  Future<void> _moveToColaFolder(String filename, String tempPath) async {
     try {
-      _addLog("Locating target folder: /sdcard/Documents/COLA_FILE/...");
       final targetFolder = Directory("/sdcard/Documents/COLA_FILE/");
-      if (!await targetFolder.exists()) {
-        _addLog("Target folder does not exist. Creating...");
-        await targetFolder.create(recursive: true);
-      }
-
+      if (!await targetFolder.exists()) await targetFolder.create(recursive: true);
+      
       final targetFile = File("${targetFolder.path}$filename");
       final sourceFile = File(tempPath);
       
-      final srcExists = await sourceFile.exists();
-      if (srcExists) {
-        _addLog("Copying file to target path: ${targetFile.path}...");
+      if (await sourceFile.exists()) {
         await sourceFile.copy(targetFile.path);
-        
-        _addLog("Deleting temporary cache file...");
         await sourceFile.delete();
-
-        _addLog("File transfer workflow successfully completed.");
-        _updateFileStatus(filename, "완료", 1.0);
-      } else {
-        _addLog("Error: Source cache file does not exist at $tempPath!");
-        _updateFileStatus(filename, "실패", 0.0);
       }
     } catch (e) {
-      _addLog("Exception in _processDownloadedFile: $e");
-      _updateFileStatus(filename, "실패", 0.0);
+      _addLog("Move error: $e");
     }
   }
 
-  void _updateFileStatus(
-    String filename, 
-    String status, 
-    double progress, {
-    int transferredBytes = 0, 
-    int totalBytes = 0
-  }) {
-    setState(() {
-      for (var f in _files) {
-        if (f['name'] == filename) {
-          f['status'] = status;
-          f['progress'] = progress;
-          f['transferred'] = transferredBytes;
-          f['total'] = totalBytes;
-          break;
-        }
+  void _startNextAutoSyncPhase() {
+    if (_autoSyncStage <= 1 && _targetColaFilename != null) {
+      setState(() {
+        _autoSyncStage = 2;
+        _syncProgress = 0.0;
+        _syncStartTimeMs = null;
+      });
+      _requestDownload(_targetColaFilename!);
+    } else if (_autoSyncStage <= 2 && _targetLogFilename != null) {
+      setState(() {
+        _autoSyncStage = 3;
+        _syncProgress = 0.0;
+        _syncStartTimeMs = null;
+      });
+      _requestDownload(_targetLogFilename!);
+    } else {
+      _recompressDownloadedFiles();
+    }
+  }
+
+  Future<void> _recompressDownloadedFiles() async {
+    setState(() => _autoSyncStage = 4);
+    final targetFolder = "/sdcard/Documents/COLA_FILE/";
+    
+    try {
+      if (_targetColaFilename != null) {
+        await compute(_recompressZipIsolate, "$targetFolder${_targetColaFilename!}");
       }
-    });
+      if (_targetLogFilename != null) {
+        await compute(_recompressZipIsolate, "$targetFolder${_targetLogFilename!}");
+      }
+      
+      setState(() => _autoSyncStage = 5);
+      _addLog("All sync & compression complete!");
+    } catch (e) {
+      _addLog("Recompress error: $e");
+      setState(() => _autoSyncStage = 0);
+    }
+  }
+
+  static void _recompressZipIsolate(String zipPath) {
+    final file = File(zipPath);
+    if (!file.existsSync()) return;
+    
+    final tempDir = Directory("${zipPath}_unzipped");
+    if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+    tempDir.createSync();
+    
+    final bytes = file.readAsBytesSync();
+    final archive = ZipDecoder().decodeBytes(bytes);
+    for (final file in archive) {
+      final filename = file.name;
+      if (file.isFile) {
+        final data = file.content as List<int>;
+        File('${tempDir.path}/$filename')
+          ..createSync(recursive: true)
+          ..writeAsBytesSync(data);
+      } else {
+        Directory('${tempDir.path}/$filename').createSync(recursive: true);
+      }
+    }
+    
+    final encoder = ZipFileEncoder();
+    encoder.zipDirectory(tempDir, filename: zipPath);
+    tempDir.deleteSync(recursive: true);
   }
 
   void _requestDownload(String filename) async {
     if (_connectedEndpointId == null) return;
-
-    setState(() {
-      for (var f in _files) {
-        if (f['name'] == filename) {
-          f['status'] = "다운로드 중...";
-          f['progress'] = 0.0;
-        }
-      }
-    });
-
     _addLog("Requesting download for $filename...");
     try {
       await _wifiP2pChannel.invokeMethod("requestFileDownload", {"filename": filename});
     } catch (e) {
       _addLog("Request download error: $e");
-    }
-  }
-
-  void _downloadSelectedFiles() {
-    final selected = _files.where((f) => f['selected'] == true && f['status'] != "완료").toList();
-    if (selected.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("다운로드할 파일을 선택해 주세요.")),
-      );
-      return;
-    }
-
-    for (var f in selected) {
-      final filename = f['name'] as String;
-      _requestDownload(filename);
     }
   }
 
@@ -577,7 +583,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
                 setState(() {
                   _connectedEndpointId = null;
                   _connectedEndpointName = null;
-                  _files.clear();
+                  _autoSyncStage = 0;
                 });
               },
             ),
@@ -664,211 +670,101 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   }
 
   Widget _buildFileListView() {
-    if (_isLoadingFileList) {
+    if (_autoSyncStage == 0) {
       return Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Color(0xFF3DFFC1))),
+            const Icon(Icons.sync_rounded, size: 48, color: Colors.white24),
             const SizedBox(height: 16),
-            Text(
-              _isCompressing
-                  ? 'COLA 파일 압축 중...\n잠시만 기다려 주세요.'
-                  : '워치에서 운동 데이터 목록을 가져오는 중...',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
-            ),
-            if (_isCompressing) ...[  
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.compress_rounded, size: 14, color: Color(0xFF3DFFC1)),
-                  const SizedBox(width: 4),
-                  Text(
-                    'COLA_FILE_[버전]_[날짜]_[시간].zip 형식으로 변환 중',
-                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
-                  ),
-                ],
-              ),
-            ],
-          ],
+            const Text('위의 탐색 버튼을 눌러 워치와 연결하세요.', style: TextStyle(color: Colors.white70)),
+          ]
         ),
       );
     }
-
-    if (_files.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.folder_open_rounded, size: 48, color: Colors.white24),
-            const SizedBox(height: 16),
-            const Text(
-              '워치에 저장된 운동 데이터 파일(.zip)이 없습니다.',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '워치 앱에서 운동을 완료하여 데이터를 생성해 주세요.',
-              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _sendFileListRequest,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('목록 새로고침'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E5BFF),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
+    
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              '워치 운동 파일 목록',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
-            ),
-            TextButton(
-              onPressed: _sendFileListRequest,
-              child: const Row(
-                children: [
-                  Icon(Icons.refresh, size: 16, color: Color(0xFF3DFFC1)),
-                  SizedBox(width: 4),
-                  Text('새로고침', style: TextStyle(color: Color(0xFF3DFFC1))),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Expanded(
-          child: ListView.builder(
-            itemCount: _files.length,
-            itemBuilder: (context, index) {
-              final file = _files[index];
-              final String name = file['name'];
-              final int size = file['size'];
-              final double progress = file['progress'] ?? 0.0;
-              final String status = file['status'] ?? "대기";
-              final bool selected = file['selected'] ?? false;
-              final int transferred = file['transferred'] ?? 0;
-              final int total = file['total'] ?? 0;
+        const Text('자동 동기화 진행 상황', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+        const SizedBox(height: 20),
+        _buildSyncStageRow(1, '워치 연결 및 패키지 요청 중', _autoSyncStage > 1, _autoSyncStage == 1),
+        _buildSyncStageRow(2, 'COLA 데이터 수신 중', _autoSyncStage > 2, _autoSyncStage == 2, progress: _autoSyncStage == 2 ? _syncProgress : null, transferred: _autoSyncStage == 2 ? _syncTransferredBytes : null, total: _autoSyncStage == 2 ? _syncTotalBytes : null, startTime: _autoSyncStage == 2 ? _syncStartTimeMs : null),
+        _buildSyncStageRow(3, 'Log 데이터 수신 중', _autoSyncStage > 3, _autoSyncStage == 3, progress: _autoSyncStage == 3 ? _syncProgress : null, transferred: _autoSyncStage == 3 ? _syncTransferredBytes : null, total: _autoSyncStage == 3 ? _syncTotalBytes : null, startTime: _autoSyncStage == 3 ? _syncStartTimeMs : null),
+        _buildSyncStageRow(4, '폰 단말 최적화 압축 진행 중', _autoSyncStage > 4, _autoSyncStage == 4),
+        _buildSyncStageRow(5, '동기화 완료!', _autoSyncStage == 5, false),
+      ],
+    );
+  }
 
-              // Size formatting
-              final String sizeText = size > 1024 * 1024
-                  ? '${(size / (1024 * 1024)).toStringAsFixed(1)} MB'
-                  : '${(size / 1024).toStringAsFixed(1)} KB';
+  Widget _buildSyncStageRow(int step, String label, bool isDone, bool isActive, {double? progress, int? transferred, int? total, int? startTime}) {
+    String percentStr = "";
+    String etaStr = "";
+    if (isActive && progress != null) {
+      percentStr = " ${(progress * 100).toStringAsFixed(1)}%";
+      if (transferred != null && total != null && startTime != null && progress < 1.0 && transferred > 0) {
+        final elapsedMs = DateTime.now().millisecondsSinceEpoch - startTime;
+        if (elapsedMs > 500) {
+          final speedBytesPerSec = (transferred / (elapsedMs / 1000)).round();
+          if (speedBytesPerSec > 0) {
+            final remainingBytes = total - transferred;
+            final remainingSec = (remainingBytes / speedBytesPerSec).ceil();
+            final speedMBps = (speedBytesPerSec / (1024 * 1024)).toStringAsFixed(2);
+            etaStr = "남은 시간: 약 ${remainingSec}초 ($speedMBps MB/s)";
+          }
+        }
+      }
+    }
 
-              String displayStatus = status;
-              if (status == "다운로드 중...") {
-                final double percent = progress * 100;
-                final double txMB = transferred / (1024 * 1024);
-                final double totalMB = total / (1024 * 1024);
-                displayStatus = "${percent.toStringAsFixed(1)}% (${txMB.toStringAsFixed(1)}MB/${totalMB.toStringAsFixed(1)}MB)";
-              }
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: _GlassCard(
-                  padding: const EdgeInsets.all(12),
-                  radius: 12,
-                  child: Row(
-                    children: [
-                      Checkbox(
-                        value: selected,
-                        activeColor: const Color(0xFF3DFFC1),
-                        checkColor: Colors.black,
-                        onChanged: status == "완료" || status == "다운로드 중..."
-                            ? null
-                            : (val) {
-                                setState(() {
-                                  file['selected'] = val;
-                                });
-                              },
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  sizeText,
-                                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
-                                ),
-                                Text(
-                                  displayStatus,
-                                  style: TextStyle(
-                                    color: status == "완료"
-                                        ? const Color(0xFF3DFFC1)
-                                        : status == "다운로드 중..."
-                                            ? const Color(0xFF2E5BFF)
-                                            : status.startsWith("실패")
-                                                ? const Color(0xFFFF5252)
-                                                : Colors.white60,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (status == "다운로드 중...") ...[
-                              const SizedBox(height: 8),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value: progress,
-                                  backgroundColor: Colors.white12,
-                                  valueColor: const AlwaysStoppedAnimation(Color(0xFF2E5BFF)),
-                                  minHeight: 4,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isDone)
+            const Icon(Icons.check_circle, color: Color(0xFF3DFFC1), size: 24)
+          else if (isActive)
+            RotationTransition(
+              turns: _spinController!,
+              child: const Icon(Icons.sync, color: Color(0xFF2E5BFF), size: 24),
+            )
+          else
+            const Icon(Icons.radio_button_unchecked, color: Colors.white24, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label + percentStr,
+                  style: TextStyle(
+                    color: isActive || isDone ? Colors.white : Colors.white54,
+                    fontWeight: isActive || isDone ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 15,
                   ),
                 ),
-              );
-            },
+                if (isActive && etaStr.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(etaStr, style: const TextStyle(color: Color(0xFF3DFFC1), fontSize: 12)),
+                ],
+                if (isActive && progress != null) ...[
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: Colors.white12,
+                    valueColor: const AlwaysStoppedAnimation(Color(0xFF2E5BFF)),
+                  ),
+                ] else if (isActive && step == 4) ...[
+                  const SizedBox(height: 8),
+                  const LinearProgressIndicator(
+                    backgroundColor: Colors.white12,
+                    valueColor: AlwaysStoppedAnimation(Color(0xFF2E5BFF)),
+                  ),
+                ]
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        ElevatedButton(
-          onPressed: _downloadSelectedFiles,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF3DFFC1),
-            foregroundColor: Colors.black,
-            minimumSize: const Size.fromHeight(54),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-          child: const Text(
-            '선택 파일 가져오기',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

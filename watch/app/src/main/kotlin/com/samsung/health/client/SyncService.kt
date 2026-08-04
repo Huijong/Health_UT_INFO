@@ -223,6 +223,8 @@ class SyncService : Service() {
                     writeLog("Physical Wi-Fi network available! Binding active socket link...")
                     activeWifiNetwork = network
                     connectivityManager?.bindProcessToNetwork(network)
+                    // 기존에 엉뚱한 망(LTE 등)으로 연결된 가짜 소켓이 있다면 강제 종료하여 새 Wi-Fi 망으로 재접속 유도
+                    stopTcpClient()
                 }
 
                 override fun onLost(network: Network) {
@@ -466,6 +468,7 @@ class SyncService : Service() {
                 sendSocketLine("COMPRESSING")
                 // Compress any unzipped COLA folders into new naming format
                 compressColaFiles()
+                compressLogFiles()
                 // Send the final file list
                 sendSocketLine("FILE_LIST:${getFileListJson()}")
             }
@@ -515,6 +518,44 @@ class SyncService : Service() {
         return "COLA_FILE_${version}_${dateStr}_${timeStr}.zip"
     }
 
+    private fun buildLogZipName(): String {
+        val version = getWatchSoftwareVersion()
+        val (dateStr, timeStr) = parseColaDateTime("ALL")
+        return "log_${version}_${dateStr}_${timeStr}.zip"
+    }
+
+    private fun compressLogFiles() {
+        val logFolder = File("/sdcard/log/")
+        writeLog("COMPRESS: logFolder exists? ${logFolder.exists()}, isDir? ${logFolder.isDirectory}, canRead? ${logFolder.canRead()}")
+        
+        if (!logFolder.exists()) {
+            writeLog("COMPRESS: /sdcard/log/ does not exist. Aborting log compression.")
+            return
+        }
+
+        val targetFolder = File("/sdcard/Documents/COLA_FILE/")
+        if (!targetFolder.exists()) { targetFolder.mkdirs() }
+
+        val zipName = buildLogZipName()
+        val zipFile = File(targetFolder, zipName)
+
+        targetFolder.listFiles { _, n -> n.startsWith("log_") && n.endsWith(".zip") }?.forEach { f ->
+            try { f.delete() } catch (_: Exception) {}
+        }
+
+        writeLog("COMPRESS: log folder → $zipName")
+        try {
+            ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
+                zos.setLevel(java.util.zip.Deflater.NO_COMPRESSION)
+                addFolderToZip(logFolder, "log", zos)
+            }
+            writeLog("COMPRESS: done → $zipName")
+        } catch (e: Exception) {
+            writeLog("COMPRESS log error: ${e.message}")
+            try { zipFile.delete() } catch (_: Exception) {}
+        }
+    }
+
     /**
      * Scans /sdcard/Documents/COLA_FILE/ for directories whose names
      * are 10-digit date-time strings (YYMMDDHHMM) and compresses each
@@ -528,30 +569,39 @@ class SyncService : Service() {
         val colaPattern = Regex("^\\d{10}$")
         val targets = folder.listFiles { f ->
             f.isDirectory && colaPattern.matches(f.name)
-        } ?: return
+        }?.sortedBy { it.name } ?: return
 
         if (targets.isEmpty()) {
             writeLog("COMPRESS: no unzipped COLA folders found.")
             return
         }
 
-        for (dir in targets) {
-            val zipName = buildColaZipName(dir.name)
-            val zipFile = File(folder, zipName)
-            if (zipFile.exists()) {
-                writeLog("COMPRESS: $zipName already exists, skipping.")
-                continue
-            }
-            writeLog("COMPRESS: ${dir.name} → $zipName")
-            try {
-                ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
+        val newestFolder = targets.last()
+        val zipName = buildColaZipName(newestFolder.name)
+        val zipFile = File(folder, zipName)
+
+        if (zipFile.exists()) {
+            writeLog("COMPRESS: $zipName already exists, skipping.")
+            return
+        }
+
+        // Clean up old zip files before creating the new unified one
+        folder.listFiles { _, n -> n.startsWith("COLA_FILE_") && n.endsWith(".zip") }?.forEach { f ->
+            try { f.delete() } catch (_: Exception) {}
+        }
+
+        writeLog("COMPRESS: ${targets.size} folders → $zipName")
+        try {
+            ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
+                zos.setLevel(java.util.zip.Deflater.NO_COMPRESSION)
+                for (dir in targets) {
                     addFolderToZip(dir, dir.name, zos)
                 }
-                writeLog("COMPRESS: done → $zipName")
-            } catch (e: Exception) {
-                writeLog("COMPRESS error for ${dir.name}: ${e.message}")
-                try { zipFile.delete() } catch (_: Exception) {}
             }
+            writeLog("COMPRESS: done → $zipName")
+        } catch (e: Exception) {
+            writeLog("COMPRESS error: ${e.message}")
+            try { zipFile.delete() } catch (_: Exception) {}
         }
     }
 
@@ -581,6 +631,9 @@ class SyncService : Service() {
             writeLog("Sending $filename ($size bytes) with 1MB Buffer...")
             sendSocketLine("FILE_START:$filename:$size:$md5")
             socketWriter?.flush()
+            
+            // 패킷 병합 방지: 폰의 BufferedReader가 파일 데이터까지 미리 읽어버리는 현상을 막기 위해 패킷 경계선(Delay) 형성
+            Thread.sleep(200)
             
             val out = BufferedOutputStream(tcpSocket?.getOutputStream() ?: return, BUFFER_SIZE)
             FileInputStream(file).use { fis ->
