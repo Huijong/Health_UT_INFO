@@ -13,7 +13,7 @@ class RankingScreen extends StatefulWidget {
   State<RankingScreen> createState() => _RankingScreenState();
 }
 
-class _RankingScreenState extends State<RankingScreen> {
+class _RankingScreenState extends State<RankingScreen> with SingleTickerProviderStateMixin {
   late List<String> _months;
   late String _selectedMonth;
   bool _isLoading = true;
@@ -22,9 +22,18 @@ class _RankingScreenState extends State<RankingScreen> {
   List<dynamic> _rankings = [];
   Map<String, dynamic> _meta = {};
 
+  late AnimationController _glowController;
+  late Animation<double> _glowAnimation;
+
   @override
   void initState() {
     super.initState();
+    _glowController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
+    _glowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
+      parent: _glowController,
+      curve: Curves.easeInOut,
+    ));
+    _glowController.repeat(reverse: true);
     _months = _getRecentMonths();
     _selectedMonth = _months.first;
     _fetchRankings();
@@ -44,6 +53,12 @@ class _RankingScreenState extends State<RankingScreen> {
       temp = DateTime(temp.year, temp.month - 1, 1);
     }
     return list;
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchRankings() async {
@@ -184,9 +199,9 @@ class _RankingScreenState extends State<RankingScreen> {
                                   child: _buildRankingItem(item, actualIndex),
                                 );
                               }),
-                            ],
-                          ],
-                        ],
+                            ], // if length > 3 닫기
+                          ], // else 블록 닫기
+                        ], // ListView children 닫기
                       ),
                     ),
         ),
@@ -655,16 +670,30 @@ class _RankingScreenState extends State<RankingScreen> {
           ),
         ),
         _GlassCard(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 28, bottom: 16, left: 12, right: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildPodiumColumn(rank2, 2, 60),
-                _buildPodiumColumn(rank1, 1, 85),
-                _buildPodiumColumn(rank3, 3, 50),
-              ],
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0.0, -0.1),
+                radius: 1.2,
+                colors: [
+                  const Color(0xFFFFD700).withOpacity(0.35), // 찬란한 황금빛 코어
+                  const Color(0xFFFDD835).withOpacity(0.1), // 퍼져나가는 옐로우 골드
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 28, bottom: 16, left: 12, right: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _buildPodiumColumn(rank2, 2, 60),
+                  _buildPodiumColumn(rank1, 1, 85),
+                  _buildPodiumColumn(rank3, 3, 50),
+                ],
+              ),
             ),
           ),
         ),
@@ -716,118 +745,136 @@ class _RankingScreenState extends State<RankingScreen> {
     double avatarRadius;
 
     if (rank == 1) {
-      themeColor = const Color(0xFFFFD700); // Gold
-      glowColor = const Color(0xFFFFD700).withOpacity(0.2);
+      themeColor = const Color(0xFFFFD700); // Pure Gold
+      glowColor = const Color(0xFFFFD700).withOpacity(0.8);
       badgeEmoji = '👑';
       avatarRadius = 28;
     } else if (rank == 2) {
       themeColor = const Color(0xFFC0C0C0); // Silver
-      glowColor = Colors.white.withOpacity(0.1);
+      glowColor = Colors.white.withOpacity(0.3);
       badgeEmoji = '🥈';
       avatarRadius = 24;
     } else {
       themeColor = const Color(0xFFCD7F32); // Bronze
-      glowColor = const Color(0xFFCD7F32).withOpacity(0.15);
+      glowColor = const Color(0xFFCD7F32).withOpacity(0.35);
       badgeEmoji = '🥉';
       avatarRadius = 24;
     }
 
     return Expanded(
-      child: GestureDetector(
-        onTap: () => _showTesterHistory(name),
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: glowColor,
-                  blurRadius: 12,
-                  spreadRadius: 2,
+      child: AnimatedBuilder(
+        animation: _glowController,
+        builder: (context, child) {
+          final double animValue = rank == 1 ? _glowAnimation.value : 0.0;
+          final double currentBlur = rank == 1 ? 12.0 + (12.0 * animValue) : 12.0;
+          final double currentSpread = rank == 1 ? 4.0 + (6.0 * animValue) : 2.0;
+          final Color currentAvatarGlow = rank == 1 ? glowColor.withOpacity(0.4 + (0.6 * animValue)) : glowColor;
+          final Color currentBarGlow = rank == 1 ? glowColor.withOpacity(0.2 + (0.4 * animValue)) : glowColor.withOpacity(0.15);
+
+          return GestureDetector(
+            onTap: () => _showTesterHistory(name),
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: currentAvatarGlow,
+                      blurRadius: currentBlur,
+                      spreadRadius: currentSpread,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: CircleAvatar(
-              radius: avatarRadius,
-              backgroundColor: isMe ? const Color(0xFF3DFFC1) : themeColor.withOpacity(0.15),
-              child: CircleAvatar(
-                radius: avatarRadius - 2,
-                backgroundColor: const Color(0xFF1E2020),
-                child: Text(
-                  rank == 1
-                      ? '🥇'
-                      : rank == 2
-                          ? '🥈'
-                          : '🥉',
-                  style: TextStyle(
-                    fontSize: rank == 1 ? 22 : 18,
+                child: CircleAvatar(
+                  radius: avatarRadius,
+                  backgroundColor: isMe ? const Color(0xFF3DFFC1) : themeColor.withOpacity(0.15),
+                  child: CircleAvatar(
+                    radius: avatarRadius - 2,
+                    backgroundColor: const Color(0xFF1E2020),
+                    child: Text(
+                      rank == 1
+                          ? '🥇'
+                          : rank == 2
+                              ? '🥈'
+                              : '🥉',
+                      style: TextStyle(
+                        fontSize: rank == 1 ? 22 : 18,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
+                    color: isMe ? const Color(0xFF3DFFC1) : Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${_formatPoints(points)}P (${submissions}건)',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.bold,
+                  color: themeColor,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                height: barHeight,
+                width: 60,
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: currentBarGlow,
+                      blurRadius: currentBlur,
+                      spreadRadius: rank == 1 ? 2.0 + (4.0 * animValue) : 2.0,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      rank == 1 ? const Color(0xFFFFD700).withOpacity(0.8) : themeColor.withOpacity(0.6),
+                      rank == 1 ? const Color(0xFFFDD835).withOpacity(0.1) : themeColor.withOpacity(0.05),
+                    ],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                  border: Border.all(
+                    color: themeColor.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$rank',
+                  style: TextStyle(
+                    fontSize: rank == 1 ? 18 : 14,
+                    fontWeight: FontWeight.bold,
+                    color: themeColor,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                color: isMe ? const Color(0xFF3DFFC1) : Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '${_formatPoints(points)}P (${submissions}건)',
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.bold,
-              color: themeColor,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            height: barHeight,
-            width: 60,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  themeColor.withOpacity(0.4),
-                  themeColor.withOpacity(0.05),
-                ],
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-              border: Border.all(
-                color: themeColor.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '$rank',
-              style: TextStyle(
-                fontSize: rank == 1 ? 18 : 14,
-                fontWeight: FontWeight.bold,
-                color: themeColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
+        );
+      }),
     );
   }
 
