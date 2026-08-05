@@ -2,6 +2,11 @@ import 'dart:io';
 import 'dart:ui';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
+import 'dart:io';
+import 'lab_watch_sync_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 import '../config/app_config.dart';
@@ -157,6 +162,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
+  String? _hotspotSsid;
+  String? _hotspotPwd;
+  bool _isHotspotOn = false;
+  bool _wentToHotspotSettings = false;
   static const _appChannel = MethodChannel('com.samsung.health.client/app_info');
   final _formKey1 = GlobalKey<FormState>();
   final _formKey5 = GlobalKey<FormState>();
@@ -321,6 +330,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   @override
   void initState() {
     super.initState();
+    _loadHotspotConfig();
     WidgetsBinding.instance.addObserver(this);
     _confettiController = ConfettiController(duration: const Duration(seconds: 3));
     _init();
@@ -355,6 +365,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       _distanceCtrl.clear();
       // 운동 장소 역시 진입 시마다 빈 값 및 힌트 상태로 초기화
       _locationCtrl.clear();
+      _fitFiles.clear();
+      _garminFiles.clear();
+      _colaFiles.clear();
+      _logFiles.clear();
+      _captureFiles.clear();
     });
 
     final details = _prefs!.getSportDetail(sport);
@@ -1460,6 +1475,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   // ── 클립보드 감시 및 이메일 전송 ──────────────────────────────────
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_wentToHotspotSettings) {
+        _wentToHotspotSettings = false;
+        setState(() { _isHotspotOn = true; });
+      }
+      if (_currentStep == 4) _scanGarminFilesFromDownload();
+    }
     if (state == AppLifecycleState.resumed && _packResult != null) {
       Future.delayed(const Duration(milliseconds: 400), _checkClipboard);
     }
@@ -3400,128 +3422,378 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   }
 
   // ── Step 5: 파일 첨부 및 디테일 입력 ─────────────────────────────────
+
+  Future<void> _loadHotspotConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _hotspotSsid = prefs.getString('hotspot_ssid') ?? 'healthport';
+      _hotspotPwd = prefs.getString('hotspot_pwd') ?? '12345678';
+    });
+  }
+
+  Future<void> _saveHotspotConfig(String key, String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, value);
+  }
+
+  Future<void> _openHotspotSettings() async {
+    _wentToHotspotSettings = true;
+    Clipboard.setData(ClipboardData(text: _hotspotSsid ?? 'healthport'));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('네트워크 이름이 복사되었습니다. 붙여넣기 하세요.')),
+    );
+    if (Platform.isAndroid) {
+      final intent = const AndroidIntent(
+        action: 'android.settings.TETHER_SETTINGS',
+      );
+      await intent.launch();
+    }
+  }
+
+  Future<void> _triggerDialer9900() async {
+    const channel = MethodChannel('com.samsung.health.client/app_info');
+    try {
+      final bool result = await channel.invokeMethod('openWatchSysDump');
+      if (result) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('워치에 SysDump 호출 요청을 전송했습니다.')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('페어링된 워치 노드를 찾을 수 없습니다.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('워치 SysDump 호출 실패: $e')),
+        );
+      }
+    }
+  }
+
+  void _scanGarminFilesFromDownload() {
+    final dir = Directory('/storage/emulated/0/Download');
+    if (dir.existsSync()) {
+      final files = dir.listSync();
+      for (var f in files) {
+        if (f is File) {
+          final name = f.path.split('/').last.toLowerCase();
+          if ((name.endsWith('.fit') || name.endsWith('.zip')) && name.contains('garmin')) {
+            bool exists = _garminFiles.any((e) => e.originalPath == f.path);
+            if (!exists) {
+              setState(() {
+                _garminFiles.add(AttachedFile(originalPath: f.path, name: f.path.split('/').last, sizeBytes: f.lengthSync(), type: AttachType.fit));
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  void _showWatchSyncWizard() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E2640),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 20,
+              top: 20,
+              left: 20,
+              right: 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.rocket_launch, color: Color(0xFF3DFFC1)),
+                    const SizedBox(width: 10),
+                    const Text('워치 자동 동기화 마법사', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white54),
+                      onPressed: () => Navigator.pop(ctx),
+                    )
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 30),
+                
+                // Step 1
+                const Text('Step 1. Watch 로그 덤프 준비', style: TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E5BFF),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: _triggerDialer9900,
+                        child: const Text('*#9900# 로그 확보하러 가기', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const SizedBox(height: 10),
+                const Center(child: BouncingArrow()),
+                const SizedBox(height: 10),
+
+                // Step 2
+                const Text('Step 2. 핫스팟 설정 (워치 연결용)', style: TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: _hotspotSsid ?? 'healthport',
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: const InputDecoration(labelText: '네트워크 이름 (SSID)', labelStyle: TextStyle(color: Colors.white54)),
+                        onChanged: (val) {
+                          _hotspotSsid = val;
+                          _saveHotspotConfig('hotspot_ssid', val);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: _hotspotPwd ?? '12345678',
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: const InputDecoration(labelText: '비밀번호', labelStyle: TextStyle(color: Colors.white54)),
+                        onChanged: (val) {
+                          _hotspotPwd = val;
+                          _saveHotspotConfig('hotspot_pwd', val);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: _isHotspotOn ? const Color(0xFF3DFFC1) : Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _isHotspotOn ? const Color(0xFF3DFFC1) : Colors.white12),
+                  ),
+                  child: Row(
+                    children: [
+                      if (_isHotspotOn)
+                        const Icon(Icons.check_circle, color: Color(0xFF1E2640), size: 20)
+                      else
+                        const Icon(Icons.wifi_off, color: Colors.white54, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _isHotspotOn ? '워치(AP) 연결 완료! ✔️' : '핫스팟 꺼져 있음',
+                          style: TextStyle(
+                            color: _isHotspotOn ? const Color(0xFF1E2640) : Colors.white54,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      if (!_isHotspotOn)
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E5BFF).withOpacity(0.2),
+                            foregroundColor: const Color(0xFF3DFFC1),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                          ),
+                          onPressed: _openHotspotSettings,
+                          icon: const Icon(Icons.settings, size: 14),
+                          label: const Text('설정 열기', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        )
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Divider(color: Colors.white12, height: 30),
+
+                // Step 3
+                const Text('Step 3. 워치 연결 수락', style: TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3DFFC1).withOpacity(0.15), 
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Color(0xFF3DFFC1), size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text('워치 화면에 연결 팝업이 뜨면 [확인]을 눌러주세요!', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E5BFF),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => LabWatchSyncScreen(
+                          autoStart: true,
+                          initialSyncMode: 'HOTSPOT',
+                          hotspotSsid: _hotspotSsid ?? 'healthport',
+                          hotspotPwd: _hotspotPwd ?? '12345678',
+                        ),
+                      ));
+                    },
+                    child: const Text('워치와 연결 시작', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+
   Widget _buildStep5Details() {
     final bool hasFiles = _fitFiles.isNotEmpty || _garminFiles.isNotEmpty || _colaFiles.isNotEmpty || _logFiles.isNotEmpty || _captureFiles.isNotEmpty;
 
     return Form(
       key: _formKey5,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.directions_run_rounded, color: Color(0xFF3DFFC1), size: 16),
-              const SizedBox(width: 4),
-              Text(
-                '선택된 운동: $_selectedExercise',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF3DFFC1),
-                  fontWeight: FontWeight.w600,
-                ),
+              Text('Step 3. 검증 파일 및 디테일 등록', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 18, fontWeight: FontWeight.w600)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFF2E5BFF).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                child: const Text('마지막 단계', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-
-          // ── 파일 첨부 카드 섹션 ──
-          const Text(
-            '1. 운동 데이터 첨부',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
+          const SizedBox(height: 8),
+          Text('운동 결과 검증을 위한 각종 파일들을 첨부합니다.', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14)),
+          const SizedBox(height: 24),
+          
+          // --- SECTION 1: 수동 첨부 (기본 데이터) ---
+          Text('섹션 1: 기본 운동 데이터 (수동)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          _buildAttachCard(icon: Icons.watch, title: '1. 기준 FIT 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickFit, files: _fitFiles),
+          const SizedBox(height: 12),
+          _buildCaptureAttachCard(), // 2. 캡처 이미지 (기존 함수 재사용)
+          const SizedBox(height: 30),
+          
+          // --- SECTION 2: 자동화 첨부 (비교 데이터) ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('섹션 2: 비교 데이터 (자동화)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E5BFF).withOpacity(0.2), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                onPressed: _scanGarminFilesFromDownload,
+                icon: const Icon(Icons.refresh, size: 14, color: Color(0xFF3DFFC1)),
+                label: const Text('스캔', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12)),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
+          _buildAttachCard(icon: Icons.file_copy, title: '3. Garmin Fit 파일', hint: 'Download 폴더 자동 스캔됨', busy: _fileBusy, onTap: _pickGarminFit, files: _garminFiles),
+          const SizedBox(height: 12),
+          _buildAttachCard(icon: Icons.bar_chart, title: '4. Cola 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickCola, files: _colaFiles),
+          const SizedBox(height: 12),
+          _buildAttachCard(icon: Icons.article_outlined, title: '5. 단말 Log 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickLog, files: _logFiles),
+          const SizedBox(height: 30),
 
-          // FIT
-          _buildAttachCard(
-            icon: Icons.fitness_center_rounded,
-            title: 'FIT 파일 추가',
-            hint: 'Download/삼성 헬스/fit',
-            busy: _fileBusy,
-            onTap: _pickFit,
-            files: _fitFiles,
-          ),
-          const SizedBox(height: 10),
-
-          // Garmin FIT
-          _buildAttachCard(
-            icon: Icons.directions_bike_rounded,
-            title: 'Garmin FIT 파일 추가',
-            hint: 'Download/23606307436.zip',
-            busy: _fileBusy,
-            onTap: _pickGarminFit,
-            files: _garminFiles,
-          ),
-          const SizedBox(height: 10),
-
-          // Cola
-          _buildAttachCard(
-            icon: Icons.folder_zip_outlined,
-            title: 'COLA 파일 추가',
-            hint: 'Documents/COLA_FILE/COLA_FILE*.zip',
-            busy: _fileBusy,
-            onTap: _pickCola,
-            files: _colaFiles,
-          ),
-          const SizedBox(height: 10),
-
-          // Logs
-          _buildAttachCard(
-            icon: Icons.article_outlined,
-            title: '로그 파일 추가',
-            hint: 'Documents/COLA_FILE/log_*.zip',
-            busy: _fileBusy,
-            onTap: _pickLog,
-            files: _logFiles,
-          ),
-          const SizedBox(height: 10),
-
-          // Captures (Multi)
-          _buildCaptureAttachCard(),
-          const SizedBox(height: 14),
-
-          if (!hasFiles) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 24),
+          // --- SECTION 3: 워치 로그 동기화 (원스크린 마법사) ---
+          Text('섹션 3: 워치 로그 (마법사)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: _showWatchSyncWizard,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.white.withOpacity(0.12), style: BorderStyle.none),
+                color: const Color(0xFF2E5BFF).withOpacity(0.1),
+                border: Border.all(color: const Color(0xFF2E5BFF).withOpacity(0.3)),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  Icon(Icons.cloud_upload_outlined, size: 36, color: Colors.white.withOpacity(0.3)),
-                  const SizedBox(height: 8),
-                  Text(
-                    '필수 검증 파일을 한 개 이상 첨부해 주세요.',
-                    style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4)),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: const Color(0xFF2E5BFF).withOpacity(0.2), shape: BoxShape.circle),
+                    child: const Icon(Icons.watch_outlined, color: Color(0xFF2E5BFF)),
                   ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('6. 워치 Log 파일 동기화', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text('클릭하여 마법사(Checklist)를 띄웁니다.', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-          ],
-
-          const Divider(height: 32, color: Colors.white10),
-
-          // ── 디테일 선택 영역 ──
-          const Text(
-            '2. 운동 종합 데이터 입력',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 30),
 
-          // 그룹 A: 착용 상태 및 디바이스 환경 카드
-          GlassCard(
-            radius: 16,
+          // --- SECTION 4: 운동 종합 데이터 및 특이사항 ---
+          Text('섹션 4: 운동 종합 데이터 입력', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+
+          // 그룹 A: 착용 상태 및 디바이스 환경
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('착용 상태', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const Text('착용 상태', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('착용 위치', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    const Text('착용 위치', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70)),
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.04),
@@ -3542,7 +3814,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('착용 정도', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    const Text('착용 정도', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70)),
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.04),
@@ -3561,12 +3833,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   ],
                 ),
                 const Divider(height: 32, color: Colors.white10),
-                const Text('동시 착용 타사 모델', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const Text('동시 착용 타사 모델', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
                   value: _competitorWatch,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.compare_arrows_rounded, size: 20),
+                  dropdownColor: const Color(0xFF1E1E2C),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.compare_arrows_rounded, size: 20, color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.black26,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.all(12),
                   ),
                   items: ['가민', '애플', '크로스', '없음', '직접입력']
                       .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
@@ -3582,8 +3860,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   const SizedBox(height: 10),
                   TextFormField(
                     controller: _customCompetitorCtrl,
-                    decoration: const InputDecoration(
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
                       labelText: '타사 기기 직접 입력 *',
+                      labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                      filled: true,
+                      fillColor: Colors.black26,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.all(12),
                     ),
                   ),
                 ]
@@ -3592,15 +3876,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
           const SizedBox(height: 16),
 
-          // 그룹 B: 운동 정보 카드 (내부에 Divider 구분선 적용)
-          GlassCard(
-            radius: 16,
+          // 그룹 B: 운동 정보
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('운동 정보', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const Text('운동 정보', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                 const SizedBox(height: 16),
-                const Text('운동 거리', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const Text('운동 거리', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70)),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _distanceCtrl,
@@ -3609,19 +3898,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                   ],
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.linear_scale_rounded, size: 20),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.linear_scale_rounded, size: 20, color: Colors.white54),
                     hintText: '예) 21.09',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
                     suffixText: 'km',
+                    suffixStyle: const TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Colors.black26,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.all(12),
                   ),
                 ),
                 const Divider(height: 32, color: Colors.white10),
-                const Text('운동 종류', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const Text('운동 종류', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _trainingType,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.sports_score_rounded, size: 20),
+                  dropdownColor: const Color(0xFF1E1E2C),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.sports_score_rounded, size: 20, color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.black26,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.all(12),
                   ),
                   items: ['조깅', '인터벌', 'LSD', '변속주', '지속주', '직접입력']
                       .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
@@ -3637,19 +3939,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   const SizedBox(height: 10),
                   TextFormField(
                     controller: _customTrainingCtrl,
-                    decoration: const InputDecoration(
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
                       labelText: '운동 종류 직접 입력 *',
+                      labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                      filled: true,
+                      fillColor: Colors.black26,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.all(12),
                     ),
                   ),
                 ],
                 const Divider(height: 32, color: Colors.white10),
-                const Text('운동 장소', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const Text('운동 장소', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70)),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _locationCtrl,
-                  decoration: const InputDecoration(
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
                     hintText: '예: 금오산 X코스, 헬스장 등 직접 입력',
-                    prefixIcon: Icon(Icons.place_outlined, size: 20),
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                    prefixIcon: const Icon(Icons.place_outlined, size: 20, color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.black26,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.all(12),
                   ),
                 ),
                 if (_prefs != null && _prefs!.getRecentLocations().isNotEmpty) ...[
@@ -3704,33 +4018,153 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
           const SizedBox(height: 16),
 
-          // 데이터 정밀 검증 영역 (GPS, HR, 속도/페이스, 고도)
           _buildPrecisionVerificationSection(),
           const SizedBox(height: 16),
 
           // 특이 사항 TextArea
-          GlassCard(
-            radius: 16,
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('특이 사항 및 메모', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const Text('특이 사항 및 메모', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _memoCtrl,
                   maxLines: 4,
-                  decoration: const InputDecoration(
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
                     hintText: '특이 사항이 있다면 적어주세요. (착용감 흔들림, 센서 오작동 등)',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
                     alignLabelWithHint: true,
+                    filled: true,
+                    fillColor: Colors.black26,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.all(12),
                   ),
                 ),
               ],
             ),
           ),
+          
           const SizedBox(height: 30),
+          Text('첨부 내역', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                // FIT Files
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(width: 80, child: Text('[기준 FIT]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      Expanded(
+                        child: _fitFiles.isNotEmpty
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _fitFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis)).toList(),
+                              )
+                            : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Garmin Files
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(width: 80, child: Text('[Garmin FIT]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      Expanded(
+                        child: _garminFiles.isNotEmpty
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _garminFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis)).toList(),
+                              )
+                            : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // COLA Files
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(width: 80, child: Text('[COLA]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      Expanded(
+                        child: _colaFiles.isNotEmpty
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _colaFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis)).toList(),
+                              )
+                            : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Log Files
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(width: 80, child: Text('[Log]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      Expanded(
+                        child: _logFiles.isNotEmpty
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _logFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis)).toList(),
+                              )
+                            : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Capture Files
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(width: 80, child: Text('[Capture]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      Expanded(
+                        child: _captureFiles.isNotEmpty
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _captureFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis)).toList(),
+                              )
+                            : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildPrecisionVerificationSection() {
@@ -5161,6 +5595,45 @@ class _NicknameFinderSheetContentState extends State<_NicknameFinderSheetContent
           ),
         ],
       ),
+    );
+  }
+}
+
+class BouncingArrow extends StatefulWidget {
+  const BouncingArrow({super.key});
+
+  @override
+  State<BouncingArrow> createState() => _BouncingArrowState();
+}
+
+class _BouncingArrowState extends State<BouncingArrow> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0, end: 10).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _animation.value),
+          child: child,
+        );
+      },
+      child: const Icon(Icons.keyboard_double_arrow_down, color: Color(0xFF3DFFC1), size: 30),
     );
   }
 }

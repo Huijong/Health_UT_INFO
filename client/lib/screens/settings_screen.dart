@@ -1930,7 +1930,7 @@ class LabSubScreen extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => LabWatchSyncScreen(prefs: prefs),
+                            builder: (context) => const LabWatchSyncScreen(),
                           ),
                         );
                       },

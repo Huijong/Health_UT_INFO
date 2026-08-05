@@ -149,8 +149,9 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
 
     private fun sendWifiJoinToService() {
         val serviceIntent = Intent(this, SyncService::class.java).apply {
-            action = "ACTION_TRIGGER_WIFI_JOIN"
-        }
+                action = "ACTION_TRIGGER_WIFI_JOIN"
+                intent?.extras?.let { putExtras(it) }
+            }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)
         } else {

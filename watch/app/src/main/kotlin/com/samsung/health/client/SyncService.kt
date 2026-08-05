@@ -113,7 +113,7 @@ class SyncService : Service() {
         if (intent != null && intent.action == "ACTION_TRIGGER_WIFI_JOIN") {
             writeLog("Received Intent command: ACTION_TRIGGER_WIFI_JOIN. Scheduling Wi-Fi join in 1.5s...")
             mainHandler.postDelayed({
-                triggerWifiNetworkSpecifier()
+                triggerWifiNetworkSpecifier(intent.getStringExtra("ssid") ?: "healthport", intent.getStringExtra("pwd") ?: "12345678")
             }, 1500)
         }
         return START_STICKY
@@ -137,14 +137,14 @@ class SyncService : Service() {
     // WIFI NETWORK SPECIFIER (AUTO JOIN GALAXY WATCH WI-FI)
     // ────────────────────────────────────────────────────────────────
 
-    private fun triggerWifiNetworkSpecifier() {
+    private fun triggerWifiNetworkSpecifier(ssid: String, pwd: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             writeLog("WifiNetworkSpecifier is not supported on Android version < 10")
             return
         }
 
         try {
-            writeLog("Triggering WifiNetworkSpecifier for SSID 'healthport'...")
+            writeLog("Triggering WifiNetworkSpecifier for SSID '$ssid'...")
             ensureWifiEnabled()
 
             // Release any existing autojoin callback to prevent memory leak
@@ -152,8 +152,8 @@ class SyncService : Service() {
 
             // 1. Build Network Specifier targeting hotspot credentials
             val specifier = WifiNetworkSpecifier.Builder()
-                .setSsid("healthport")
-                .setWpa2Passphrase("00000000")
+                .setSsid(ssid)
+                .setWpa2Passphrase(pwd)
                 .build()
 
             // 2. Build Network Request

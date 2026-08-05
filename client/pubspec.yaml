@@ -55,6 +55,7 @@ dependencies:
   open_filex: ^4.7.0
   nearby_connections: ^4.3.0
   confetti: ^0.8.0
+  google_fonts: ^8.2.1
 
 dev_dependencies:
   flutter_test:
