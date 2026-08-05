@@ -3537,21 +3537,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton.icon(
+                      child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2E5BFF),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         onPressed: _triggerDialer9900,
-                        icon: const Icon(Icons.dialpad, size: 16),
-                        label: const Text('*#9900# 로그 확보하러 가기', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text('*#9900# 로그 확보하러 가기', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
-                const Divider(color: Colors.white12, height: 30),
+                const SizedBox(height: 10),
+                const Center(child: BouncingArrow()),
+                const SizedBox(height: 10),
 
                 // Step 2
                 const Text('Step 2. 핫스팟 설정 (워치 연결용)', style: TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold, fontSize: 15)),
@@ -3584,26 +3585,46 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   ],
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Icon(_isHotspotOn ? Icons.check_circle : Icons.cancel, color: _isHotspotOn ? Colors.green : Colors.red, size: 16),
-                    const SizedBox(width: 6),
-                    Text(_isHotspotOn ? '핫스팟 켜져 있음' : '핫스팟 꺼져 있음', style: TextStyle(color: _isHotspotOn ? Colors.green : Colors.red)),
-                    const Spacer(),
-                    if (!_isHotspotOn)
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E5BFF).withOpacity(0.2),
-                          foregroundColor: const Color(0xFF3DFFC1),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: _isHotspotOn ? const Color(0xFF3DFFC1) : Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _isHotspotOn ? const Color(0xFF3DFFC1) : Colors.white12),
+                  ),
+                  child: Row(
+                    children: [
+                      if (_isHotspotOn)
+                        const Icon(Icons.check_circle, color: Color(0xFF1E2640), size: 20)
+                      else
+                        const Icon(Icons.wifi_off, color: Colors.white54, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _isHotspotOn ? '워치(AP) 연결 완료! ✔️' : '핫스팟 꺼져 있음',
+                          style: TextStyle(
+                            color: _isHotspotOn ? const Color(0xFF1E2640) : Colors.white54,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
-                        onPressed: _openHotspotSettings,
-                        icon: const Icon(Icons.settings, size: 14),
-                        label: const Text('설정 열기', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      )
-                  ],
+                      ),
+                      if (!_isHotspotOn)
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E5BFF).withOpacity(0.2),
+                            foregroundColor: const Color(0xFF3DFFC1),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                          ),
+                          onPressed: _openHotspotSettings,
+                          icon: const Icon(Icons.settings, size: 14),
+                          label: const Text('설정 열기', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        )
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 20),
                 const Divider(color: Colors.white12, height: 30),
@@ -3649,7 +3670,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         ),
                       ));
                     },
-                    child: const Text('워치와 연결 시작', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: const Text('워치와 연결 시작', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -5574,6 +5595,45 @@ class _NicknameFinderSheetContentState extends State<_NicknameFinderSheetContent
           ),
         ],
       ),
+    );
+  }
+}
+
+class BouncingArrow extends StatefulWidget {
+  const BouncingArrow({super.key});
+
+  @override
+  State<BouncingArrow> createState() => _BouncingArrowState();
+}
+
+class _BouncingArrowState extends State<BouncingArrow> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0, end: 10).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _animation.value),
+          child: child,
+        );
+      },
+      child: const Icon(Icons.keyboard_double_arrow_down, color: Color(0xFF3DFFC1), size: 30),
     );
   }
 }

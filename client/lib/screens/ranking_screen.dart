@@ -678,22 +678,22 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                 center: const Alignment(0.0, -0.1),
                 radius: 1.2,
                 colors: [
-                  const Color(0xFFFFD700).withOpacity(0.35), // 찬란한 황금빛 코어
-                  const Color(0xFFFDD835).withOpacity(0.1), // 퍼져나가는 옐로우 골드
+                  const Color(0xFFFFD700).withOpacity(0.25), // 찬란한 황금빛 코어
+                  const Color(0xFFFDD835).withOpacity(0.08), // 퍼져나가는 옐로우 골드
                   Colors.transparent,
                 ],
                 stops: const [0.0, 0.5, 1.0],
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.only(top: 28, bottom: 16, left: 12, right: 12),
+              padding: const EdgeInsets.only(top: 48, bottom: 16, left: 12, right: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  _buildPodiumColumn(rank2, 2, 60),
-                  _buildPodiumColumn(rank1, 1, 85),
-                  _buildPodiumColumn(rank3, 3, 50),
+                  _buildPodiumColumn(rank2, 2, 45, rank1Item: rank1, rank2Item: rank2, rank3Item: rank3),
+                  _buildPodiumColumn(rank1, 1, 70, rank1Item: rank1, rank2Item: rank2, rank3Item: rank3),
+                  _buildPodiumColumn(rank3, 3, 35, rank1Item: rank1, rank2Item: rank2, rank3Item: rank3),
                 ],
               ),
             ),
@@ -703,7 +703,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildPodiumColumn(dynamic item, int rank, double barHeight) {
+  Widget _buildPodiumColumn(dynamic item, int rank, double barHeight, {dynamic rank1Item, dynamic rank2Item, dynamic rank3Item}) {
     if (item == null) {
       return Expanded(
         child: Opacity(
@@ -768,10 +768,10 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
         animation: _glowController,
         builder: (context, child) {
           final double animValue = rank == 1 ? _glowAnimation.value : 0.0;
-          final double currentBlur = rank == 1 ? 12.0 + (12.0 * animValue) : 12.0;
-          final double currentSpread = rank == 1 ? 4.0 + (6.0 * animValue) : 2.0;
-          final Color currentAvatarGlow = rank == 1 ? glowColor.withOpacity(0.4 + (0.6 * animValue)) : glowColor;
-          final Color currentBarGlow = rank == 1 ? glowColor.withOpacity(0.2 + (0.4 * animValue)) : glowColor.withOpacity(0.15);
+          final double currentBlur = rank == 1 ? 10.0 + (10.0 * animValue) : 10.0;
+          final double currentSpread = rank == 1 ? 2.0 + (4.0 * animValue) : 1.5;
+          final Color currentAvatarGlow = rank == 1 ? glowColor.withOpacity(0.25 + (0.45 * animValue)) : glowColor;
+          final Color currentBarGlow = rank == 1 ? glowColor.withOpacity(0.15 + (0.3 * animValue)) : glowColor.withOpacity(0.15);
 
           return GestureDetector(
             onTap: () => _showTesterHistory(name),
@@ -816,7 +816,12 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                   if (rank >= 1 && rank <= 3)
                     Positioned(
                       bottom: avatarRadius * 2 - (rank == 1 ? 10 : 6),
-                      child: AnimatedSpeechBubble(rank: rank),
+                      child: AnimatedSpeechBubble(
+                        rank: rank,
+                        rank1Item: rank1Item,
+                        rank2Item: rank2Item,
+                        rank3Item: rank3Item,
+                      ),
                     ),
                 ],
               ),
@@ -853,7 +858,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                     BoxShadow(
                       color: currentBarGlow,
                       blurRadius: currentBlur,
-                      spreadRadius: rank == 1 ? 2.0 + (4.0 * animValue) : 2.0,
+                      spreadRadius: rank == 1 ? 1.0 + (3.0 * animValue) : 1.5,
                       offset: const Offset(0, -4),
                     ),
                   ],
@@ -1257,7 +1262,10 @@ String _formatPoints(dynamic value) {
 
 class AnimatedSpeechBubble extends StatefulWidget {
   final int rank;
-  const AnimatedSpeechBubble({super.key, required this.rank});
+  final dynamic rank1Item;
+  final dynamic rank2Item;
+  final dynamic rank3Item;
+  const AnimatedSpeechBubble({super.key, required this.rank, this.rank1Item, this.rank2Item, this.rank3Item});
 
   @override
   State<AnimatedSpeechBubble> createState() => _AnimatedSpeechBubbleState();
@@ -1304,20 +1312,63 @@ class _AnimatedSpeechBubbleState extends State<AnimatedSpeechBubble> with Single
     
     _animation = Tween<double>(begin: 0, end: -6).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
+    String formatPoints(double p) {
+      if (p == p.truncateToDouble()) return p.toInt().toString();
+      return p.toStringAsFixed(2);
+    }
+
     final rnd = Random();
+    
+    final rank1Name = widget.rank1Item != null ? widget.rank1Item['tester_name'] as String? : null;
+    final rank2Name = widget.rank2Item != null ? widget.rank2Item['tester_name'] as String? : null;
+    final rank3Name = widget.rank3Item != null ? widget.rank3Item['tester_name'] as String? : null;
+    
+    final rank1Points = widget.rank1Item != null ? (widget.rank1Item['points'] as num).toDouble() : 0.0;
+    final rank2Points = widget.rank2Item != null ? (widget.rank2Item['points'] as num).toDouble() : 0.0;
+    final rank3Points = widget.rank3Item != null ? (widget.rank3Item['points'] as num).toDouble() : 0.0;
+
+    List<String> currentPhrases = [];
+
     if (widget.rank == 1) {
-      _phrase = rank1Phrases[rnd.nextInt(rank1Phrases.length)];
+      currentPhrases = List.from(rank1Phrases);
+      if (rank2Name != null && rank2Name.isNotEmpty) {
+        currentPhrases.addAll([
+          "$rank2Name님 어디쯤 오고 계신가요~? 😎",
+          "뒤에 $rank2Name님 따라오는 소리 들리는데? 😜",
+          "$rank2Name님 분발하셔야겠어요! 🥇"
+        ]);
+      }
       _bubbleColor = const Color(0xFFFFD700);
       _textColor = const Color(0xFF1E2020);
     } else if (widget.rank == 2) {
-      _phrase = rank2Phrases[rnd.nextInt(rank2Phrases.length)];
+      currentPhrases = List.from(rank2Phrases);
+      if (rank1Name != null && rank1Name.isNotEmpty) {
+        final diff = formatPoints(rank1Points - rank2Points);
+        currentPhrases.addAll([
+          "$rank1Name 딱 대! ${diff}p 남았다 🚀",
+          "1등 자리 비워둬라. ${diff}p 차이 금방이다 🔥",
+          "조심해라 $rank1Name, 턱밑까지 추격했다 👀"
+        ]);
+      }
       _bubbleColor = const Color(0xFFE2E8F0);
       _textColor = const Color(0xFF1E2020);
     } else {
-      _phrase = rank3Phrases[rnd.nextInt(rank3Phrases.length)];
+      currentPhrases = List.from(rank3Phrases);
+      if (rank2Name != null && rank2Name.isNotEmpty) {
+        final diff = formatPoints(rank2Points - rank3Points);
+        currentPhrases.addAll([
+          "$rank2Name님 긴장하세요! 뒤에서 쫓아갑니다 🏃‍♂️",
+          "나도 ${diff}p만 더하면 2등인데! 부들부들... 🥉"
+        ]);
+      }
+      if (rank1Name != null && rank1Name.isNotEmpty) {
+        currentPhrases.add("저기요... $rank1Name님 위쪽 공기는 맑습니까? 🥺");
+      }
       _bubbleColor = const Color(0xFFCD7F32);
       _textColor = Colors.white;
     }
+    
+    _phrase = currentPhrases[rnd.nextInt(currentPhrases.length)];
   }
 
   @override
@@ -1340,7 +1391,8 @@ class _AnimatedSpeechBubbleState extends State<AnimatedSpeechBubble> with Single
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            constraints: const BoxConstraints(maxWidth: 100),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
               color: _bubbleColor,
               borderRadius: BorderRadius.circular(12),
@@ -1354,9 +1406,11 @@ class _AnimatedSpeechBubbleState extends State<AnimatedSpeechBubble> with Single
             ),
             child: Text(
               _phrase,
+              textAlign: TextAlign.center,
               style: GoogleFonts.jua(
                 color: _textColor,
                 fontSize: widget.rank == 1 ? 12 : 11,
+                height: 1.2,
               ),
             ),
           ),
