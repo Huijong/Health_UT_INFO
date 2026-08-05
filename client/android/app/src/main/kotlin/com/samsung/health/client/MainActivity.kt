@@ -9,6 +9,7 @@ import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.MethodCall
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.CapabilityClient
@@ -57,7 +58,7 @@ class MainActivity : FlutterActivity() {
                     openSysDump(result)
                 }
                 "requestWatchWifiJoin" -> {
-                    requestWatchWifiJoin(result)
+                    requestWatchWifiJoin(call, result)
                 }
                 "openWatchSysDump" -> {
                     openWatchSysDump(result)
@@ -243,9 +244,12 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {}
     }
 
-    private fun requestWatchWifiJoin(result: MethodChannel.Result) {
+    private fun requestWatchWifiJoin(call: MethodCall, result: MethodChannel.Result) {
         val context = this
-        writeClientLog("Initiating watch WiFi join request from Phone...")
+        val ssid = call.argument<String>("ssid") ?: "healthport"
+        val pwd = call.argument<String>("pwd") ?: "12345678"
+        writeClientLog("Initiating watch WiFi join request from Phone... (SSID: $ssid)")
+        
         Thread {
             try {
                 val nodeClient = Wearable.getNodeClient(context)
@@ -256,13 +260,18 @@ class MainActivity : FlutterActivity() {
                     return@Thread
                 }
                 
+                // Create JSON Payload
+                val jsonPayload = org.json.JSONObject()
+                jsonPayload.put("ssid", ssid)
+                jsonPayload.put("pwd", pwd)
+                val payloadBytes = jsonPayload.toString().toByteArray(Charsets.UTF_8)
+                
                 writeClientLog("Found ${nodes.size} paired nodes. Sending WiFi join request...")
                 val messageClient = Wearable.getMessageClient(context)
                 var sentCount = 0
                 for (node in nodes) {
                     writeClientLog("Sending to Node: ${node.displayName} (ID: ${node.id})")
-                    // Send message path "/request_wifi_join"
-                    Tasks.await(messageClient.sendMessage(node.id, "/request_wifi_join", ByteArray(0)))
+                    Tasks.await(messageClient.sendMessage(node.id, "/request_wifi_join", payloadBytes))
                     writeClientLog("Message successfully dispatched to Node: ${node.displayName}")
                     sentCount++
                 }

@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'dart:math';
 import 'package:dio/dio.dart';
 import '../config/app_config.dart';
 import '../services/prefs_service.dart';
@@ -777,35 +779,46 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: currentAvatarGlow,
-                      blurRadius: currentBlur,
-                      spreadRadius: currentSpread,
+              Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: currentAvatarGlow,
+                          blurRadius: currentBlur,
+                          spreadRadius: currentSpread,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: CircleAvatar(
-                  radius: avatarRadius,
-                  backgroundColor: isMe ? const Color(0xFF3DFFC1) : themeColor.withOpacity(0.15),
-                  child: CircleAvatar(
-                    radius: avatarRadius - 2,
-                    backgroundColor: const Color(0xFF1E2020),
-                    child: Text(
-                      rank == 1
-                          ? '🥇'
-                          : rank == 2
-                              ? '🥈'
-                              : '🥉',
-                      style: TextStyle(
-                        fontSize: rank == 1 ? 22 : 18,
+                    child: CircleAvatar(
+                      radius: avatarRadius,
+                      backgroundColor: isMe ? const Color(0xFF3DFFC1) : themeColor.withOpacity(0.15),
+                      child: CircleAvatar(
+                        radius: avatarRadius - 2,
+                        backgroundColor: const Color(0xFF1E2020),
+                        child: Text(
+                          rank == 1
+                              ? '🥇'
+                              : rank == 2
+                                  ? '🥈'
+                                  : '🥉',
+                          style: TextStyle(
+                            fontSize: rank == 1 ? 22 : 18,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  if (rank >= 1 && rank <= 3)
+                    Positioned(
+                      bottom: avatarRadius * 2 - (rank == 1 ? 10 : 6),
+                      child: AnimatedSpeechBubble(rank: rank),
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
               Padding(
@@ -1239,4 +1252,140 @@ String _formatPoints(dynamic value) {
     return parsed.toStringAsFixed(2);
   }
   return value.toString();
+}
+
+
+class AnimatedSpeechBubble extends StatefulWidget {
+  final int rank;
+  const AnimatedSpeechBubble({super.key, required this.rank});
+
+  @override
+  State<AnimatedSpeechBubble> createState() => _AnimatedSpeechBubbleState();
+}
+
+class _AnimatedSpeechBubbleState extends State<AnimatedSpeechBubble> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  late String _phrase;
+  late Color _bubbleColor;
+  late Color _textColor;
+
+  static const List<String> rank1Phrases = [
+    "따라올테면 따라 와봐 😎",
+    "내가 제일 잘나가~ 🥇",
+    "이게 바로 1등의 여유지 ☕️",
+    "정상은 외롭군... 훗 😏",
+    "언제쯤 날 넘어설 텐가? 😜"
+  ];
+  static const List<String> rank2Phrases = [
+    "아깝다... 쪼금만 더 하면 1등인데! 😫",
+    "1등, 자리 비워둬라. 곧 간다 🚀",
+    "두고 봐, 내일은 내가 1등이야 🔥",
+    "은메달도 나쁘지 않... 지만 배아파 😭",
+    "뒤통수 조심해라 1등 👀"
+  ];
+  static const List<String> rank3Phrases = [
+    "동메달도 메달이잖아?! 🥉",
+    "저기요... 위쪽 공기는 맑습니까? 🥺",
+    "나도 언젠간 저 자리에... 부럽다 ✨",
+    "1, 2등... 기다려라! 내가 치고 올라간다 🏃‍♂️",
+    "휴~ 턱걸이로 시상대 입성 성공! 💦"
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
+    
+    // Different delay for each rank to desync animation
+    Future.delayed(Duration(milliseconds: widget.rank * 300), () {
+      if (mounted) _controller.forward();
+    });
+    
+    _animation = Tween<double>(begin: 0, end: -6).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+    final rnd = Random();
+    if (widget.rank == 1) {
+      _phrase = rank1Phrases[rnd.nextInt(rank1Phrases.length)];
+      _bubbleColor = const Color(0xFFFFD700);
+      _textColor = const Color(0xFF1E2020);
+    } else if (widget.rank == 2) {
+      _phrase = rank2Phrases[rnd.nextInt(rank2Phrases.length)];
+      _bubbleColor = const Color(0xFFE2E8F0);
+      _textColor = const Color(0xFF1E2020);
+    } else {
+      _phrase = rank3Phrases[rnd.nextInt(rank3Phrases.length)];
+      _bubbleColor = const Color(0xFFCD7F32);
+      _textColor = Colors.white;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _animation.value),
+          child: child,
+        );
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _bubbleColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: _bubbleColor.withOpacity(0.4),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                )
+              ]
+            ),
+            child: Text(
+              _phrase,
+              style: GoogleFonts.jua(
+                color: _textColor,
+                fontSize: widget.rank == 1 ? 12 : 11,
+              ),
+            ),
+          ),
+          // Tail
+          ClipPath(
+            clipper: SpeechBubbleTailClipper(),
+            child: Container(
+              width: 10,
+              height: 6,
+              color: _bubbleColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SpeechBubbleTailClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width / 2, size.height);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }

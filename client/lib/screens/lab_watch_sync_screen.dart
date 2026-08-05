@@ -10,8 +10,11 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 class LabWatchSyncScreen extends StatefulWidget {
-  final PrefsService prefs;
-  const LabWatchSyncScreen({super.key, required this.prefs});
+  final bool autoStart;
+  final String? hotspotSsid;
+  final String? hotspotPwd;
+  final String initialSyncMode;
+  const LabWatchSyncScreen({super.key, this.autoStart = false, this.initialSyncMode = 'AP', this.hotspotSsid, this.hotspotPwd});
 
   @override
   State<LabWatchSyncScreen> createState() => _LabWatchSyncScreenState();
@@ -87,6 +90,12 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   @override
   void initState() {
     super.initState();
+    _syncMode = widget.initialSyncMode;
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startDiscovery();
+      });
+    }
     _radarController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -328,10 +337,20 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     _addLog("Starting synchronization server in mode: $_syncMode...");
     try {
       await _wifiP2pChannel.invokeMethod("startServer", {"mode": _syncMode});
+      
+      // Request watch to join the custom hotspot
+      if (widget.hotspotSsid != null && widget.hotspotPwd != null) {
+        _addLog("Sending Wi-Fi Join Request to watch for SSID: ${widget.hotspotSsid}...");
+        await _appChannel.invokeMethod("requestWatchWifiJoin", {
+          "ssid": widget.hotspotSsid,
+          "pwd": widget.hotspotPwd,
+        });
+      }
+      
       if (_syncMode == 'BT') {
         _addLog("Bluetooth mode ready. Waiting for Wear OS communication...");
       } else if (_syncMode == 'HOTSPOT') {
-        _addLog("Hotspot Server started. Connect watch to 'healthport' (00000000) and wait...");
+        _addLog("Hotspot Server started. Connect watch to '${widget.hotspotSsid}' and wait...");
       } else {
         _addLog("AP Server started. Connect both to same Wi-Fi and wait...");
       }
@@ -513,7 +532,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     return Scaffold(
       backgroundColor: const Color(0xFF0C0F0F),
       appBar: AppBar(
-        title: const Text('실험실 - 워치 동기화', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('워치 동기화', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [

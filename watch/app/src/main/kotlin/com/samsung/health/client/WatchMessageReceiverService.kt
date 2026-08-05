@@ -20,6 +20,14 @@ class WatchMessageReceiverService : WearableListenerService() {
                 val mainIntent = Intent(this, MainActivity::class.java).apply {
                     action = "ACTION_TRIGGER_WIFI_JOIN"
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    if (messageEvent.data != null && messageEvent.data.isNotEmpty()) {
+                        try {
+                            val payloadStr = String(messageEvent.data, Charsets.UTF_8)
+                            val json = org.json.JSONObject(payloadStr)
+                            putExtra("ssid", json.optString("ssid", "healthport"))
+                            putExtra("pwd", json.optString("pwd", "12345678"))
+                        } catch (e: Exception) {}
+                    }
                 }
                 startActivity(mainIntent)
                 writeLog("[BG_MSG] MainActivity launched successfully with wifi join action.")
