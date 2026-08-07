@@ -1,8 +1,8 @@
 1<?xml version="1.0" encoding="utf-8"?>
 2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
 3    package="com.samsung.health.client"
-4    android:versionCode="2"
-5    android:versionName="1.1" >
+4    android:versionCode="102"
+5    android:versionName="1.101" >
 6
 7    <uses-sdk
 8        android:minSdkVersion="29"
@@ -100,14 +100,14 @@
 50-->[androidx.core:core:1.12.0] C:\Users\user\.gradle\caches\8.14\transforms\5755d0ee235c5240f0c34b791297e15e\transformed\core-1.12.0\AndroidManifest.xml:26:22-94
 51
 52    <application
-52-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:36:5-85:19
+52-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:36:5-86:19
 53        android:allowBackup="true"
 53-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:37:9-35
 54        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
 54-->[androidx.core:core:1.12.0] C:\Users\user\.gradle\caches\8.14\transforms\5755d0ee235c5240f0c34b791297e15e\transformed\core-1.12.0\AndroidManifest.xml:28:18-86
 55        android:extractNativeLibs="false"
-56        android:icon="@android:drawable/sym_def_app_icon"
-56-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:38:9-58
+56        android:icon="@mipmap/launcher_icon"
+56-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:38:9-45
 57        android:label="HealthPort Sync"
 57-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:39:9-40
 58        android:requestLegacyExternalStorage="true"
@@ -123,104 +123,111 @@
 63            android:required="true" />
 63-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:44:66-89
 64
-65        <activity
-65-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:46:9-54:20
-66            android:name="com.samsung.health.client.MainActivity"
-66-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:47:13-66
-67            android:exported="true"
-67-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:48:13-36
-68            android:label="HealthPort Sync" >
-68-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:49:13-44
-69            <intent-filter>
-69-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:50:13-53:29
-70                <action android:name="android.intent.action.MAIN" />
-70-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:51:17-69
-70-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:51:25-66
-71
-72                <category android:name="android.intent.category.LAUNCHER" />
-72-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:52:17-77
-72-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:52:27-74
-73            </intent-filter>
-74        </activity>
+65        <meta-data
+65-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:45:9-97
+66            android:name="com.google.android.wearable.standalone"
+66-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:45:20-73
+67            android:value="true" />
+67-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:45:74-94
+68
+69        <activity
+69-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:47:9-55:20
+70            android:name="com.samsung.health.client.MainActivity"
+70-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:48:13-66
+71            android:exported="true"
+71-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:49:13-36
+72            android:label="HealthPort Sync" >
+72-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:50:13-44
+73            <intent-filter>
+73-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:51:13-54:29
+74                <action android:name="android.intent.action.MAIN" />
+74-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:52:17-69
+74-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:52:25-66
 75
-76        <service
-76-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:56:9-60:56
-77            android:name="com.samsung.health.client.SyncService"
-77-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:57:13-65
-78            android:enabled="true"
-78-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:58:13-35
-79            android:exported="false"
-79-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:59:13-37
-80            android:foregroundServiceType="dataSync" />
-80-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:60:13-53
-81        <service
-81-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:62:9-77:19
-82            android:name="com.samsung.health.client.WatchMessageReceiverService"
-82-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:63:13-81
-83            android:enabled="true"
-83-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:65:13-35
-84            android:exported="true" >
-84-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:64:13-36
-85            <intent-filter>
-85-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:66:13-76:29
-86                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
-86-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:67:17-91
-86-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:67:25-88
-87
-88                <data
-88-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:68:17-71:63
-89                    android:host="*"
-89-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:70:21-37
-90                    android:pathPrefix="/request_wifi_join"
-90-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:71:21-60
-91                    android:scheme="wear" />
-91-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:69:21-42
+76                <category android:name="android.intent.category.LAUNCHER" />
+76-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:53:17-77
+76-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:53:27-74
+77            </intent-filter>
+78        </activity>
+79
+80        <service
+80-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:57:9-61:56
+81            android:name="com.samsung.health.client.SyncService"
+81-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:58:13-65
+82            android:enabled="true"
+82-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:59:13-35
+83            android:exported="false"
+83-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:60:13-37
+84            android:foregroundServiceType="dataSync" />
+84-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:61:13-53
+85        <service
+85-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:63:9-78:19
+86            android:name="com.samsung.health.client.WatchMessageReceiverService"
+86-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:64:13-81
+87            android:enabled="true"
+87-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:66:13-35
+88            android:exported="true" >
+88-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:65:13-36
+89            <intent-filter>
+89-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:67:13-77:29
+90                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+90-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:68:17-91
+90-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:68:25-88
+91
 92                <data
-92-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:68:17-71:63
+92-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:69:17-72:63
 93                    android:host="*"
-93-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:70:21-37
-94                    android:pathPrefix="/open_watch_sysdump"
-94-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:71:21-60
+93-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:71:21-37
+94                    android:pathPrefix="/request_wifi_join"
+94-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:72:21-60
 95                    android:scheme="wear" />
-95-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:69:21-42
-96            </intent-filter>
-97        </service>
-98
-99        <activity
-99-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:79:9-83:45
-100            android:name="com.samsung.health.client.GuideDialogActivity"
-100-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:80:13-73
-101            android:exported="false"
-101-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:81:13-37
-102            android:label="SysDump Guide"
-102-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:83:13-42
-103            android:theme="@android:style/Theme.DeviceDefault.Dialog" />
-103-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:82:13-70
-104
-105        <service
-105-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:10:9-13:105
-106            android:name="com.google.android.gms.nearby.exposurenotification.WakeUpService"
-106-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:11:13-92
-107            android:exported="true"
-107-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:12:13-36
-108            android:permission="com.google.android.gms.nearby.exposurenotification.EXPOSURE_CALLBACK" />
-108-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:13:13-102
-109
-110        <activity
-110-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:20:9-22:45
-111            android:name="com.google.android.gms.common.api.GoogleApiActivity"
-111-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:20:19-85
-112            android:exported="false"
-112-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:22:19-43
-113            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-113-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:21:19-78
-114
-115        <meta-data
-115-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:21:9-23:69
-116            android:name="com.google.android.gms.version"
-116-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:22:13-58
-117            android:value="@integer/google_play_services_version" />
-117-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:23:13-66
-118    </application>
-119
-120</manifest>
+95-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:70:21-42
+96                <data
+96-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:69:17-72:63
+97                    android:host="*"
+97-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:71:21-37
+98                    android:pathPrefix="/open_watch_sysdump"
+98-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:72:21-60
+99                    android:scheme="wear" />
+99-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:70:21-42
+100            </intent-filter>
+101        </service>
+102
+103        <activity
+103-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:80:9-84:45
+104            android:name="com.samsung.health.client.GuideDialogActivity"
+104-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:81:13-73
+105            android:exported="false"
+105-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:82:13-37
+106            android:label="SysDump Guide"
+106-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:84:13-42
+107            android:theme="@android:style/Theme.DeviceDefault.Dialog" />
+107-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:83:13-70
+108
+109        <service
+109-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:10:9-13:105
+110            android:name="com.google.android.gms.nearby.exposurenotification.WakeUpService"
+110-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:11:13-92
+111            android:exported="true"
+111-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:12:13-36
+112            android:permission="com.google.android.gms.nearby.exposurenotification.EXPOSURE_CALLBACK" />
+112-->[com.google.android.gms:play-services-nearby:18.7.0] C:\Users\user\.gradle\caches\8.14\transforms\942333155d4a0d8e1dcdbd425f0f9fed\transformed\play-services-nearby-18.7.0\AndroidManifest.xml:13:13-102
+113
+114        <activity
+114-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:20:9-22:45
+115            android:name="com.google.android.gms.common.api.GoogleApiActivity"
+115-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:20:19-85
+116            android:exported="false"
+116-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:22:19-43
+117            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+117-->[com.google.android.gms:play-services-base:18.0.1] C:\Users\user\.gradle\caches\8.14\transforms\c1d5e29e94a4e6786dbd0828d88622b3\transformed\play-services-base-18.0.1\AndroidManifest.xml:21:19-78
+118
+119        <meta-data
+119-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:21:9-23:69
+120            android:name="com.google.android.gms.version"
+120-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:22:13-58
+121            android:value="@integer/google_play_services_version" />
+121-->[com.google.android.gms:play-services-basement:18.0.0] C:\Users\user\.gradle\caches\8.14\transforms\4adb8f1a10b9fe01365435128b5d9909\transformed\play-services-basement-18.0.0\AndroidManifest.xml:23:13-66
+122    </application>
+123
+124</manifest>

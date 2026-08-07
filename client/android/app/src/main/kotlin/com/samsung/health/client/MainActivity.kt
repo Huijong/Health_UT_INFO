@@ -54,6 +54,9 @@ class MainActivity : FlutterActivity() {
                 "openHotspotSettings" -> {
                     openHotspotSettings(result)
                 }
+                "isHotspotEnabled" -> {
+                    isHotspotEnabled(result)
+                }
                 "openSysDump" -> {
                     openSysDump(result)
                 }
@@ -97,6 +100,41 @@ class MainActivity : FlutterActivity() {
                 result.success("FALLBACK")
             } catch (ex: Exception) {
                 result.error("INTENT_ERROR", ex.message, null)
+            }
+        }
+    }
+
+    private fun isHotspotEnabled(result: MethodChannel.Result) {
+        try {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+            val method = wifiManager.javaClass.getDeclaredMethod("isWifiApEnabled")
+            method.isAccessible = true
+            val isEnabled = method.invoke(wifiManager) as Boolean
+            result.success(isEnabled)
+        } catch (e: Exception) {
+            // Fallback for newer Android versions if reflection fails
+            try {
+                var isEnabled = false
+                val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+                while (interfaces.hasMoreElements()) {
+                    val networkInterface = interfaces.nextElement()
+                    val name = networkInterface.name
+                    if (name.contains("wlan") || name.contains("swlan") || name.contains("ap")) {
+                        val addresses = networkInterface.inetAddresses
+                        while (addresses.hasMoreElements()) {
+                            val address = addresses.nextElement()
+                            if (address is java.net.Inet4Address) {
+                                val ip = address.hostAddress
+                                if ((ip.startsWith("192.168.43.") || ip.startsWith("192.168.")) && !name.equals("wlan0")) {
+                                    isEnabled = true
+                                }
+                            }
+                        }
+                    }
+                }
+                result.success(isEnabled)
+            } catch (ex: Exception) {
+                result.success(false)
             }
         }
     }
@@ -195,7 +233,7 @@ class MainActivity : FlutterActivity() {
                 // Open Play Store details on the watch for the watch application package
                 val intent = Intent(Intent.ACTION_VIEW)
                     .addCategory(Intent.CATEGORY_BROWSABLE)
-                    .setData(Uri.parse("market://details?id=com.samsung.health.client.watch"))
+                    .setData(Uri.parse("market://details?id=com.samsung.health.client"))
                 
                 for (node in nodes) {
                     remoteActivityHelper.startRemoteActivity(intent, node.id)

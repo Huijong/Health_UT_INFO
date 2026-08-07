@@ -2,6 +2,7 @@ package com.samsung.health.client
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -220,10 +221,24 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
         }
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 102) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (Environment.isExternalStorageManager()) {
+                    startSyncService()
+                } else {
+                    Toast.makeText(this, "파일 접근 권한이 거부되었습니다.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     private fun startSyncService() {
         val serviceIntent = Intent(this, SyncService::class.java).apply {
             if (wifiJoinPending) {
                 action = "ACTION_TRIGGER_WIFI_JOIN"
+                intent?.extras?.let { putExtras(it) }
             }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
