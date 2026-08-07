@@ -64,6 +64,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  static const _appChannel = MethodChannel('com.samsung.health.client/app_info');
+  bool _isWatchAppInstalled = false;
   late String _name;
   late double? _height;
   late double? _weight;
@@ -90,6 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (_watch.isEmpty) _watch = kWatchOptions.first;
     if (_strap.isEmpty) _strap = kStrapOptions.first['name']!;
+    _checkWatchAppInstalled();
     
     if (widget.showEmailGuide) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -118,6 +121,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           });
         }
       });
+    }
+  }
+
+  Future<void> _checkWatchAppInstalled() async {
+    try {
+      final bool result = await _appChannel.invokeMethod('checkWatchAppInstalled');
+      if (mounted) setState(() => _isWatchAppInstalled = result);
+    } catch (e) {
+      debugPrint('Watch app check failed: $e');
+    }
+  }
+
+  Future<void> _installWatchApp() async {
+    try {
+      await _appChannel.invokeMethod('launchWatchPlayStore');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('워치에서 플레이 스토어가 열렸습니다. 설치를 진행해 주세요.'), backgroundColor: Color(0xFF3DFFC1)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('워치 호출 실패: $e'), backgroundColor: Colors.redAccent));
+      }
     }
   }
 
@@ -393,6 +418,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 24),
                       _buildSectionHeader('추가 애플리케이션 설치'),
                       const SizedBox(height: 8),
+                      _buildMenuCard(
+                        title: '워치 앱(HealthPort Sync) 설치',
+                        subtitle: '워치와 연동하여 자동으로 로그를 동기화해 보세요.',
+                        icon: Icons.watch_outlined,
+                        onTap: _installWatchApp,
+                      ),
+                      // Badge overlay for watch card
+                      Transform.translate(
+                        offset: const Offset(12, -80),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _isWatchAppInstalled ? const Color(0xFF3DFFC1).withOpacity(0.2) : Colors.redAccent.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _isWatchAppInstalled ? const Color(0xFF3DFFC1) : Colors.redAccent),
+                            ),
+                            child: Text(
+                              _isWatchAppInstalled ? '설치됨(Connected)' : '설치 필요',
+                              style: TextStyle(
+                                color: _isWatchAppInstalled ? const Color(0xFF3DFFC1) : Colors.redAccent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       _buildMenuCard(
                         title: 'Cola Manager 설치',
                         subtitle: 'Cola Manager(APK) 최신버전을 스마트폰에 다운로드하고 설치합니다.',

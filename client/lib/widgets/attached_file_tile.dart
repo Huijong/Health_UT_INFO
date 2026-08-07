@@ -21,6 +21,8 @@ class AttachedFileTile extends StatelessWidget {
       color: cs.surfaceContainerHighest,
       child: ListTile(
         dense: true,
+        visualDensity: const VisualDensity(vertical: -4),
+        minVerticalPadding: 0,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         leading: _typeAvatar(cs),
         title: Text(

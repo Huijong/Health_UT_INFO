@@ -8,6 +8,7 @@ import 'package:client/services/prefs_service.dart';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LabWatchSyncScreen extends StatefulWidget {
   final bool autoStart;
@@ -91,11 +92,12 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   void initState() {
     super.initState();
     _syncMode = widget.initialSyncMode;
-    if (widget.autoStart) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _showGuidePopupIfNeeded();
+      if (widget.autoStart) {
         _startDiscovery();
-      });
-    }
+      }
+    });
     _radarController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -107,6 +109,83 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     _checkPermissions();
     _checkWatchAppInstalled();
     _setupWifiP2pEventSubscription();
+  }
+
+  Future<void> _showGuidePopupIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool dontShowAgain = prefs.getBool('hide_watch_sync_guide') ?? false;
+
+    if (!dontShowAgain) {
+      bool localDontShow = false;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogCtx) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                backgroundColor: const Color(0xFF1E1E1E),
+                title: const Text('워치 연결 가이드(최초 1회 발생)', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('스마트폰에서 연결을 시작하면, 워치 화면에 아래와 같은 팝업이 뜹니다.\n워치에서 스크롤을 내려 반드시 [확인]을 눌러주세요!', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Expanded(child: Image.asset('assert/Check_1.png', height: 180, fit: BoxFit.contain)),
+                        const Icon(Icons.arrow_forward, color: Colors.white54, size: 24),
+                        Expanded(child: Image.asset('assert/Check_2.png', height: 180, fit: BoxFit.contain)),
+                      ],
+                    ),
+                  ],
+                ),
+                actions: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Checkbox(
+                              value: localDontShow,
+                              activeColor: const Color(0xFF3DFFC1),
+                              checkColor: Colors.black,
+                              onChanged: (val) {
+                                setDialogState(() {
+                                  localDontShow = val ?? false;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('다시 보지 않기', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        ],
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E5BFF),
+                        ),
+                        onPressed: () {
+                          if (localDontShow) {
+                            prefs.setBool('hide_watch_sync_guide', true);
+                          }
+                          Navigator.pop(dialogCtx);
+                        },
+                        child: const Text('연결 시작', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            }
+          );
+        }
+      );
+    }
   }
 
   @override
@@ -157,7 +236,6 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         final ssid = data["ssid"] as String? ?? "healthport";
         final pw   = data["password"] as String? ?? "00000000";
         _addLog("Direct Hotspot Started: SSID=$ssid, PW=$pw");
-        _showHotspotInfoDialog(ssid, pw);
         break;
 
       case "fileListReceived":
@@ -668,7 +746,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
           _syncMode == 'BT'
               ? '스마트폰과 워치가 블루투스로 연결되어 있어야 합니다.\n이후 워치 앱에서 [연동 시작]을 눌러주세요.'
               : (_syncMode == 'HOTSPOT'
-                  ? '스마트폰 핫스팟(healthport / 00000000)을 활성화하고,\n워치가 이 핫스팟에 연결되었는지 확인해 주세요.'
+                  ? '스마트폰 핫스팟을 활성화하고,\n워치가 이 핫스팟에 연결되었는지 확인해 주세요.'
                   : '스마트폰과 워치가 모두 동일한 Wi-Fi 공유기(AP)망에\n연결되어 있어야 무선 고속 연동이 가능합니다.'),
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),

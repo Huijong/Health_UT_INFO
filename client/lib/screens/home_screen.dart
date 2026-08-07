@@ -166,8 +166,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   String? _hotspotPwd;
   bool _isHotspotOn = false;
   bool _wentToHotspotSettings = false;
+  StateSetter? _wizardSetState;
   static const _appChannel = MethodChannel('com.samsung.health.client/app_info');
   final _formKey1 = GlobalKey<FormState>();
+
+  Future<void> _checkHotspotStatus() async {
+    try {
+      final isEnabled = await _appChannel.invokeMethod('isHotspotEnabled') ?? false;
+      if (mounted) {
+        setState(() {
+          _isHotspotOn = isEnabled;
+        });
+        if (_wizardSetState != null) {
+          _wizardSetState!(() {
+            _isHotspotOn = isEnabled;
+          });
+        }
+      }
+    } catch (e) {
+      print('Hotspot check error: $e');
+    }
+  }
   final _formKey5 = GlobalKey<FormState>();
 
   // 가이드 영상 관련 상태 변수 및 애니메이션 컨트롤러
@@ -451,6 +470,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       if (savedStrap.isNotEmpty) _selectedStrap = savedStrap;
       _customStrapCtrl.text = prefs.customStrap;
 
+      final savedExercise = prefs.lastSelectedExercise;
+      if (savedExercise.isNotEmpty) {
+        _selectedExercise = savedExercise;
+      }
+      
       final hasWatched = prefs.hasWatchedGuide;
       _guidePulseController = AnimationController(
         vsync: this,
@@ -1478,7 +1502,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     if (state == AppLifecycleState.resumed) {
       if (_wentToHotspotSettings) {
         _wentToHotspotSettings = false;
-        setState(() { _isHotspotOn = true; });
+        _checkHotspotStatus();
       }
       if (_currentStep == 4) _scanGarminFilesFromDownload();
     }
@@ -3371,6 +3395,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       onTap: () {
         setState(() {
           _selectedExercise = name;
+          _prefs?.saveLastSelectedExercise(name);
           _currentStep = 5; // 즉시 다음 단계 이동
         });
         _loadSportDetails(name);
@@ -3496,8 +3521,48 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
-  void _showWatchSyncWizard() {
-    showModalBottomSheet(
+  Set<String> _getSnapshotFiles() {
+    final dir = Directory('/storage/emulated/0/Documents/COLA_FILE');
+    if (!dir.existsSync()) return {};
+    return dir.listSync().whereType<File>().map((f) => f.path).toSet();
+  }
+
+  bool _addNewFiles(Set<String> oldFiles) {
+    bool added = false;
+    final dir = Directory('/storage/emulated/0/Documents/COLA_FILE');
+    if (dir.existsSync()) {
+      final files = dir.listSync();
+      for (var f in files) {
+        if (f is File && !oldFiles.contains(f.path)) {
+          final name = f.path.split('/').last.toLowerCase();
+          if (name.endsWith('.zip')) {
+            if (name.startsWith('cola_file')) {
+              bool exists = _colaFiles.any((e) => e.originalPath == f.path);
+              if (!exists) {
+                setState(() {
+                  _colaFiles.add(AttachedFile(originalPath: f.path, name: f.path.split('/').last, sizeBytes: f.lengthSync(), type: AttachType.cola));
+                });
+                added = true;
+              }
+            } else if (name.startsWith('log_')) {
+              bool exists = _logFiles.any((e) => e.originalPath == f.path);
+              if (!exists) {
+                setState(() {
+                  _logFiles.add(AttachedFile(originalPath: f.path, name: f.path.split('/').last, sizeBytes: f.lengthSync(), type: AttachType.log));
+                });
+                added = true;
+              }
+            }
+          }
+        }
+      }
+    }
+    return added;
+  }
+
+  Future<void> _showWatchSyncWizard() async {
+    await _checkHotspotStatus();
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF1E2640),
@@ -3506,6 +3571,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       ),
       builder: (ctx) {
         return StatefulBuilder(builder: (ctx, setModalState) {
+          _wizardSetState = setModalState;
           return Padding(
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 20,
@@ -3532,30 +3598,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 const Divider(color: Colors.white12, height: 30),
                 
                 // Step 1
-                const Text('Step 1. Watch 로그 덤프 준비', style: TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold, fontSize: 15)),
+                Text('Step 1. Watch 로그 덤프 준비', style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E5BFF),
-                          foregroundColor: Colors.white,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: Colors.white.withOpacity(0.05),
+                          side: const BorderSide(color: Colors.white24),
+                          foregroundColor: Colors.white.withOpacity(0.9),
                         ),
                         onPressed: _triggerDialer9900,
-                        child: const Text('*#9900# 로그 확보하러 가기', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text('*#9900# 로그 확보하러 가기', style: TextStyle(fontWeight: FontWeight.w500)),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 const Center(child: BouncingArrow()),
                 const SizedBox(height: 10),
 
                 // Step 2
-                const Text('Step 2. 핫스팟 설정 (워치 연결용)', style: TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold, fontSize: 15)),
+                Text('Step 2. 핫스팟 설정 (워치 연결용)', style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -3587,25 +3653,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   decoration: BoxDecoration(
-                    color: _isHotspotOn ? const Color(0xFF3DFFC1) : Colors.white.withOpacity(0.05),
+                    color: Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: _isHotspotOn ? const Color(0xFF3DFFC1) : Colors.white12),
                   ),
                   child: Row(
                     children: [
                       if (_isHotspotOn)
-                        const Icon(Icons.check_circle, color: Color(0xFF1E2640), size: 20)
+                        const Icon(Icons.check_circle, color: Color(0xFF3DFFC1), size: 20)
                       else
                         const Icon(Icons.wifi_off, color: Colors.white54, size: 18),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          _isHotspotOn ? '워치(AP) 연결 완료! ✔️' : '핫스팟 꺼져 있음',
+                          _isHotspotOn ? '핫스팟 켜져 있음! ✔️' : '핫스팟 꺼져 있음',
                           style: TextStyle(
-                            color: _isHotspotOn ? const Color(0xFF1E2640) : Colors.white54,
-                            fontWeight: FontWeight.bold,
+                            color: _isHotspotOn ? const Color(0xFF3DFFC1) : Colors.white54,
+                            fontWeight: FontWeight.w500,
                             fontSize: 14,
                           ),
                         ),
@@ -3614,7 +3680,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2E5BFF).withOpacity(0.2),
-                            foregroundColor: const Color(0xFF3DFFC1),
+                            foregroundColor: Colors.white.withOpacity(0.8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
@@ -3626,31 +3692,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                const Divider(color: Colors.white12, height: 30),
+                const SizedBox(height: 16),
+                const Center(child: BouncingArrow()),
+                const SizedBox(height: 16),
 
                 // Step 3
-                const Text('Step 3. 워치 연결 수락', style: TextStyle(color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold, fontSize: 15)),
+                Text('Step 3. 워치 연결 수락', style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3DFFC1).withOpacity(0.15), 
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Color(0xFF3DFFC1), size: 18),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text('워치 화면에 연결 팝업이 뜨면 [확인]을 눌러주세요!', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -3659,9 +3707,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                       backgroundColor: const Color(0xFF2E5BFF),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
+                      final oldFiles = _getSnapshotFiles();
                       Navigator.pop(ctx);
-                      Navigator.push(context, MaterialPageRoute(
+                      await Navigator.push(context, MaterialPageRoute(
                         builder: (_) => LabWatchSyncScreen(
                           autoStart: true,
                           initialSyncMode: 'HOTSPOT',
@@ -3669,16 +3718,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                           hotspotPwd: _hotspotPwd ?? '12345678',
                         ),
                       ));
+                      if (_addNewFiles(oldFiles)) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('동기화된 워치 로그 파일이 추가되었습니다.\n워치 용량 확보를 위해 기존 로그 삭제를 권장합니다.'),
+                              action: SnackBarAction(
+                                label: '#9900# 열기',
+                                onPressed: () => launchUrl(Uri.parse('tel:*%239900%23')),
+                              ),
+                              duration: const Duration(seconds: 7),
+                            ),
+                          );
+                        }
+                      }
                     },
                     child: const Text('워치와 연결 시작', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3DFFC1).withOpacity(0.15), 
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
+                  ),                  
                 ),
               ],
             ),
           );
         });
       },
-    );
+    ).then((_) => _wizardSetState = null);
   }
 
   Widget _buildStep5Details() {
@@ -3691,25 +3763,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Step 3. 검증 파일 및 디테일 등록', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 18, fontWeight: FontWeight.w600)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: const Color(0xFF2E5BFF).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                child: const Text('마지막 단계', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text('운동 결과 검증을 위한 각종 파일들을 첨부합니다.', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14)),
-          const SizedBox(height: 24),
+          // Step 3 Header removed
           
           // --- SECTION 1: 수동 첨부 (기본 데이터) ---
           Text('섹션 1: 기본 운동 데이터 (수동)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
-          _buildAttachCard(icon: Icons.watch, title: '1. 기준 FIT 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickFit, files: _fitFiles),
+          _buildAttachCard(icon: Icons.watch, title: '1. 자사 FIT 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickFit, files: _fitFiles),
           const SizedBox(height: 12),
           _buildCaptureAttachCard(), // 2. 캡처 이미지 (기존 함수 재사용)
           const SizedBox(height: 30),
@@ -3719,11 +3778,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('섹션 2: 비교 데이터 (자동화)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E5BFF).withOpacity(0.2), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+              IconButton(
                 onPressed: _scanGarminFilesFromDownload,
-                icon: const Icon(Icons.refresh, size: 14, color: Color(0xFF3DFFC1)),
-                label: const Text('스캔', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12)),
+                icon: const Icon(Icons.refresh, size: 20, color: Color(0xFF3DFFC1)),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
             ],
           ),
@@ -3736,7 +3795,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 30),
 
           // --- SECTION 3: 워치 로그 동기화 (원스크린 마법사) ---
-          Text('섹션 3: 워치 로그 (마법사)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+          Text('섹션 3: 워치 COLA/로그 확보 (마법사)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
           InkWell(
             onTap: _showWatchSyncWizard,
@@ -3760,7 +3819,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('6. 워치 Log 파일 동기화', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                        const Text('6. 워치 COLA / Log 파일 동기화', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 4),
                         Text('클릭하여 마법사(Checklist)를 띄웁니다.', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
                       ],
@@ -4071,7 +4130,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 80, child: Text('[기준 FIT]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      const SizedBox(width: 80, child: Text('[자사 FIT]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
                       Expanded(
                         child: _fitFiles.isNotEmpty
                             ? Column(
@@ -5633,7 +5692,7 @@ class _BouncingArrowState extends State<BouncingArrow> with SingleTickerProvider
           child: child,
         );
       },
-      child: const Icon(Icons.keyboard_double_arrow_down, color: Color(0xFF3DFFC1), size: 30),
+      child: const Icon(Icons.keyboard_double_arrow_down, color: Colors.white38, size: 30),
     );
   }
 }

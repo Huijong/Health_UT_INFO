@@ -22,6 +22,7 @@ class PrefsService {
   static const _keyLastSeenFameMonth = 'last_seen_fame_month';
   static const _keyFavoriteSports = 'favorite_sports';
   static const _keyEmailMigrationDone = 'email_migration_done';
+  static const _keyLastSelectedExercise = 'last_selected_exercise';
 
   final SharedPreferences _prefs;
 
@@ -36,6 +37,7 @@ class PrefsService {
   String get googleEmail => _prefs.getString(_keyGoogleEmail) ?? '';
   String get lastSeenFameMonth => _prefs.getString(_keyLastSeenFameMonth) ?? '';
   List<String> get favoriteSports => _prefs.getStringList(_keyFavoriteSports) ?? [];
+  String get lastSelectedExercise => _prefs.getString(_keyLastSelectedExercise) ?? '';
   
   double? get height {
     final v = _prefs.getDouble(_keyHeight);
@@ -80,6 +82,7 @@ class PrefsService {
   Future<void> saveGoogleEmail(String value) => _prefs.setString(_keyGoogleEmail, value);
   Future<void> saveLastSeenFameMonth(String value) => _prefs.setString(_keyLastSeenFameMonth, value);
   Future<void> saveFavoriteSports(List<String> values) => _prefs.setStringList(_keyFavoriteSports, values);
+  Future<void> saveLastSelectedExercise(String value) => _prefs.setString(_keyLastSelectedExercise, value);
   Future<void> saveDeviceUuid(String value) => _prefs.setString(_keyDeviceUuid, value);
   Future<void> saveHeight(double value) => _prefs.setDouble(_keyHeight, value);
   Future<void> saveWeight(double value) => _prefs.setDouble(_keyWeight, value);
