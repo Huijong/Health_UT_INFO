@@ -112,7 +112,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
           child: _isLoading
               ? const Center(
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3366FF)),
                   ),
                 )
               : _errorMessage != null
@@ -131,7 +131,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                             ElevatedButton(
                               onPressed: _fetchRankings,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2E5BFF),
+                                backgroundColor: const Color(0xFF3366FF),
                                 foregroundColor: Colors.white,
                               ),
                               child: const Text('다시 시도'),
@@ -142,7 +142,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                     )
                   : RefreshIndicator(
                       onRefresh: _fetchRankings,
-                      color: const Color(0xFF3DFFC1),
+                      color: const Color(0xFF3366FF),
                       backgroundColor: const Color(0xFF1E2020),
                       child: ListView(
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -252,12 +252,12 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                   _fetchRankings();
                 }
               },
-              selectedColor: const Color(0xFF3DFFC1),
+              selectedColor: const Color(0xFF3366FF),
               backgroundColor: Colors.white.withOpacity(0.06),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
-                  color: isSelected ? const Color(0xFF3DFFC1) : Colors.white.withOpacity(0.08),
+                  color: isSelected ? const Color(0xFF3366FF) : Colors.white.withOpacity(0.08),
                 ),
               ),
               showCheckmark: false,
@@ -287,7 +287,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF3DFFC1),
+                      color: Color(0xFF3366FF),
                     ),
                   ),
                 ],
@@ -309,7 +309,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF3DFFC1),
+                      color: Color(0xFF3366FF),
                     ),
                   ),
                 ],
@@ -331,14 +331,14 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: const [
-                        Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF3DFFC1)),
+                        Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF3366FF)),
                         SizedBox(width: 4),
                         Text(
                           '상세 보기',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF3DFFC1),
+                            color: Color(0xFF3366FF),
                           ),
                         ),
                       ],
@@ -375,7 +375,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                         padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                         child: Row(
                           children: const [
-                            Icon(Icons.stars_rounded, color: Color(0xFF3DFFC1), size: 24),
+                            Icon(Icons.stars_rounded, color: Color(0xFF3366FF), size: 24),
                             SizedBox(width: 8),
                             Text(
                               '포인트 적립 기준 안내',
@@ -391,8 +391,8 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                       ),
                       // Tab Bar (Text Only for saving space)
                       const TabBar(
-                        indicatorColor: Color(0xFF3DFFC1),
-                        labelColor: Color(0xFF3DFFC1),
+                        indicatorColor: Color(0xFF3366FF),
+                        labelColor: Color(0xFF3366FF),
                         unselectedLabelColor: Colors.white38,
                         labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                         padding: EdgeInsets.symmetric(horizontal: 8),
@@ -422,8 +422,8 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                           child: TextButton(
                             onPressed: () => Navigator.pop(ctx),
                             style: TextButton.styleFrom(
-                              backgroundColor: const Color(0xFF3DFFC1),
-                              foregroundColor: Colors.black,
+                              backgroundColor: const Color(0xFF3366FF),
+                              foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
@@ -493,9 +493,9 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF2E5BFF).withOpacity(0.08),
+        color: const Color(0xFF3366FF).withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF2E5BFF).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.2)),
       ),
       child: Text(
         text,
@@ -530,7 +530,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
         children: [
           Expanded(flex: 3, child: Text(range, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
           Expanded(flex: 4, child: Text(rule, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11))),
-          Expanded(flex: 3, child: Text(example, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFF3DFFC1), fontSize: 11, fontWeight: FontWeight.bold))),
+          Expanded(flex: 3, child: Text(example, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFF3366FF), fontSize: 11, fontWeight: FontWeight.bold))),
         ],
       ),
     );
@@ -581,15 +581,15 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF2E5BFF).withOpacity(0.35),
+            const Color(0xFF3366FF).withOpacity(0.35),
             const Color(0xFF1429A0).withOpacity(0.1),
-            const Color(0xFF3DFFC1).withOpacity(0.05),
+            const Color(0xFF3366FF).withOpacity(0.05),
           ],
         ),
-        border: Border.all(color: const Color(0xFF2E5BFF).withOpacity(0.3), width: 1.5),
+        border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2E5BFF).withOpacity(0.1),
+            color: const Color(0xFF3366FF).withOpacity(0.1),
             blurRadius: 16,
             offset: const Offset(0, 4),
           )
@@ -620,14 +620,14 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF3DFFC1).withOpacity(0.15),
+                    color: const Color(0xFF3366FF).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3)),
                   ),
                   child: Text(
                     '${_formatPoints(myCount)}포인트 ($mySubmissions건)',
                     style: const TextStyle(
-                      color: Color(0xFF3DFFC1),
+                      color: Color(0xFF3366FF),
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -796,7 +796,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                     ),
                     child: CircleAvatar(
                       radius: avatarRadius,
-                      backgroundColor: isMe ? const Color(0xFF3DFFC1) : themeColor.withOpacity(0.15),
+                      backgroundColor: isMe ? const Color(0xFF3366FF) : themeColor.withOpacity(0.15),
                       child: CircleAvatar(
                         radius: avatarRadius - 2,
                         backgroundColor: const Color(0xFF1E2020),
@@ -836,7 +836,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                    color: isMe ? const Color(0xFF3DFFC1) : Colors.white,
+                    color: isMe ? const Color(0xFF3366FF) : Colors.white,
                   ),
                 ),
               ),
@@ -929,9 +929,9 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
       changeWidget = Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
         decoration: BoxDecoration(
-          color: const Color(0xFF2E5BFF).withOpacity(0.2),
+          color: const Color(0xFF3366FF).withOpacity(0.2),
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: const Color(0xFF2E5BFF).withOpacity(0.4), width: 0.8),
+          border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.4), width: 0.8),
         ),
         child: const Text(
           'NEW',
@@ -970,8 +970,8 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
     return GestureDetector(
       onTap: () => _showTesterHistory(name),
       child: _GlassCard(
-        borderColor: isMe ? const Color(0xFF3DFFC1).withOpacity(0.5) : null,
-        backgroundColor: isMe ? const Color(0xFF3DFFC1).withOpacity(0.04) : null,
+        borderColor: isMe ? const Color(0xFF3366FF).withOpacity(0.5) : null,
+        backgroundColor: isMe ? const Color(0xFF3366FF).withOpacity(0.04) : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
@@ -986,7 +986,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                        color: isMe ? const Color(0xFF3DFFC1) : Colors.white,
+                        color: isMe ? const Color(0xFF3366FF) : Colors.white,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -999,7 +999,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                  color: isMe ? const Color(0xFF3DFFC1) : Colors.white70,
+                  color: isMe ? const Color(0xFF3366FF) : Colors.white70,
                 ),
               ),
             ],
@@ -1017,7 +1017,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
       barrierDismissible: false,
       builder: (context) => const Center(
         child: CircularProgressIndicator(
-          color: Color(0xFF3DFFC1),
+          color: Color(0xFF3366FF),
         ),
       ),
     );
@@ -1126,7 +1126,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
 
                           final isPositive = points >= 0;
                           final pointsStr = isPositive ? '+${_formatPoints(points)} P' : '${_formatPoints(points)} P';
-                          final pointsColor = isPositive ? const Color(0xFF3DFFC1) : Colors.redAccent;
+                          final pointsColor = isPositive ? const Color(0xFF3366FF) : Colors.redAccent;
                           final isBigBonus = points >= 4;
 
                           return Padding(
@@ -1191,7 +1191,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF3DFFC1), size: 16),
+                    const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF3366FF), size: 16),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
