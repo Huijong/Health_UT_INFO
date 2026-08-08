@@ -297,13 +297,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         _addLog("워치 내부 잔여 파일 삭제 완료!");
         setState(() => _autoSyncStage = 6);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('워치 동기화 및 잔여 파일 삭제가 모두 완료되었습니다!'),
-              duration: Duration(seconds: 3),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showSuccessSnackBarAndPop('워치 동기화 및 잔여 파일 삭제가 모두 완료되었습니다!');
         }
         break;
 
@@ -533,13 +527,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       } else {
         setState(() => _autoSyncStage = 6);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('워치 동기화가 완료되었습니다! (워치 잔여 파일 유지)'),
-              duration: Duration(seconds: 3),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showSuccessSnackBarAndPop('워치 동기화가 완료되었습니다! (워치 잔여 파일 유지)');
         }
       }
     } catch (e) {
@@ -583,6 +571,34 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     } catch (e) {
       _addLog("Request download error: $e");
     }
+  }
+
+  void _showSuccessSnackBarAndPop(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message, 
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+        backgroundColor: const Color(0xFF3366FF),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 8,
+        margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
+      ),
+    );
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) Navigator.pop(context);
+    });
   }
 
   void _deleteWatchFiles() {
@@ -835,10 +851,10 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         _buildSyncStageRow(4, '폰 단말 최적화 압축 진행 중', _autoSyncStage > 4, _autoSyncStage == 4),
         _buildSyncStageRow(
           5, 
-          '워치 잔여 파일 정리 중', 
+          _autoDeleteWatchFiles ? '워치 잔여 파일 정리 중' : '워치 잔여 파일 유지', 
           _autoSyncStage > 5, 
           _autoSyncStage == 5,
-          isStrikeThrough: !_autoDeleteWatchFiles,
+          isStrikeThrough: false,
           appendText: !_autoDeleteWatchFiles ? "(설정 > 워치 동기화 후 자동삭제 OFF)" : null,
         ),
         _buildSyncStageRow(6, '동기화 완료!', _autoSyncStage == 6, false),
