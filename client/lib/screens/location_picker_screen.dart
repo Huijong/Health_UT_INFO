@@ -147,8 +147,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       data: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0C0F0F),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF2E5BFF),
-          secondary: Color(0xFF3DFFC1),
+          primary: Color(0xFF3366FF),
+          secondary: Color(0xFF3366FF),
           surface: Color(0xFF1E2020),
         ),
       ),
@@ -163,7 +163,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.my_location_rounded, color: Color(0xFF3DFFC1)),
+              icon: const Icon(Icons.my_location_rounded, color: Color(0xFF3366FF)),
               onPressed: _moveToCurrentPosition,
               tooltip: '현재 위치로 이동',
             )
@@ -224,7 +224,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 color: Colors.black38,
                 child: const Center(
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3366FF)),
                   ),
                 ),
               ),
@@ -259,7 +259,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.location_on_rounded, color: Color(0xFF3DFFC1), size: 20),
+                        const Icon(Icons.location_on_rounded, color: Color(0xFF3366FF), size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -286,7 +286,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                                 Navigator.pop(context, _address);
                               },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3DFFC1),
+                          backgroundColor: const Color(0xFF3366FF),
                           foregroundColor: const Color(0xFF0C0F0F),
                           disabledBackgroundColor: Colors.white.withOpacity(0.12),
                           disabledForegroundColor: Colors.white24,

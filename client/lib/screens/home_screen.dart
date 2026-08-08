@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../widgets/custom_file_picker.dart';
 import 'dart:ui';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:android_intent_plus/android_intent.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
+import '../widgets/custom_file_picker.dart';
 import 'lab_watch_sync_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
@@ -301,8 +303,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFF23293F),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3), width: 1),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3), width: 1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.5),
@@ -316,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.info_outline_rounded, color: Color(0xFF3DFFC1), size: 20),
+                const Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -512,7 +514,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.notifications_active_rounded, color: Color(0xFF3DFFC1)),
+                  const Icon(Icons.notifications_active_rounded, color: Colors.white),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -646,7 +648,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.account_circle_rounded, color: Color(0xFF3DFFC1), size: 48),
+              const Icon(Icons.account_circle_rounded, color: Colors.white, size: 48),
               const SizedBox(height: 16),
               const Text(
                 '이전 등록 정보 발견',
@@ -690,7 +692,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E5BFF),
+                        backgroundColor: const Color(0xFF3366FF),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -807,7 +809,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.system_update_rounded, color: Color(0xFF3DFFC1), size: 48),
+                const Icon(Icons.system_update_rounded, color: Colors.white, size: 48),
                 const SizedBox(height: 16),
                 const Text(
                   '필수 업데이트 안내',
@@ -849,8 +851,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                           _launchPlayStore();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3DFFC1),
-                          foregroundColor: Colors.black,
+                          backgroundColor: const Color(0xFF3366FF),
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
@@ -970,8 +972,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                 left: 4,
                                 child: IconButton(
                                   icon: const Icon(
-                                    Icons.chevron_left_rounded,
-                                    color: Color(0xFF3DFFC1),
+                                    Icons.chevron_left_rounded, color: Colors.white,
                                     size: 36,
                                   ),
                                   onPressed: () {
@@ -987,8 +988,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                 right: 4,
                                 child: IconButton(
                                   icon: const Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: Color(0xFF3DFFC1),
+                                    Icons.chevron_right_rounded, color: Colors.white,
                                     size: 36,
                                   ),
                                   onPressed: () {
@@ -1014,7 +1014,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF3DFFC1),
+                                    color: Color(0xFF3366FF),
                                     height: 1.4,
                                   ),
                                   children: [
@@ -1036,7 +1036,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF3DFFC1),
+                                  color: Color(0xFF3366FF),
                                   height: 1.4,
                                 ),
                               ),
@@ -1062,7 +1062,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                 height: 24,
                                 child: Checkbox(
                                   value: dontShowAgain,
-                                  activeColor: const Color(0xFF3DFFC1),
+                                  activeColor: const Color(0xFF3366FF),
                                   checkColor: Colors.black,
                                   onChanged: (val) {
                                     setDialogState(() {
@@ -1095,8 +1095,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                               onConfirm();
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF3DFFC1),
-                              foregroundColor: Colors.black,
+                              backgroundColor: const Color(0xFF3366FF),
+                              foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
@@ -1195,7 +1195,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         return AlertDialog(
           backgroundColor: const Color(0xFF1E2128).withOpacity(0.95),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             side: BorderSide(color: Colors.white.withOpacity(0.1)),
           ),
           title: const Text(
@@ -1212,7 +1212,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              Icon(Icons.security_rounded, size: 40, color: const Color(0xFF3DFFC1).withOpacity(0.8)),
+              Icon(Icons.security_rounded, size: 40, color: const Color(0xFF3366FF).withOpacity(0.8)),
             ],
           ),
           actions: [
@@ -1230,7 +1230,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   });
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E5BFF),
+                  backgroundColor: const Color(0xFF3366FF),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
                 ),
@@ -1327,7 +1327,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             AlertDialog(
               backgroundColor: const Color(0xFF1E2128).withOpacity(0.95),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 side: BorderSide(color: Colors.white.withOpacity(0.1)),
               ),
               title: Text(
@@ -1375,13 +1375,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   if (hasParticipated) ...[
                     Text('총 $myPoints P 획득', style: const TextStyle(fontSize: 15, color: Colors.white)),
                     const SizedBox(height: 5),
-                    Text('순위: $myRank 위', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF3DFFC1))),
+                    Text('순위: $myRank 위', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF3366FF))),
                     const SizedBox(height: 15),
                   ],
                   Text(
                     feedbackText,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFFFFB74D)),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFFFFB74D)),
                   ),
                 ],
               ),
@@ -1395,7 +1395,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                       _sendDevicePing();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E5BFF),
+                      backgroundColor: const Color(0xFF3366FF),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
                     ),
@@ -1644,21 +1644,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E243A),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            '센서/데이터 이슈 메모',
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          content: SingleChildScrollView(
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GlassCard(
+            padding: const EdgeInsets.all(20),
+            radius: 20,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '센서/데이터 이슈 메모',
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx, false);
+                        FocusManager.instance.primaryFocus?.unfocus();
+                      },
+                      child: const Icon(Icons.close_rounded, color: Colors.white54, size: 24),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 const Text(
                   '입력하신 센서/데이터 이슈 메모를 확인해 주세요.',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
                 ),
                 const SizedBox(height: 16),
                 Container(
@@ -1684,39 +1698,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     ],
                   ),
                 ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx, false);
+                          FocusManager.instance.primaryFocus?.unfocus();
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            final ctx = _precisionCardKey.currentContext;
+                            if (ctx != null) {
+                              Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+                            }
+                          });
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          backgroundColor: Colors.white.withOpacity(0.05),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('다시 수정', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3366FF),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('확인 및 전송', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx, false);
-                // 키보드나 다른 입력 필드 포커스를 해제하여 이전 포커스 위치로 되돌아가지 않도록 함
-                FocusManager.instance.primaryFocus?.unfocus();
-                // 다시 수정 버튼 클릭 시 정밀 검증 카드로 스크롤 포커스
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  final ctx = _precisionCardKey.currentContext;
-                  if (ctx != null) {
-                    Scrollable.ensureVisible(
-                      ctx,
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.easeInOut,
-                    );
-                  }
-                });
-              },
-              child: const Text('다시 수정', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E5BFF),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('확인 및 전송'),
-            ),
-          ],
         );
       },
     );
@@ -1735,13 +1759,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: isNormal ? const Color(0xFF3DFFC1).withOpacity(0.12) : const Color(0xFFFFAE2E).withOpacity(0.12),
+                color: isNormal ? Colors.white.withOpacity(0.15) : const Color(0xFFFFAE2E).withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 status,
                 style: TextStyle(
-                  color: isNormal ? const Color(0xFF3DFFC1) : const Color(0xFFFFAE2E),
+                  color: isNormal ? Colors.white : const Color(0xFFFFAE2E),
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1940,8 +1964,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     if (_fileBusy) return;
     setState(() => _fileBusy = true);
     try {
-      final f = await FileService.pickFit();
-      if (f != null && mounted) setState(() => _fitFiles.add(f));
+      final f = await CustomFilePicker.showPicker(
+        context: context,
+        title: '자사 FIT 파일 선택',
+        directoryPath: '/sdcard/Download/삼성 헬스/fit',
+        extensionFilter: '.fit',
+        onFreeSelect: () => FileService.pickFit(),
+      );
+      if (f != null && mounted)         if (f is File) {
+          final stat = f.statSync();
+          final name = f.path.split('/').last.split('\\').last;
+          setState(() => _fitFiles.add(AttachedFile(originalPath: f.path, name: name, sizeBytes: stat.size, type: AttachType.fit)));
+        } else {
+          setState(() => _fitFiles.add(f));
+        }
     } catch (e) {
       _showFileError('FIT 파일', e);
     } finally {
@@ -1963,13 +1999,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.open_in_new_rounded, color: Color(0xFF3DFFC1), size: 24),
-                    SizedBox(width: 8),
-                    Text(
+                    const Text(
                       'Garmin Fit 파일 다운로드',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(ctx, null),
+                      child: const Icon(Icons.close_rounded, color: Colors.white54, size: 24),
                     ),
                   ],
                 ),
@@ -1985,8 +2024,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF3DFFC1)),
-                      foregroundColor: const Color(0xFF3DFFC1),
+                      side: BorderSide(color: Colors.white.withOpacity(0.5)),
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -2018,7 +2057,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     Expanded(
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E5BFF),
+                          backgroundColor: const Color(0xFF3366FF),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -2059,14 +2098,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       if (_fileBusy) return;
       setState(() => _fileBusy = true);
       try {
-        final f = await FileService.pickGarminFit();
+        final f = await CustomFilePicker.showPicker(
+          context: context,
+          title: 'Garmin Fit 파일 선택',
+          directoryPath: '/sdcard/Download',
+          extensionFilter: '.zip',
+          onFreeSelect: () => FileService.pickGarminFit(),
+        );
         if (f != null && mounted) {
-          final fileName = f.originalPath.split('/').last.split('\\').last;
+          final pathStr = f is File ? f.path : f.originalPath;
+          final fileName = pathStr.split('/').last.split('\\').last;
           if (!fileName.toLowerCase().endsWith('.zip')) {
             _showFileError('Garmin FIT 파일', '선택한 파일이 .zip 파일이 아닙니다.');
             return;
           }
+                  if (f is File) {
+          final stat = f.statSync();
+          final name = f.path.split('/').last.split('\\').last;
+          setState(() => _garminFiles.add(AttachedFile(originalPath: f.path, name: name, sizeBytes: stat.size, type: AttachType.fit)));
+        } else {
           setState(() => _garminFiles.add(f));
+        }
         }
       } catch (e) {
         _showFileError('Garmin FIT 파일', e);
@@ -2080,14 +2132,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     if (_fileBusy) return;
     setState(() => _fileBusy = true);
     try {
-      final f = await FileService.pickCola();
+      final f = await CustomFilePicker.showPicker(
+        context: context,
+        title: 'Cola 파일 선택',
+        directoryPath: '/sdcard/Documents/COLA_FILE',
+        prefixFilters: ['COLA_FILE', 'log_'],
+        priorityPrefix: 'COLA_FILE',
+        onFreeSelect: () => FileService.pickCola(),
+      );
       if (f != null && mounted) {
-        final fileName = f.originalPath.split('/').last.split('\\').last;
+        final pathStr = f is File ? f.path : f.originalPath;
+        final fileName = pathStr.split('/').last.split('\\').last;
         if (!fileName.toLowerCase().startsWith('cola')) {
           _showFileError('Cola.zip', '선택한 파일이 COLA_FILE로 시작하는 zip 파일이 아닙니다.');
           return;
         }
-        setState(() => _colaFiles.add(f));
+                if (f is File) {
+          final stat = f.statSync();
+          final name = f.path.split('/').last.split('\\').last;
+          setState(() => _colaFiles.add(AttachedFile(originalPath: f.path, name: name, sizeBytes: stat.size, type: AttachType.cola)));
+        } else {
+          setState(() => _colaFiles.add(f));
+        }
       }
     } catch (e) {
       _showFileError('Cola.zip', e);
@@ -2100,14 +2166,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     if (_fileBusy) return;
     setState(() => _fileBusy = true);
     try {
-      final f = await FileService.pickLog();
+      final f = await CustomFilePicker.showPicker(
+        context: context,
+        title: '단말 Log 파일 선택',
+        directoryPath: '/sdcard/Documents/COLA_FILE',
+        prefixFilters: ['COLA_FILE', 'log_'],
+        priorityPrefix: 'log_',
+        onFreeSelect: () => FileService.pickLog(),
+      );
       if (f != null && mounted) {
-        final fileName = f.originalPath.split('/').last.split('\\').last;
+        final pathStr = f is File ? f.path : f.originalPath;
+        final fileName = pathStr.split('/').last.split('\\').last;
         if (!fileName.toLowerCase().startsWith('log_')) {
-          _showFileError('로그 파일', '선택한 파일이 log_로 시작하는 zip 파일이 아닙니다.');
+          _showFileError('단말 Log 파일', '선택한 파일이 log_로 시작하는 zip 파일이 아닙니다.');
           return;
         }
-        setState(() => _logFiles.add(f));
+        if (f is File) {
+          final stat = f.statSync();
+          setState(() => _logFiles.add(AttachedFile(originalPath: f.path, name: fileName, sizeBytes: stat.size, type: AttachType.log)));
+        } else {
+          setState(() => _logFiles.add(f));
+        }
       }
     } catch (e) {
       _showFileError('로그 파일', e);
@@ -2153,7 +2232,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         backgroundColor: Color(0xFF0C0F0F),
         body: Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3366FF)),
           ),
         ),
       );
@@ -2162,8 +2241,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     final mainTheme = ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0C0F0F),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF2E5BFF),
-          secondary: Color(0xFF3DFFC1),
+          primary: Color(0xFF3366FF),
+          secondary: Color(0xFF3366FF),
           surface: Color(0xFF1E2020),
           error: Color(0xFFFF5252),
         ),
@@ -2185,7 +2264,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF2E5BFF), width: 1.5),
+            borderSide: const BorderSide(color: Color(0xFF3366FF), width: 1.5),
           ),
           labelStyle: TextStyle(color: const Color(0xFFE2E2E2).withOpacity(0.7)),
         ),
@@ -2310,7 +2389,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               ),
               if (_currentStep == 4)
                 IconButton(
-                  icon: const Icon(Icons.settings_rounded, size: 22, color: Color(0xFF3DFFC1)),
+                  icon: const Icon(Icons.settings_rounded, size: 22, color: Color(0xFF3366FF)),
                   onPressed: () async {
                     if (_prefs == null) return;
                     final updated = await Navigator.push(
@@ -2344,7 +2423,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                       child: Container(
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
-                            colors: [Color(0xFF2E5BFF), Color(0xFF3DFFC1)],
+                            colors: [Color(0xFF3366FF), Color(0xFF3366FF)],
                           ),
                         ),
                       ),
@@ -2373,7 +2452,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   '${((_currentStep / 3.0) * 100).toInt().clamp(0, 100)}% 완료',
                   style: const TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF3DFFC1),
+                    color: Color(0xFF3366FF),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -2472,7 +2551,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                       height: 56,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E5BFF),
+                          backgroundColor: const Color(0xFF3366FF),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -2511,7 +2590,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                             child: Column(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                const Icon(Icons.account_circle_rounded, color: Color(0xFF3DFFC1), size: 48),
+                                                const Icon(Icons.account_circle_rounded, color: Colors.white, size: 48),
                                                 const SizedBox(height: 16),
                                                 const Text(
                                                   '기존 닉네임 발견',
@@ -2543,7 +2622,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                                       child: ElevatedButton(
                                                         onPressed: () => Navigator.pop(ctx, true),
                                                         style: ElevatedButton.styleFrom(
-                                                          backgroundColor: const Color(0xFF3DFFC1),
+                                                          backgroundColor: const Color(0xFF3366FF),
                                                           foregroundColor: const Color(0xFF0F172A),
                                                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                                           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -2730,7 +2809,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     watch,
                     style: TextStyle(
                       fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                      color: isSel ? const Color(0xFF3DFFC1) : const Color(0xFFE2E2E2),
+                      color: isSel ? const Color(0xFF3366FF) : const Color(0xFFE2E2E2),
                     ),
                   ),
                   value: watch,
@@ -2889,7 +2968,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E5BFF),
+                      backgroundColor: const Color(0xFF3366FF),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -2955,7 +3034,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                                color: isSel ? const Color(0xFF3DFFC1) : const Color(0xFFE2E2E2),
+                                color: isSel ? const Color(0xFF3366FF) : const Color(0xFFE2E2E2),
                               ),
                             ),
                           ],
@@ -3029,14 +3108,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                            color: isSel ? const Color(0xFF3DFFC1) : const Color(0xFFE2E2E2),
+                            color: isSel ? const Color(0xFF3366FF) : const Color(0xFFE2E2E2),
                           ),
                         ),
                       ),
                       if (url.isNotEmpty)
                         IconButton(
                           icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                          color: isSel ? const Color(0xFF3DFFC1) : Colors.white60,
+                          color: isSel ? const Color(0xFF3366FF) : Colors.white60,
                           onPressed: () => _launchUrl(url),
                         ),
                     ],
@@ -3098,8 +3177,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             builder: (context, child) {
               final double val = _updateNoticePulseController?.value ?? 0.0;
               final Color pulseColor = Color.lerp(
-                const Color(0xFF2E5BFF),
-                const Color(0xFF3DFFC1),
+                const Color(0xFF3366FF),
+                const Color(0xFF3366FF),
                 val,
               )!;
 
@@ -3145,7 +3224,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 radius: 16,
                 child: Row(
                   children: [
-                    const Icon(Icons.system_update_rounded, color: Color(0xFF3DFFC1), size: 26),
+                    const Icon(Icons.system_update_rounded, color: Colors.white, size: 26),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -3162,13 +3241,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF3DFFC1).withOpacity(0.2),
+                        color: const Color(0xFF3366FF).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF3DFFC1), width: 1),
+                        border: Border.all(color: const Color(0xFF3366FF), width: 1),
                       ),
                       child: const Text(
                         '업데이트',
-                        style: TextStyle(fontSize: 10, color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 10, color: Color(0xFF3366FF), fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -3262,8 +3341,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           builder: (context, child) {
             final double val = _guidePulseController?.value ?? 0.0;
             final Color pulseColor = Color.lerp(
-              const Color(0xFF2E5BFF),
-              const Color(0xFF3DFFC1),
+              const Color(0xFF3366FF),
+              const Color(0xFF3366FF),
               val,
             )!;
 
@@ -3291,7 +3370,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               radius: 16,
               child: Row(
                 children: [
-                  const Icon(Icons.play_circle_outline_rounded, color: Color(0xFF3DFFC1), size: 26),
+                  const Icon(Icons.play_circle_outline_rounded, color: Colors.white, size: 26),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
@@ -3307,13 +3386,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF3DFFC1).withOpacity(0.2),
+                        color: const Color(0xFF3366FF).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF3DFFC1), width: 1),
+                        border: Border.all(color: const Color(0xFF3366FF), width: 1),
                       ),
                       child: const Text(
                         '필독',
-                        style: TextStyle(fontSize: 10, color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 10, color: Color(0xFF3366FF), fontWeight: FontWeight.bold),
                       ),
                     ),
                 ],
@@ -3409,10 +3488,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isSel ? const Color(0xFF3DFFC1).withOpacity(0.15) : Colors.white.withOpacity(0.04),
+                color: isSel ? Colors.white.withOpacity(0.15) : Colors.white.withOpacity(0.04),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: isSel ? const Color(0xFF3DFFC1) : Colors.white60, size: 22),
+              child: Icon(icon, color: isSel ? Colors.white : Colors.white60, size: 22),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -3421,7 +3500,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                  color: isSel ? const Color(0xFF3DFFC1) : Colors.white,
+                  color: isSel ? Colors.white : Colors.white70,
                 ),
               ),
             ),
@@ -3438,7 +3517,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             if (isFavorite) ...[
               const Icon(Icons.drag_handle_rounded, size: 20, color: Colors.white30),
             ] else ...[
-              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: isSel ? const Color(0xFF3DFFC1) : Colors.white30),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: isSel ? Colors.white : Colors.white30),
             ],
           ],
         ),
@@ -3585,7 +3664,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.rocket_launch, color: Color(0xFF3DFFC1)),
+                    const Icon(Icons.rocket_launch, color: Colors.white),
                     const SizedBox(width: 10),
                     const Text('워치 자동 동기화 마법사', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                     const Spacer(),
@@ -3597,154 +3676,184 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 ),
                 const Divider(color: Colors.white12, height: 30),
                 
-                // Step 1
-                Text('Step 1. Watch 로그 덤프 준비', style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.bold, fontSize: 15)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          backgroundColor: Colors.white.withOpacity(0.05),
-                          side: const BorderSide(color: Colors.white24),
-                          foregroundColor: Colors.white.withOpacity(0.9),
-                        ),
-                        onPressed: _triggerDialer9900,
-                        child: const Text('*#9900# 로그 확보하러 가기', style: TextStyle(fontWeight: FontWeight.w500)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Center(child: BouncingArrow()),
-                const SizedBox(height: 10),
-
-                // Step 2
-                Text('Step 2. 핫스팟 설정 (워치 연결용)', style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.bold, fontSize: 15)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        initialValue: _hotspotSsid ?? 'healthport',
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
-                        decoration: const InputDecoration(labelText: '네트워크 이름 (SSID)', labelStyle: TextStyle(color: Colors.white54)),
-                        onChanged: (val) {
-                          _hotspotSsid = val;
-                          _saveHotspotConfig('hotspot_ssid', val);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextFormField(
-                        initialValue: _hotspotPwd ?? '12345678',
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
-                        decoration: const InputDecoration(labelText: '비밀번호', labelStyle: TextStyle(color: Colors.white54)),
-                        onChanged: (val) {
-                          _hotspotPwd = val;
-                          _saveHotspotConfig('hotspot_pwd', val);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _isHotspotOn ? const Color(0xFF3DFFC1) : Colors.white12),
-                  ),
-                  child: Row(
+                // Step 1 GlassCard
+                GlassCard(
+                  padding: const EdgeInsets.all(16),
+                  radius: 16,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (_isHotspotOn)
-                        const Icon(Icons.check_circle, color: Color(0xFF3DFFC1), size: 20)
-                      else
-                        const Icon(Icons.wifi_off, color: Colors.white54, size: 18),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _isHotspotOn ? '핫스팟 켜져 있음! ✔️' : '핫스팟 꺼져 있음',
-                          style: TextStyle(
-                            color: _isHotspotOn ? const Color(0xFF3DFFC1) : Colors.white54,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14,
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                            child: const Text('1', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           ),
+                          const SizedBox(width: 12),
+                          const Text('핫스팟 설정 (워치 연결용)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Input Area Group
+                      const Text('네트워크 정보', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: _hotspotSsid ?? 'healthport',
+                              style: const TextStyle(color: Colors.white, fontSize: 14),
+                              decoration: InputDecoration(
+                                labelText: '네트워크 이름 (SSID)', 
+                                labelStyle: const TextStyle(color: Colors.white54),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.04),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              ),
+                              onChanged: (val) {
+                                _hotspotSsid = val;
+                                _saveHotspotConfig('hotspot_ssid', val);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: _hotspotPwd ?? '12345678',
+                              style: const TextStyle(color: Colors.white, fontSize: 14),
+                              decoration: InputDecoration(
+                                labelText: '비밀번호', 
+                                labelStyle: const TextStyle(color: Colors.white54),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.04),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              ),
+                              onChanged: (val) {
+                                _hotspotPwd = val;
+                                _saveHotspotConfig('hotspot_pwd', val);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(color: Colors.white12, height: 24),
+                      // Status Area
+                      const Text('핫스팟 설정 상태', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: _isHotspotOn ? const Color(0xFF3366FF).withOpacity(0.1) : Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _isHotspotOn ? const Color(0xFF3366FF).withOpacity(0.5) : Colors.white12),
+                        ),
+                        child: Row(
+                          children: [
+                            if (_isHotspotOn)
+                              const Icon(Icons.check_circle, color: Colors.lightBlueAccent, size: 20)
+                            else
+                              const Icon(Icons.wifi_off, color: Colors.white54, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _isHotspotOn ? '핫스팟 켜져 있음!' : '핫스팟 꺼져 있음!',
+                                style: TextStyle(
+                                  color: _isHotspotOn ? Colors.white : Colors.white54,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            if (!_isHotspotOn)
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white.withOpacity(0.15),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                  minimumSize: const Size(60, 32),
+                                ),
+                                onPressed: _openHotspotSettings,
+                                icon: const Icon(Icons.settings, color: Colors.white, size: 14),
+                                label: const Text('설정 열기', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              )
+                          ],
                         ),
                       ),
-                      if (!_isHotspotOn)
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2E5BFF).withOpacity(0.2),
-                            foregroundColor: Colors.white.withOpacity(0.8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                          ),
-                          onPressed: _openHotspotSettings,
-                          icon: const Icon(Icons.settings, size: 14),
-                          label: const Text('설정 열기', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        )
                     ],
                   ),
                 ),
+                
                 const SizedBox(height: 16),
                 const Center(child: BouncingArrow()),
                 const SizedBox(height: 16),
 
-                // Step 3
-                Text('Step 3. 워치 연결 수락', style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.bold, fontSize: 15)),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E5BFF),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () async {
-                      final oldFiles = _getSnapshotFiles();
-                      Navigator.pop(ctx);
-                      await Navigator.push(context, MaterialPageRoute(
-                        builder: (_) => LabWatchSyncScreen(
-                          autoStart: true,
-                          initialSyncMode: 'HOTSPOT',
-                          hotspotSsid: _hotspotSsid ?? 'healthport',
-                          hotspotPwd: _hotspotPwd ?? '12345678',
-                        ),
-                      ));
-                      if (_addNewFiles(oldFiles)) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('동기화된 워치 로그 파일이 추가되었습니다.\n워치 용량 확보를 위해 기존 로그 삭제를 권장합니다.'),
-                              action: SnackBarAction(
-                                label: '#9900# 열기',
-                                onPressed: () => launchUrl(Uri.parse('tel:*%239900%23')),
+                // Step 2 GlassCard
+                GlassCard(
+                  padding: const EdgeInsets.all(16),
+                  radius: 16,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                            child: const Text('2', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text('워치 연결 시작', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3366FF),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () async {
+                            final oldFiles = _getSnapshotFiles();
+                            Navigator.pop(ctx);
+                            await Navigator.push(context, MaterialPageRoute(
+                              builder: (_) => LabWatchSyncScreen(
+                                autoStart: true,
+                                initialSyncMode: 'HOTSPOT',
+                                hotspotSsid: _hotspotSsid ?? 'healthport',
+                                hotspotPwd: _hotspotPwd ?? '12345678',
                               ),
-                              duration: const Duration(seconds: 7),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    child: const Text('워치와 연결 시작', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            ));
+                            if (_addNewFiles(oldFiles)) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('동기화된 워치 로그 파일이 추가되었습니다.\n워치 용량 확보를 위해 기존 로그 삭제를 권장합니다.'),
+                                    action: SnackBarAction(
+                                      label: '#9900# 열기',
+                                      onPressed: () => launchUrl(Uri.parse('tel:*%239900%23')),
+                                    ),
+                                    duration: const Duration(seconds: 7),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          child: const Text('워치와 연결 시작', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3DFFC1).withOpacity(0.15), 
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
-                  ),                  
-                ),
+                ),                
               ],
             ),
           );
@@ -3766,7 +3875,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           // Step 3 Header removed
           
           // --- SECTION 1: 수동 첨부 (기본 데이터) ---
-          Text('섹션 1: 기본 운동 데이터 (수동)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+          Text('섹션 1: 기본 운동 데이터 (수동)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           _buildAttachCard(icon: Icons.watch, title: '1. 자사 FIT 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickFit, files: _fitFiles),
           const SizedBox(height: 12),
@@ -3774,18 +3883,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 30),
           
           // --- SECTION 2: 자동화 첨부 (비교 데이터) ---
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('섹션 2: 비교 데이터 (자동화)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
-              IconButton(
-                onPressed: _scanGarminFilesFromDownload,
-                icon: const Icon(Icons.refresh, size: 20, color: Color(0xFF3DFFC1)),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
+          Text('섹션 2: 비교 데이터 (자동화)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           _buildAttachCard(icon: Icons.file_copy, title: '3. Garmin Fit 파일', hint: 'Download 폴더 자동 스캔됨', busy: _fileBusy, onTap: _pickGarminFit, files: _garminFiles),
           const SizedBox(height: 12),
@@ -3795,7 +3893,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 30),
 
           // --- SECTION 3: 워치 로그 동기화 (원스크린 마법사) ---
-          Text('섹션 3: 워치 COLA/로그 확보 (마법사)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+          Text('섹션 3: 워치 COLA/로그 확보 (마법사)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           InkWell(
             onTap: _showWatchSyncWizard,
@@ -3803,16 +3901,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF2E5BFF).withOpacity(0.1),
-                border: Border.all(color: const Color(0xFF2E5BFF).withOpacity(0.3)),
+                color: Colors.white.withOpacity(0.1),
+                border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3)),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: const Color(0xFF2E5BFF).withOpacity(0.2), shape: BoxShape.circle),
-                    child: const Icon(Icons.watch_outlined, color: Color(0xFF2E5BFF)),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.cloud_sync, color: Colors.white, size: 22),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -3833,7 +3931,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 30),
 
           // --- SECTION 4: 운동 종합 데이터 및 특이사항 ---
-          Text('섹션 4: 운동 종합 데이터 입력', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+          Text('섹션 4: 운동 종합 데이터 입력', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
 
           // 그룹 A: 착용 상태 및 디바이스 환경
@@ -4042,12 +4140,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                             _locationCtrl.text = loc;
                           });
                         },
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(24),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.04),
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(24),
                             border: Border.all(color: Colors.white.withOpacity(0.08)),
                           ),
                           child: Row(
@@ -4055,7 +4153,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                             children: [
                               Text(
                                 loc,
-                                style: const TextStyle(color: Color(0xFF3DFFC1), fontSize: 11),
+                                style: const TextStyle(color: Color(0xFF3366FF), fontSize: 11),
                               ),
                               const SizedBox(width: 6),
                               GestureDetector(
@@ -4112,14 +4210,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           ),
           
           const SizedBox(height: 30),
-          Text('첨부 내역', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+          Text('첨부 내역', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.05),
-              border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
+              border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3)),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
@@ -4130,7 +4228,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 80, child: Text('[자사 FIT]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      const SizedBox(width: 80, child: Text('[자사 FIT]', style: TextStyle(color: Color(0xFF3366FF), fontSize: 12, fontWeight: FontWeight.bold))),
                       Expanded(
                         child: _fitFiles.isNotEmpty
                             ? Column(
@@ -4149,7 +4247,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 80, child: Text('[Garmin FIT]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      const SizedBox(width: 80, child: Text('[Garmin FIT]', style: TextStyle(color: Color(0xFF3366FF), fontSize: 12, fontWeight: FontWeight.bold))),
                       Expanded(
                         child: _garminFiles.isNotEmpty
                             ? Column(
@@ -4168,7 +4266,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 80, child: Text('[COLA]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      const SizedBox(width: 80, child: Text('[COLA]', style: TextStyle(color: Color(0xFF3366FF), fontSize: 12, fontWeight: FontWeight.bold))),
                       Expanded(
                         child: _colaFiles.isNotEmpty
                             ? Column(
@@ -4187,7 +4285,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 80, child: Text('[Log]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      const SizedBox(width: 80, child: Text('[Log]', style: TextStyle(color: Color(0xFF3366FF), fontSize: 12, fontWeight: FontWeight.bold))),
                       Expanded(
                         child: _logFiles.isNotEmpty
                             ? Column(
@@ -4206,7 +4304,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 80, child: Text('[Capture]', style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 12, fontWeight: FontWeight.bold))),
+                      const SizedBox(width: 80, child: Text('[Capture]', style: TextStyle(color: Color(0xFF3366FF), fontSize: 12, fontWeight: FontWeight.bold))),
                       Expanded(
                         child: _captureFiles.isNotEmpty
                             ? Column(
@@ -4306,7 +4404,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.04),
@@ -4316,7 +4414,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               padding: const EdgeInsets.all(4),
               child: Row(
                 children: [
-                  _buildVerifTab('정상', currentStatus == '정상', const Color(0xFF3DFFC1), () => onChanged('정상')),
+                  _buildVerifTab('정상', currentStatus == '정상', const Color(0xFF3366FF), () => onChanged('정상')),
                   _buildVerifTab('확인 필요', currentStatus == '확인 필요', const Color(0xFFFFAE2E), () => onChanged('확인 필요')),
                 ],
               ),
@@ -4353,16 +4451,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? activeColor.withOpacity(0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: active ? activeColor.withOpacity(0.3) : Colors.transparent, width: 1),
+          color: active ? Colors.white.withOpacity(0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
         ),
         child: Text(
           text,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: active ? FontWeight.bold : FontWeight.normal,
-            color: active ? activeColor : Colors.white54,
+            color: active ? Colors.white : Colors.white54,
           ),
         ),
       ),
@@ -4378,8 +4475,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFF2E5BFF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          color: active ? Colors.white.withOpacity(0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
         ),
         child: Text(
           text,
@@ -4402,8 +4499,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFF2E5BFF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          color: active ? Colors.white.withOpacity(0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
         ),
         child: Text(
           text,
@@ -4417,7 +4514,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     );
   }
 
-  Widget _buildAttachCard({
+    Widget _buildAttachCard({
     required IconData icon,
     required String title,
     required String hint,
@@ -4425,143 +4522,159 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     required VoidCallback onTap,
     required List<AttachedFile> files,
   }) {
-    return GlassCard(
-      padding: const EdgeInsets.all(12),
-      radius: 16,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: busy ? null : onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: GlassCard(
+          padding: const EdgeInsets.all(12),
+          radius: 16,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: const Color(0xFF3DFFC1), size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    Text(hint, style: const TextStyle(fontSize: 10, color: Colors.white38)),
-                  ],
-                ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        Text(hint, style: const TextStyle(fontSize: 10, color: Colors.white38)),
+                      ],
+                    ),
+                  ),
+                  if (busy)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                    )
+                  else
+                    const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white54),
+                ],
               ),
-              OutlinedButton(
-                onPressed: busy ? null : onTap,
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(60, 32),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  side: const BorderSide(color: Color(0xFF3DFFC1)),
-                  foregroundColor: const Color(0xFF3DFFC1),
-                ),
-                child: busy
-                    ? const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 1.5, valueColor: AlwaysStoppedAnimation(Color(0xFF3DFFC1))),
-                      )
-                    : const Text('추가', style: TextStyle(fontSize: 12)),
-              ),
+              if (files.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...files.asMap().entries.map((e) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: AttachedFileTile(
+                      file: e.value,
+                      onDelete: () => _removeFile(files, e.key),
+                    ),
+                  );
+                }),
+              ]
             ],
           ),
-          if (files.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            ...files.asMap().entries.map((e) {
-              return Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: AttachedFileTile(
-                  file: e.value,
-                  onDelete: () => _removeFile(files, e.key),
-                ),
-              );
-            }),
-          ]
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildCaptureAttachCard() {
-    return GlassCard(
-      padding: const EdgeInsets.all(12),
-      radius: 16,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _fileBusy ? null : _pickCaptures,
+        borderRadius: BorderRadius.circular(16),
+        child: GlassCard(
+          padding: const EdgeInsets.all(12),
+          radius: 16,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.photo_library_outlined, color: Color(0xFF3DFFC1), size: 22),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('운동 캡처 선택 (다중)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    Text('갤러리 다중 이미지 첨부 가능', style: TextStyle(fontSize: 10, color: Colors.white38)),
-                  ],
-                ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.photo_library_outlined, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('운동 캡처 선택 (다중)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        Text('갤러리 다중 이미지 첨부 가능', style: TextStyle(fontSize: 10, color: Colors.white38)),
+                      ],
+                    ),
+                  ),
+                  if (_fileBusy)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                    )
+                  else
+                    const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white54),
+                ],
               ),
-              OutlinedButton(
-                onPressed: _fileBusy ? null : _pickCaptures,
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(60, 32),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  side: const BorderSide(color: Color(0xFF3DFFC1)),
-                  foregroundColor: const Color(0xFF3DFFC1),
+              if (_captureFiles.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: _captureFiles.length,
+                  itemBuilder: (ctx, index) {
+                    final file = _captureFiles[index];
+                    final path = file.tempPath ?? file.originalPath;
+                    return Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              File(path),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 2,
+                          right: 2,
+                          child: GestureDetector(
+                            onTap: () => _removeFile(_captureFiles, index),
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close, size: 12, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
-                child: const Text('선택', style: TextStyle(fontSize: 12)),
-              ),
+              ]
             ],
           ),
-          if (_captureFiles.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              itemCount: _captureFiles.length,
-              itemBuilder: (ctx, index) {
-                final file = _captureFiles[index];
-                final path = file.tempPath ?? file.originalPath;
-                return Stack(
-                  children: [
-                    Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          File(path),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 2,
-                      right: 2,
-                      child: GestureDetector(
-                        onTap: () => _removeFile(_captureFiles, index),
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.close, size: 12, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ]
-        ],
+        ),
       ),
     );
   }
-
-
 
   // ── Step 6: 압축 & 전송 완료 (Dashboard) ─────────────────────────
   Future<void> _onReshare() async {
@@ -4591,7 +4704,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               if (_isPackaging || _step6State == 'sending')
                 const CircularProgressIndicator(
                   strokeWidth: 6,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3366FF)),
                 )
               else if (_step6State == 'success')
                 Container(
@@ -4599,12 +4712,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   height: 110,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF3DFFC1).withOpacity(0.12),
-                    border: Border.all(color: const Color(0xFF3DFFC1), width: 3),
+                    color: const Color(0xFF3366FF).withOpacity(0.12),
+                    border: Border.all(color: const Color(0xFF3366FF), width: 3),
                   ),
                   child: const Icon(
-                    Icons.check_circle_outline_rounded,
-                    color: Color(0xFF3DFFC1),
+                    Icons.check_circle_outline_rounded, color: Colors.white,
                     size: 52,
                   ),
                 )
@@ -4614,12 +4726,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   height: 110,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF2E5BFF).withOpacity(0.12),
-                    border: Border.all(color: const Color(0xFF2E5BFF), width: 3),
+                    color: const Color(0xFF3366FF).withOpacity(0.12),
+                    border: Border.all(color: const Color(0xFF3366FF), width: 3),
                   ),
                   child: const Icon(
-                    Icons.link_rounded,
-                    color: Color(0xFF2E5BFF),
+                    Icons.link_rounded, color: Colors.white,
                     size: 52,
                   ),
                 ),
@@ -4648,7 +4759,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.inventory_2_outlined, color: Color(0xFF2E5BFF), size: 18),
+                    Icon(Icons.inventory_2_outlined, color: Colors.white, size: 18),
                     SizedBox(width: 8),
                     Text('압축 결과 리포트', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                   ],
@@ -4707,8 +4818,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
                       onPressed: () => _sendEmail(_lastProcessedLink!),
-                      icon: const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF2E5BFF)),
-                      label: const Text('메일 다시 보내기', style: TextStyle(fontSize: 12, color: Color(0xFF2E5BFF))),
+                      icon: const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF3366FF)),
+                      label: const Text('메일 다시 보내기', style: TextStyle(fontSize: 12, color: Color(0xFF3366FF))),
                     ),
                   ),
                 )
@@ -4727,7 +4838,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3DFFC1),
+              backgroundColor: const Color(0xFF3366FF),
               minimumSize: const Size.fromHeight(54),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
@@ -4741,7 +4852,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3DFFC1),
+              backgroundColor: const Color(0xFF3366FF),
               minimumSize: const Size.fromHeight(54),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
@@ -4785,7 +4896,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     Color color = Colors.white30;
     if (isDone) {
       icon = Icons.check_circle_rounded;
-      color = const Color(0xFF3DFFC1);
+      color = const Color(0xFF3366FF);
     } else if (isWarning) {
       icon = Icons.hourglass_empty_rounded;
       color = const Color(0xFFFFB300);
@@ -4898,7 +5009,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                     children: [
                                       Row(
                                         children: [
-                                          const Icon(Icons.info_outline_rounded, color: Color(0xFF3DFFC1), size: 24),
+                                          const Icon(Icons.info_outline_rounded, color: Colors.white, size: 24),
                                           const SizedBox(width: 8),
                                           const Text(
                                             '닉네임 연동 확인',
@@ -4923,8 +5034,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                           ElevatedButton(
                                             onPressed: () => Navigator.pop(ctx, true),
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF3DFFC1),
-                                              foregroundColor: Colors.black,
+                                              backgroundColor: const Color(0xFF3366FF),
+                                              foregroundColor: Colors.white,
                                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                             ),
@@ -5011,7 +5122,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E5BFF),
+                backgroundColor: const Color(0xFF3366FF),
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(50),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -5042,7 +5153,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         children: [
           const SizedBox(height: 20),
           const Center(
-            child: Icon(Icons.security_rounded, color: Color(0xFF3DFFC1), size: 48),
+            child: Icon(Icons.security_rounded, color: Colors.white, size: 48),
           ),
           const SizedBox(height: 16),
           const Center(
@@ -5094,7 +5205,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           CheckboxListTile(
             title: const Text('위 개인정보 및 민감정보 수집·이용에 동의합니다.', style: TextStyle(fontSize: 12, color: Colors.white70)),
             value: _agreePersonal,
-            activeColor: const Color(0xFF2E5BFF),
+            activeColor: const Color(0xFF3366FF),
             checkColor: Colors.white,
             contentPadding: EdgeInsets.zero,
             controlAffinity: ListTileControlAffinity.leading,
@@ -5155,7 +5266,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           CheckboxListTile(
             title: const Text('위 개인정보 처리방침에 동의합니다.', style: TextStyle(fontSize: 12, color: Colors.white70)),
             value: _agreeLocation,
-            activeColor: const Color(0xFF2E5BFF),
+            activeColor: const Color(0xFF3366FF),
             checkColor: Colors.white,
             contentPadding: EdgeInsets.zero,
             controlAffinity: ListTileControlAffinity.leading,
@@ -5178,8 +5289,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   }
                 : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3DFFC1),
-              foregroundColor: Colors.black,
+              backgroundColor: const Color(0xFF3366FF),
+              foregroundColor: Colors.white,
               disabledBackgroundColor: Colors.white.withOpacity(0.12),
               disabledForegroundColor: Colors.white38,
               minimumSize: const Size.fromHeight(54),
@@ -5204,7 +5315,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         });
       },
       backgroundColor: const Color(0xFF1E2020),
-      selectedItemColor: const Color(0xFF3DFFC1),
+      selectedItemColor: const Color(0xFF3366FF),
       unselectedItemColor: Colors.white38,
       showSelectedLabels: true,
       showUnselectedLabels: true,
@@ -5229,7 +5340,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       barrierDismissible: false,
       builder: (context) => const Center(
         child: CircularProgressIndicator(
-          color: Color(0xFF3DFFC1),
+          color: Color(0xFF3366FF),
         ),
       ),
     );
@@ -5306,15 +5417,15 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(radius ?? 24),
+      borderRadius: BorderRadius.circular(radius ?? 28),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(radius ?? 24),
+            color: Colors.white.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(radius ?? 28),
             border: Border.all(
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white.withOpacity(0.12),
               width: 1.0,
             ),
           ),
@@ -5402,7 +5513,7 @@ class _GuideVideoDialogState extends State<_GuideVideoDialog> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.ondemand_video_rounded, color: Color(0xFF3DFFC1), size: 20),
+                      Icon(Icons.ondemand_video_rounded, color: Colors.white, size: 20),
                       SizedBox(width: 8),
                       Text(
                         '가이드 영상 시청',
@@ -5448,7 +5559,7 @@ class _GuideVideoDialogState extends State<_GuideVideoDialog> {
                               icon: const Icon(Icons.refresh_rounded, size: 16),
                               label: const Text('재시도', style: TextStyle(fontSize: 12)),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2E5BFF),
+                                backgroundColor: const Color(0xFF3366FF),
                                 minimumSize: const Size(80, 32),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
@@ -5459,7 +5570,7 @@ class _GuideVideoDialogState extends State<_GuideVideoDialog> {
                     else
                       const Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3366FF)),
                         ),
                       ),
                     if (_initialized)
@@ -5484,8 +5595,7 @@ class _GuideVideoDialogState extends State<_GuideVideoDialog> {
                                 child: Icon(
                                   _controller.value.isPlaying
                                       ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
-                                  color: const Color(0xFF3DFFC1),
+                                      : Icons.play_arrow_rounded, color: Colors.white,
                                   size: 40,
                                 ),
                               ),
@@ -5504,7 +5614,7 @@ class _GuideVideoDialogState extends State<_GuideVideoDialog> {
                 _controller,
                 allowScrubbing: true,
                 colors: const VideoProgressColors(
-                  playedColor: Color(0xFF3DFFC1),
+                  playedColor: Color(0xFF3366FF),
                   bufferedColor: Colors.white24,
                   backgroundColor: Colors.white10,
                 ),

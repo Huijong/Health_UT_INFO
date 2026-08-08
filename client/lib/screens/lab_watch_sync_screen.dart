@@ -81,7 +81,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text("닫기", style: TextStyle(color: Color(0xFF3DFFC1))),
+            child: const Text("닫기", style: TextStyle(color: Color(0xFF3366FF))),
           )
         ],
       ),
@@ -152,7 +152,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
                             height: 24,
                             child: Checkbox(
                               value: localDontShow,
-                              activeColor: const Color(0xFF3DFFC1),
+                              activeColor: const Color(0xFF3366FF),
                               checkColor: Colors.black,
                               onChanged: (val) {
                                 setDialogState(() {
@@ -167,7 +167,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
                       ),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E5BFF),
+                          backgroundColor: const Color(0xFF3366FF),
                         ),
                         onPressed: () {
                           if (localDontShow) {
@@ -307,7 +307,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.wifi_tethering, color: Color(0xFF3DFFC1), size: 22),
+            Icon(Icons.wifi_tethering, color: Colors.white, size: 22),
             SizedBox(width: 8),
             Text("직접 연결 Wi-Fi 정보", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
           ],
@@ -327,7 +327,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
             const SizedBox(height: 12),
             const Text(
               "※ 최초 1회만 연결하면 이후 자동 연결됩니다.",
-              style: TextStyle(color: Color(0xFF3DFFC1), fontSize: 11),
+              style: TextStyle(color: Color(0xFF3366FF), fontSize: 11),
             ),
           ],
         ),
@@ -341,11 +341,11 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
                 debugPrint('Failed to open hotspot settings: $e');
               }
             },
-            child: const Text("핫스팟 설정 켜기", style: TextStyle(color: Color(0xFF2E5BFF), fontWeight: FontWeight.bold)),
+            child: const Text("핫스팟 설정 켜기", style: TextStyle(color: Color(0xFF3366FF), fontWeight: FontWeight.bold)),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text("닫기", style: TextStyle(color: Color(0xFF3DFFC1))),
+            child: const Text("닫기", style: TextStyle(color: Color(0xFF3366FF))),
           ),
         ],
       ),
@@ -358,7 +358,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       decoration: BoxDecoration(
         color: const Color(0xFF0D1B2A),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF3DFFC1).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -418,6 +418,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       
       // Request watch to join the custom hotspot
       if (widget.hotspotSsid != null && widget.hotspotPwd != null) {
+        _addLog("Waiting for WearOS Data Layer to initialize...");
+        await Future.delayed(const Duration(milliseconds: 1500));
+        
         _addLog("Sending Wi-Fi Join Request to watch for SSID: ${widget.hotspotSsid}...");
         await _appChannel.invokeMethod("requestWatchWifiJoin", {
           "ssid": widget.hotspotSsid,
@@ -582,7 +585,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF2E5BFF) : Colors.transparent,
+            color: isSelected ? const Color(0xFF3366FF) : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Column(
@@ -615,7 +618,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.bug_report, color: Color(0xFF3DFFC1)),
+            icon: const Icon(Icons.bug_report, color: Colors.white),
             onPressed: _showDebugLogs,
           ),
         ],
@@ -650,7 +653,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
             _connectedEndpointId != null
                 ? Icons.watch_rounded
                 : Icons.watch_off_rounded,
-            color: _connectedEndpointId != null ? const Color(0xFF3DFFC1) : Colors.white24,
+            color: _connectedEndpointId != null ? const Color(0xFF3366FF) : Colors.white24,
             size: 28,
           ),
           const SizedBox(width: 12),
@@ -711,7 +714,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
                       height: 160 + (i * 40) * _radarController!.value,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF2E5BFF).withOpacity(
+                        color: const Color(0xFF3366FF).withOpacity(
                           (0.15 * (1 - _radarController!.value)).clamp(0.0, 1.0),
                         ),
                       ),
@@ -722,7 +725,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
-                        colors: [Color(0xFF2E5BFF), Color(0xFF3DFFC1)],
+                        colors: [Color(0xFF1E8F7A), Color(0xFF3366FF)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -755,7 +758,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         ElevatedButton(
           onPressed: _isSearching ? null : _startDiscovery,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2E5BFF),
+            backgroundColor: const Color(0xFF3366FF),
             foregroundColor: Colors.white,
             minimumSize: const Size(180, 50),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
@@ -818,11 +821,11 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (isDone)
-            const Icon(Icons.check_circle, color: Color(0xFF3DFFC1), size: 24)
+            const Icon(Icons.check_circle, color: Colors.white, size: 24)
           else if (isActive)
             RotationTransition(
               turns: _spinController!,
-              child: const Icon(Icons.sync, color: Color(0xFF2E5BFF), size: 24),
+              child: const Icon(Icons.sync, color: Colors.white, size: 24),
             )
           else
             const Icon(Icons.radio_button_unchecked, color: Colors.white24, size: 24),
@@ -841,20 +844,20 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
                 ),
                 if (isActive && etaStr.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Text(etaStr, style: const TextStyle(color: Color(0xFF3DFFC1), fontSize: 12)),
+                  Text(etaStr, style: const TextStyle(color: Color(0xFF3366FF), fontSize: 12)),
                 ],
                 if (isActive && progress != null) ...[
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
                     value: progress,
                     backgroundColor: Colors.white12,
-                    valueColor: const AlwaysStoppedAnimation(Color(0xFF2E5BFF)),
+                    valueColor: const AlwaysStoppedAnimation(Color(0xFF3366FF)),
                   ),
                 ] else if (isActive && step == 4) ...[
                   const SizedBox(height: 8),
                   const LinearProgressIndicator(
                     backgroundColor: Colors.white12,
-                    valueColor: AlwaysStoppedAnimation(Color(0xFF2E5BFF)),
+                    valueColor: AlwaysStoppedAnimation(Color(0xFF3366FF)),
                   ),
                 ]
               ],
@@ -889,7 +892,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
             icon: const Icon(Icons.download_rounded, size: 16),
             label: const Text('워치에 원격 설치하기 (Play Store)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E5BFF),
+              backgroundColor: const Color(0xFF3366FF),
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(36),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

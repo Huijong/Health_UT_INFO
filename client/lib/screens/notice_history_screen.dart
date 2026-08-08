@@ -140,7 +140,7 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E5BFF),
+                          backgroundColor: const Color(0xFF3366FF),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -219,9 +219,9 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
                 child: Text(
                   part,
                   style: const TextStyle(
-                    color: Color(0xFF3DFFC1), // bright mint for links
+                    color: Color(0xFF3366FF), // bright mint for links
                     decoration: TextDecoration.underline,
-                    decorationColor: Color(0xFF3DFFC1),
+                    decorationColor: Color(0xFF3366FF),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -307,7 +307,7 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
                     IconButton(
                       icon: Icon(
                         _isNewestFirst ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                        color: const Color(0xFF3DFFC1),
+                        color: const Color(0xFF3366FF),
                         size: 20,
                       ),
                       tooltip: _isNewestFirst ? '최신순 (누르면 오래된순)' : '오래된순 (누르면 최신순)',
@@ -338,7 +338,7 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
                 child: _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3DFFC1)),
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3366FF)),
                         ),
                       )
                     : _errorMessage != null
@@ -407,7 +407,7 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
                                               borderRadius: BorderRadius.circular(16),
                                               border: Border.all(
                                                 color: isUnread 
-                                                    ? const Color(0xFF3DFFC1).withOpacity(0.2)
+                                                    ? const Color(0xFF3366FF).withOpacity(0.2)
                                                     : Colors.white.withOpacity(0.06),
                                                 width: isUnread ? 1.5 : 1.0,
                                               ),
@@ -420,13 +420,13 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
                                                     Container(
                                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                       decoration: BoxDecoration(
-                                                        color: const Color(0xFF3DFFC1).withOpacity(0.2),
+                                                        color: const Color(0xFF3366FF).withOpacity(0.2),
                                                         borderRadius: BorderRadius.circular(6),
-                                                        border: Border.all(color: const Color(0xFF3DFFC1), width: 1),
+                                                        border: Border.all(color: const Color(0xFF3366FF), width: 1),
                                                       ),
                                                       child: const Text(
                                                         'N',
-                                                        style: TextStyle(fontSize: 9, color: Color(0xFF3DFFC1), fontWeight: FontWeight.bold),
+                                                        style: TextStyle(fontSize: 9, color: Color(0xFF3366FF), fontWeight: FontWeight.bold),
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
