@@ -936,10 +936,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
   late TextEditingController _heightCtrl;
   late TextEditingController _weightCtrl;
   late TextEditingController _emailCtrl;
-
-  late AnimationController _bounceCtrl;
-  late Animation<double> _bounceAnim;
-  late bool _showEmailTooltip;
+  late FocusNode _emailFocusNode;
+  bool _isEmailReadOnly = true;
 
   @override
   void initState() {
@@ -950,12 +948,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
     _weightCtrl = TextEditingController(
         text: widget.initialWeight != null ? widget.initialWeight!.toStringAsFixed(1) : '');
     _emailCtrl = TextEditingController(text: widget.initialEmail);
+    _emailFocusNode = FocusNode();
     
-    _showEmailTooltip = widget.showEmailGuide;
-    _bounceCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
-    _bounceAnim = Tween<double>(begin: 0, end: 10).animate(CurvedAnimation(parent: _bounceCtrl, curve: Curves.easeInOut));
-    if (_showEmailTooltip) {
-      _bounceCtrl.repeat(reverse: true);
+    if (widget.showEmailGuide) {
+      if (widget.prefs != null) {
+        widget.prefs!.saveEmailMigrationDone(true);
+      }
     }
   }
 
@@ -965,8 +963,137 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
     _heightCtrl.dispose();
     _weightCtrl.dispose();
     _emailCtrl.dispose();
-    _bounceCtrl.dispose();
+    _emailFocusNode.dispose();
     super.dispose();
+  }
+
+  void _showToast(String message) {
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).size.height * 0.45,
+        left: 24,
+        right: 24,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF23293F),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3), width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 2), () {
+      entry.remove();
+    });
+  }
+
+  void _showEmailActionDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E2020),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            '이메일 입력 방식',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            '자동조회를 이용하시면 1초 만에 폰에 연동된 구글 계정 이메일을 입력하실 수 있습니다!',
+            style: TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _isEmailReadOnly = false;
+                });
+                _emailFocusNode.requestFocus();
+              },
+              child: const Text('직접 입력', style: TextStyle(color: Colors.white54)),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3366FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  const appChannel = MethodChannel('com.samsung.health.client/app_info');
+                  final email = await appChannel.invokeMethod<String>('getGoogleEmail');
+                  if (email != null && email.isNotEmpty) {
+                    setState(() {
+                      _emailCtrl.text = email;
+                    });
+                    if (mounted) {
+                      _showToast('이메일을 성공적으로 가져왔습니다! 저장해주세요!');
+                    }
+                  } else {
+                    if (mounted) {
+                      _showToast('등록된 구글 계정이 없습니다. 직접 입력해 주세요.');
+                      setState(() {
+                        _isEmailReadOnly = false;
+                      });
+                      _emailFocusNode.requestFocus();
+                    }
+                  }
+                } catch (e) {
+                  debugPrint('[getGoogleEmail Error] $e');
+                  if (mounted) {
+                    _showToast('이메일을 가져오지 못했습니다. 직접 입력해 주세요.');
+                    setState(() {
+                      _isEmailReadOnly = false;
+                    });
+                    _emailFocusNode.requestFocus();
+                  }
+                }
+              },
+              child: const Text('자동 조회 (추천)', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
 
@@ -1081,6 +1208,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
                                   Expanded(
                                     child: TextFormField(
                                       controller: _emailCtrl,
+                                      focusNode: _emailFocusNode,
+                                      readOnly: _isEmailReadOnly,
+                                      onTap: () {
+                                        if (_isEmailReadOnly) {
+                                          _showEmailActionDialog();
+                                        }
+                                      },
                                       decoration: const InputDecoration(
                                         labelText: '이메일 주소(Gmail) *',
                                         hintText: '예) tester@gmail.com',
@@ -1098,114 +1232,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
                                         return null;
                                       },
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      SizedBox(
-                                        height: 56,
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Color(0x26FFFFFF),
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            elevation: 0,
-                                          ),
-                                          onPressed: () async {
-                                            if (_showEmailTooltip) {
-                                              setState(() => _showEmailTooltip = false);
-                                              if (widget.prefs != null) {
-                                                widget.prefs!.saveEmailMigrationDone(true);
-                                              }
-                                            }
-                                            try {
-                                              const appChannel = MethodChannel('com.samsung.health.client/app_info');
-                                              final email = await appChannel.invokeMethod<String>('getGoogleEmail');
-                                              if (email != null && email.isNotEmpty) {
-                                                setState(() {
-                                                  _emailCtrl.text = email;
-                                                });
-                                                if (mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text('이메일을 성공적으로 가져왔습니다! 저장해주세요!'),
-                                                      backgroundColor: Color(0x26FFFFFF),
-                                                    ),
-                                                  );
-                                                }
-                                              } else {
-                                                if (mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text('등록된 구글 계정이 없습니다. 직접 입력해 주세요.'),
-                                                      backgroundColor: Colors.orangeAccent,
-                                                    ),
-                                                  );
-                                                }
-                                              }
-                                            } catch (e) {
-                                              debugPrint('[getGoogleEmail Error] $e');
-                                              if (mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text('이메일을 가져오지 못했습니다. 직접 입력해 주세요.'),
-                                                    backgroundColor: Colors.redAccent,
-                                                  ),
-                                                );
-                                              }
-                                            }
-                                          },
-                                          child: const Text('자동조회', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ),
-                                      if (_showEmailTooltip)
-                                        Positioned(
-                                          top: -45,
-                                          right: -10,
-                                          child: AnimatedBuilder(
-                                            animation: _bounceAnim,
-                                            builder: (context, child) {
-                                              return Transform.translate(
-                                                offset: Offset(0, -_bounceAnim.value),
-                                                child: child,
-                                              );
-                                            },
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius: BorderRadius.circular(12),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.white.withOpacity(0.3),
-                                                    blurRadius: 8,
-                                                    offset: const Offset(0, 4),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: const Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(Icons.touch_app, size: 16, color: Color(0xFF0C0F0F)),
-                                                  SizedBox(width: 4),
-                                                  Text(
-                                                    '여기를 눌러 연동!',
-                                                    style: TextStyle(
-                                                      color: Color(0xFF0C0F0F),
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
                                   ),
                                 ],
                               ),

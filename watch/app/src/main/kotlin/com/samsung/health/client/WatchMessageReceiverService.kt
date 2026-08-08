@@ -35,21 +35,30 @@ class WatchMessageReceiverService : WearableListenerService() {
                 writeLog("[BG_MSG] Failed to start MainActivity: ${e.message}")
             }
         } else if (messageEvent.path == "/open_watch_sysdump") {
-            writeLog("[SysDump_Msg] Received command from phone! Launching dialog activity directly...")
+            writeLog("[SysDump_Msg] Received command from phone! Launching dialer directly...")
             try {
                 // 1. Trigger Notification (Vibration & Backup access)
                 sendSysDumpNotification()
                 
-                // 2. Launch Dialog UI Activity directly on Watch screen
-                val dialogIntent = Intent(this, GuideDialogActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                // 2. Launch Dialer directly on Watch screen
+                try {
+                    val intent = Intent(Intent.ACTION_DIAL).apply {
+                        setClassName("com.samsung.android.dialer", "com.samsung.android.dialer.dialpad.DialpadActivity")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    }
+                    startActivity(intent)
+                    writeLog("[SysDump_Msg][SUCCESS] Samsung Dialer activity triggered.")
+                } catch (e: Exception) {
+                    writeLog("[SysDump_Msg][WARN] Samsung Dialer not found: ${e.message}. Trying generic fallback...")
+                    val intent = Intent(Intent.ACTION_DIAL).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    }
+                    startActivity(intent)
                 }
-                startActivity(dialogIntent)
-                writeLog("[SysDump_Msg] Successfully launched GuideDialogActivity and dispatched Notification.")
             } catch (e: Exception) {
                 val sw = java.io.StringWriter()
                 e.printStackTrace(java.io.PrintWriter(sw))
-                writeLog("[SysDump_Msg][FAIL] Error starting Dialog/Notification: ${e.message}\nStackTrace:\n$sw")
+                writeLog("[SysDump_Msg][FAIL] Error starting Dialer/Notification: ${e.message}\nStackTrace:\n$sw")
             }
         }
     }

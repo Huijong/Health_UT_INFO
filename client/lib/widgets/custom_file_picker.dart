@@ -290,13 +290,7 @@ class _CustomFilePickerPopupState extends State<_CustomFilePickerPopup> {
                                         child: const Icon(Icons.insert_drive_file, color: Colors.white),
                                       ),
                                       title: Text(fileName, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
-                                      subtitle: Padding(
-                                        padding: const EdgeInsets.only(top: 4.0),
-                                        child: Text(
-                                          ' • ',
-                                          style: const TextStyle(color: Colors.white38, fontSize: 11),
-                                        ),
-                                      ),
+
                                       onTap: () => Navigator.pop(context, file),
                                     );
                                   },
