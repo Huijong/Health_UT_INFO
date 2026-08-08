@@ -170,6 +170,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   bool _wentToHotspotSettings = false;
   StateSetter? _wizardSetState;
   static const _appChannel = MethodChannel('com.samsung.health.client/app_info');
+  bool _watchLogsAddedToZip = false;
   final _formKey1 = GlobalKey<FormState>();
 
   Future<void> _checkHotspotStatus() async {
@@ -1616,6 +1617,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 duration: Duration(seconds: 2),
               ),
             );
+            if (_watchLogsAddedToZip) {
+              _showWatchLogCleanupSnackBar();
+              _watchLogsAddedToZip = false;
+            }
             _resetVerification();
           }
         });
@@ -3842,12 +3847,55 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: const Text('동기화된 워치 로그 파일이 추가되었습니다.\n워치 용량 확보를 위해 기존 로그 삭제를 권장합니다.'),
-                                    action: SnackBarAction(
-                                      label: '#9900# 열기',
-                                      onPressed: () => launchUrl(Uri.parse('tel:*%239900%23')),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.cleaning_services_rounded, color: Colors.white, size: 28),
+                                            const SizedBox(width: 12),
+                                            const Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text('동기화가 완료되어 기존 로그는 필요가 없습니다.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                                  SizedBox(height: 2),
+                                                  Text('불필요한 기존 로그 삭제를 권장합니다.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            const BouncingArrow(),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton.icon(
+                                            onPressed: () {
+                                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                              launchUrl(Uri.parse('tel:*%239900%23'));
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white,
+                                              foregroundColor: const Color(0xFF3366FF),
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                              padding: const EdgeInsets.symmetric(vertical: 10),
+                                            ),
+                                            icon: const Icon(Icons.delete_sweep, size: 20),
+                                            label: const Text('*#9900# (덤프 삭제하러 가기)', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     duration: const Duration(seconds: 7),
+                                    backgroundColor: const Color(0xFF3366FF),
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    elevation: 8,
+                                    margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
                                   ),
                                 );
                               }
