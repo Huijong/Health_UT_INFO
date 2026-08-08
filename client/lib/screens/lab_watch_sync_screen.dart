@@ -307,7 +307,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.wifi_tethering, color: Color(0xFF3366FF), size: 22),
+            Icon(Icons.wifi_tethering, color: Colors.white, size: 22),
             SizedBox(width: 8),
             Text("직접 연결 Wi-Fi 정보", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
           ],
@@ -618,7 +618,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.bug_report, color: Color(0xFF3366FF)),
+            icon: const Icon(Icons.bug_report, color: Colors.white),
             onPressed: _showDebugLogs,
           ),
         ],
@@ -821,11 +821,11 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (isDone)
-            const Icon(Icons.check_circle, color: Color(0xFF3366FF), size: 24)
+            const Icon(Icons.check_circle, color: Colors.white, size: 24)
           else if (isActive)
             RotationTransition(
               turns: _spinController!,
-              child: const Icon(Icons.sync, color: Color(0xFF3366FF), size: 24),
+              child: const Icon(Icons.sync, color: Colors.white, size: 24),
             )
           else
             const Icon(Icons.radio_button_unchecked, color: Colors.white24, size: 24),

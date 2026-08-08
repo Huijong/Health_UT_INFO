@@ -41,7 +41,7 @@ ThemeData getSettingsTheme(BuildContext context) {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF3366FF), width: 1.5),
+        borderSide: const BorderSide(color: Colors.white, width: 1.5),
       ),
       labelStyle: TextStyle(color: const Color(0xFFE2E2E2).withOpacity(0.7)),
     ),
@@ -137,7 +137,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await _appChannel.invokeMethod('launchWatchPlayStore');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('워치에서 플레이 스토어가 열렸습니다. 설치를 진행해 주세요.'), backgroundColor: Color(0xFF3366FF)));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('워치에서 플레이 스토어가 열렸습니다. 설치를 진행해 주세요.'), backgroundColor: Color(0x26FFFFFF)));
       }
     } catch (e) {
       if (mounted) {
@@ -200,7 +200,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('프로필이 성공적으로 변경되었습니다.'),
-                  backgroundColor: Color(0xFF3366FF),
+                  backgroundColor: Color(0x26FFFFFF),
                 ),
               );
             }
@@ -368,7 +368,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('착용 워치 설정이 저장되었습니다.'),
-                                  backgroundColor: Color(0xFF3366FF),
+                                  backgroundColor: Color(0x26FFFFFF),
                                   duration: Duration(seconds: 1),
                                 ),
                               );
@@ -407,7 +407,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('착용 스트랩 설정이 저장되었습니다.'),
-                                  backgroundColor: Color(0xFF3366FF),
+                                  backgroundColor: Color(0x26FFFFFF),
                                   duration: Duration(seconds: 1),
                                 ),
                               );
@@ -599,7 +599,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
             child: const Text(
               '업데이트',
-              style: TextStyle(color: Color(0xFF3366FF), fontWeight: FontWeight.bold),
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -636,7 +636,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
             child: const Text(
               '확인',
-              style: TextStyle(color: Color(0xFF3366FF), fontWeight: FontWeight.bold),
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -684,7 +684,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text(
               '확인',
-              style: TextStyle(color: Color(0xFF3366FF), fontWeight: FontWeight.bold),
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -754,7 +754,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white.withOpacity(0.1)),
                 ),
-                child: Icon(icon, color: const Color(0xFF3366FF), size: 24),
+                child: Icon(icon, color: Colors.white, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -821,7 +821,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white.withOpacity(0.1)),
               ),
-              child: Icon(icon, color: const Color(0xFF3366FF), size: 24),
+              child: Icon(icon, color: Colors.white, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1047,7 +1047,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
                                         height: 56,
                                         child: ElevatedButton(
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF3366FF),
+                                            backgroundColor: Color(0x26FFFFFF),
                                             foregroundColor: Colors.white,
                                             padding: const EdgeInsets.symmetric(horizontal: 16),
                                             shape: RoundedRectangleBorder(
@@ -1073,7 +1073,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
                                                   ScaffoldMessenger.of(context).showSnackBar(
                                                     const SnackBar(
                                                       content: Text('이메일을 성공적으로 가져왔습니다! 저장해주세요!'),
-                                                      backgroundColor: Color(0xFF3366FF),
+                                                      backgroundColor: Color(0x26FFFFFF),
                                                     ),
                                                   );
                                                 }
@@ -1117,11 +1117,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
                                             child: Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFF3366FF),
+                                                color: Colors.white,
                                                 borderRadius: BorderRadius.circular(12),
                                                 boxShadow: [
                                                   BoxShadow(
-                                                    color: const Color(0xFF3366FF).withOpacity(0.3),
+                                                    color: Colors.white.withOpacity(0.3),
                                                     blurRadius: 8,
                                                     offset: const Offset(0, 4),
                                                   ),
@@ -1202,7 +1202,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
                     child: ElevatedButton(
                       onPressed: _onSave,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3366FF),
+                        backgroundColor: Color(0x26FFFFFF),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -1374,7 +1374,7 @@ class _WatchEditPageState extends State<WatchEditPage> {
                     child: ElevatedButton(
                       onPressed: _onSave,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3366FF),
+                        backgroundColor: Color(0x26FFFFFF),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -1652,7 +1652,7 @@ class _StrapEditPageState extends State<StrapEditPage> {
                     child: ElevatedButton(
                       onPressed: _onSave,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3366FF),
+                        backgroundColor: Color(0x26FFFFFF),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -1848,7 +1848,7 @@ class _DownloadDialogState extends State<DownloadDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.downloading_rounded, color: Color(0xFF3366FF), size: 40),
+            const Icon(Icons.downloading_rounded, color: Colors.white, size: 40),
             const SizedBox(height: 16),
             const Text(
               '설치 파일 다운로드',
@@ -1910,10 +1910,10 @@ class LabSubScreen extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF3366FF).withOpacity(0.1),
+                    color: Colors.white.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: const Color(0xFF3366FF), size: 24),
+                  child: Icon(icon, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
