@@ -3600,34 +3600,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
-  Set<String> _getSnapshotFiles() {
+  Map<String, int> _getSnapshotFiles() {
     final dir = Directory('/storage/emulated/0/Documents/COLA_FILE');
     if (!dir.existsSync()) return {};
-    return dir.listSync().whereType<File>().map((f) => f.path).toSet();
+    return {
+      for (var f in dir.listSync().whereType<File>())
+        f.path.split('/').last: f.lastModifiedSync().millisecondsSinceEpoch
+    };
   }
 
-  bool _addNewFiles(Set<String> oldFiles) {
+  bool _addNewFiles(Map<String, int> oldFiles) {
     bool added = false;
     final dir = Directory('/storage/emulated/0/Documents/COLA_FILE');
     if (dir.existsSync()) {
       final files = dir.listSync();
       for (var f in files) {
-        if (f is File && !oldFiles.contains(f.path)) {
-          final name = f.path.split('/').last.toLowerCase();
-          if (name.endsWith('.zip')) {
-            if (name.startsWith('cola_file')) {
-              bool exists = _colaFiles.any((e) => e.originalPath == f.path);
-              if (!exists) {
+        if (f is File) {
+          final fileName = f.path.split('/').last;
+          final oldTime = oldFiles[fileName];
+          final newTime = f.lastModifiedSync().millisecondsSinceEpoch;
+          
+          if (oldTime == null || newTime > oldTime) {
+            final nameLowerCase = fileName.toLowerCase();
+            if (nameLowerCase.endsWith('.zip')) {
+              if (nameLowerCase.startsWith('cola_file')) {
+                _colaFiles.removeWhere((e) => e.name == fileName);
                 setState(() {
-                  _colaFiles.add(AttachedFile(originalPath: f.path, name: f.path.split('/').last, sizeBytes: f.lengthSync(), type: AttachType.cola));
+                  _colaFiles.add(AttachedFile(originalPath: f.path, name: fileName, sizeBytes: f.lengthSync(), type: AttachType.cola));
                 });
                 added = true;
-              }
-            } else if (name.startsWith('log_')) {
-              bool exists = _logFiles.any((e) => e.originalPath == f.path);
-              if (!exists) {
+              } else if (nameLowerCase.startsWith('log_')) {
+                _logFiles.removeWhere((e) => e.name == fileName);
                 setState(() {
-                  _logFiles.add(AttachedFile(originalPath: f.path, name: f.path.split('/').last, sizeBytes: f.lengthSync(), type: AttachType.log));
+                  _logFiles.add(AttachedFile(originalPath: f.path, name: fileName, sizeBytes: f.lengthSync(), type: AttachType.log));
                 });
                 added = true;
               }

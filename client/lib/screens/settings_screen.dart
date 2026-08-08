@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -74,6 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late String _strap;
   late String _customStrap;
   bool _hasUpdate = false;
+  bool _autoDeleteWatchFiles = true;
 
   bool _blinkHighlightActive = false;
   bool _blinkState = false;
@@ -93,6 +95,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_watch.isEmpty) _watch = kWatchOptions.first;
     if (_strap.isEmpty) _strap = kStrapOptions.first['name']!;
     _checkWatchAppInstalled();
+    
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) {
+        setState(() {
+          _autoDeleteWatchFiles = p.getBool('auto_delete_watch_files') ?? true;
+        });
+      }
+    });
     
     if (widget.showEmailGuide) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -419,36 +429,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _buildSectionHeader('추가 애플리케이션 설치'),
                       const SizedBox(height: 8),
                       _buildMenuCard(
-                        title: '워치 앱(HealthPort Sync) 설치',
-                        subtitle: '워치와 연동하여 자동으로 로그를 동기화해 보세요.',
-                        icon: Icons.watch_outlined,
-                        onTap: _installWatchApp,
-                      ),
-                      // Badge overlay for watch card
-                      Transform.translate(
-                        offset: const Offset(12, -80),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _isWatchAppInstalled ? const Color(0xFF3366FF).withOpacity(0.2) : Colors.redAccent.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: _isWatchAppInstalled ? const Color(0xFF3366FF) : Colors.redAccent),
-                            ),
-                            child: Text(
-                              _isWatchAppInstalled ? '설치됨(Connected)' : '설치 필요',
-                              style: TextStyle(
-                                color: _isWatchAppInstalled ? const Color(0xFF3366FF) : Colors.redAccent,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildMenuCard(
                         title: 'Cola Manager 설치',
                         subtitle: 'Cola Manager(APK) 최신버전을 스마트폰에 다운로드하고 설치합니다.',
                         icon: Icons.install_mobile_rounded,
@@ -469,6 +449,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onTap: _handleHealthPortUpdate,
                       ),
                       const SizedBox(height: 24),
+                      _buildSectionHeader('유용한 기능'),
+                      const SizedBox(height: 8),
+                      _buildSwitchCard(
+                        title: '워치 동기화 후 자동 삭제',
+                        subtitle: '동기화 완료 시 워치 내부의 COLA/Log 잔여 파일을 자동으로 삭제합니다.',
+                        icon: Icons.auto_delete_rounded,
+                        value: _autoDeleteWatchFiles,
+                        onChanged: (val) async {
+                          final p = await SharedPreferences.getInstance();
+                          await p.setBool('auto_delete_watch_files', val);
+                          setState(() {
+                            _autoDeleteWatchFiles = val;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
                       _buildSectionHeader('실험실'),
                       const SizedBox(height: 8),
                       _buildMenuCard(
@@ -479,7 +475,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => LabSubScreen(prefs: widget.prefs),
+                              builder: (context) => LabSubScreen(
+                                prefs: widget.prefs,
+                                isWatchAppInstalled: _isWatchAppInstalled,
+                                onInstallWatchApp: _installWatchApp,
+                              ),
                             ),
                           );
                         },
@@ -719,6 +719,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontSize: 13,
           fontWeight: FontWeight.bold,
           color: const Color(0xFFE2E2E2).withOpacity(0.7),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwitchCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return _GlassCard(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: Colors.white70, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeColor: Colors.white,
+              activeTrackColor: const Color(0xFF3366FF),
+              inactiveThumbColor: Colors.white54,
+              inactiveTrackColor: Colors.white.withOpacity(0.1),
+            ),
+          ],
         ),
       ),
     );
@@ -1882,7 +1942,15 @@ class _DownloadDialogState extends State<DownloadDialog> {
 
 class LabSubScreen extends StatelessWidget {
   final PrefsService prefs;
-  const LabSubScreen({super.key, required this.prefs});
+  final bool isWatchAppInstalled;
+  final VoidCallback onInstallWatchApp;
+
+  const LabSubScreen({
+    super.key, 
+    required this.prefs,
+    required this.isWatchAppInstalled,
+    required this.onInstallWatchApp,
+  });
 
   Widget _buildMenuCard({
     required String title,
@@ -1977,6 +2045,34 @@ class LabSubScreen extends StatelessWidget {
                 child: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
+                    _buildMenuCard(
+                      title: '워치 앱(HealthPort Sync) 설치',
+                      subtitle: '워치와 연동하여 자동으로 로그를 동기화해 보세요.',
+                      icon: Icons.watch_outlined,
+                      onTap: onInstallWatchApp,
+                    ),
+                    Transform.translate(
+                      offset: const Offset(12, -80),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isWatchAppInstalled ? const Color(0xFF3366FF).withOpacity(0.2) : Colors.redAccent.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isWatchAppInstalled ? const Color(0xFF3366FF) : Colors.redAccent),
+                          ),
+                          child: Text(
+                            isWatchAppInstalled ? '설치됨(Connected)' : '설치 필요',
+                            style: TextStyle(
+                              color: isWatchAppInstalled ? const Color(0xFF3366FF) : Colors.redAccent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                     _buildMenuCard(
                       title: '실험실 (워치 연동)',
                       subtitle: '워치에서 운동 데이터를 고속 무선 LAN(P2P)으로 전송받습니다.',

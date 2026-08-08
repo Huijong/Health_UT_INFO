@@ -475,6 +475,23 @@ class SyncService : Service() {
             command.startsWith("DOWNLOAD_FILE:") -> {
                 sendSocketFile(command.substring("DOWNLOAD_FILE:".length).trim())
             }
+            command == "DELETE_WATCH_FILES" -> {
+                try {
+                    val colaDir = File("/sdcard/Documents/COLA_FILE")
+                    if (colaDir.exists()) {
+                        colaDir.listFiles()?.forEach { it.deleteRecursively() }
+                    }
+                    val logDir = File("/sdcard/log")
+                    if (logDir.exists()) {
+                        logDir.deleteRecursively()
+                    }
+                    writeLog("Deleted watch files (COLA & log)")
+                } catch (e: Exception) {
+                    writeLog("Error deleting watch files: ${e.message}")
+                } finally {
+                    sendSocketLine("DELETE_WATCH_FILES_OK")
+                }
+            }
         }
     }
 

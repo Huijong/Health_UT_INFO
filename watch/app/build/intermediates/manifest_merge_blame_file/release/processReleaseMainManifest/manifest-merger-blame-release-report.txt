@@ -6,7 +6,7 @@
 6
 7    <uses-sdk
 8        android:minSdkVersion="29"
-9        android:targetSdkVersion="34" />
+9        android:targetSdkVersion="29" />
 10
 11    <uses-feature android:name="android.hardware.type.watch" />
 11-->D:\Health_UT\Health_UT_INFO\watch\app\src\main\AndroidManifest.xml:4:5-64
