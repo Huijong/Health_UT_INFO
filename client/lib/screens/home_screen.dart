@@ -916,9 +916,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             return Dialog(
               backgroundColor: Colors.transparent,
               insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              child: GlassCard(
-                padding: const EdgeInsets.all(20),
-                radius: 20,
+              child: Container(
+                width: 500,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E2640),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 10),
+                    )
+                  ],
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1617,11 +1630,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 duration: Duration(seconds: 2),
               ),
             );
-            if (_watchLogsAddedToZip) {
-              _showWatchLogCleanupSnackBar();
+            
+            final bool shouldShowCleanup = _watchLogsAddedToZip;
+            if (shouldShowCleanup) {
               _watchLogsAddedToZip = false;
             }
+            
             _resetVerification();
+            
+            if (shouldShowCleanup) {
+              Future.delayed(const Duration(milliseconds: 2500), () {
+                if (mounted) {
+                  _showWatchLogCleanupSnackBar();
+                }
+              });
+            }
           }
         });
       }
@@ -2394,7 +2417,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               ),
               if (_currentStep == 4)
                 IconButton(
-                  icon: const Icon(Icons.settings_rounded, size: 22, color: Color(0xFF3366FF)),
+                  icon: const Icon(Icons.settings_rounded, size: 22, color: Colors.white),
                   onPressed: () async {
                     if (_prefs == null) return;
                     final updated = await Navigator.push(
@@ -3546,11 +3569,233 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   }
 
   Future<void> _openHotspotSettings() async {
-    _wentToHotspotSettings = true;
-    Clipboard.setData(ClipboardData(text: _hotspotSsid ?? 'healthport'));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('네트워크 이름이 복사되었습니다. 붙여넣기 하세요.')),
+    final prefs = await SharedPreferences.getInstance();
+    final bool hideDialog = prefs.getBool('hide_hotspot_info_dialog') ?? false;
+
+    if (hideDialog) {
+      await _launchHotspotIntent();
+      return;
+    }
+
+    bool localHide = false;
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              backgroundColor: const Color(0xFF1E2640),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.wifi_tethering, color: Colors.white, size: 24),
+                          const SizedBox(width: 10),
+                          const Text('핫스팟 정보 일치 안내', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white54),
+                            onPressed: () => Navigator.pop(context),
+                          )
+                        ],
+                      ),
+                      const Divider(color: Colors.white12, height: 20),
+                      
+                      GlassCard(
+                        padding: const EdgeInsets.all(16),
+                        radius: 16,
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Column(
+                              children: [
+                                Icon(Icons.phone_android, color: Colors.white70, size: 28),
+                                SizedBox(height: 4),
+                                Text("앱 설정", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                              ],
+                            ),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 24),
+                              child: Text("= 일치 =", style: TextStyle(color: Color(0xFF3366FF), fontWeight: FontWeight.bold, fontSize: 16)),
+                            ),
+                            Column(
+                              children: [
+                                Icon(Icons.settings, color: Colors.white70, size: 28),
+                                SizedBox(height: 4),
+                                Text("단말 핫스팟", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      GlassCard(
+                        padding: const EdgeInsets.all(16),
+                        radius: 16,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                                  child: const Text('1', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(child: Text("단말 핫스팟 기본값 변경 (권장)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15))),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Expanded(child: Text("네트워크 이름: healthport", style: TextStyle(color: Colors.white70, fontSize: 13))),
+                                InkWell(
+                                  onTap: () {
+                                    Clipboard.setData(const ClipboardData(text: 'healthport'));
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('healthport 복사 완료!')));
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(6)),
+                                    child: const Text("복사", style: TextStyle(color: Colors.white, fontSize: 12)),
+                                  ),
+                                )
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Expanded(child: Text("비밀번호: 12345678", style: TextStyle(color: Colors.white70, fontSize: 13))),
+                                InkWell(
+                                  onTap: () {
+                                    Clipboard.setData(const ClipboardData(text: '12345678'));
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('12345678 복사 완료!')));
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(6)),
+                                    child: const Text("복사", style: TextStyle(color: Colors.white, fontSize: 12)),
+                                  ),
+                                )
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GlassCard(
+                        padding: const EdgeInsets.all(16),
+                        radius: 16,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                                  child: const Text('2', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(child: Text("단말 핫스팟 정보를 앱에 입력", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15))),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            const Text("현재 사용중인 핫스팟 정보를 앱에 적어주세요.", style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE5B512).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE5B512).withOpacity(0.5)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.bolt, color: Color(0xFFE5B512), size: 24),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                "[강력 권장] 핫스팟 설정에서 대역을 '5GHz 우선'으로 변경하시면 전송이 훨씬 빠릅니다.",
+                                style: TextStyle(color: Color(0xFFE5B512), fontSize: 13, height: 1.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          GestureDetector(
+                            onTap: () => setState(() => localHide = !localHide),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: Checkbox(
+                                    value: localHide,
+                                    onChanged: (val) => setState(() => localHide = val ?? false),
+                                    side: const BorderSide(color: Colors.white54),
+                                    activeColor: const Color(0xFF3366FF),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text("다시 보지 않기", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3366FF),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            onPressed: () async {
+                              if (localHide) {
+                                await prefs.setBool('hide_hotspot_info_dialog', true);
+                              }
+                              if (mounted) Navigator.pop(context);
+                              await _launchHotspotIntent();
+                            },
+                            child: const Text("설정 열기", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
+  }
+
+  Future<void> _launchHotspotIntent() async {
+    _wentToHotspotSettings = true;
+    Clipboard.setData(const ClipboardData(text: 'healthport'));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('네트워크 이름(healthport)이 복사되었습니다. 붙여넣기 하세요.')),
+      );
+    }
     if (Platform.isAndroid) {
       final intent = const AndroidIntent(
         action: 'android.settings.TETHER_SETTINGS',
@@ -3828,11 +4073,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF3366FF),
+                            disabledBackgroundColor: Colors.white12,
+                            disabledForegroundColor: Colors.white38,
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          onPressed: () async {
+                          onPressed: !_isHotspotOn ? null : () async {
                             final oldFiles = _getSnapshotFiles();
                             Navigator.pop(ctx);
                             await Navigator.push(context, MaterialPageRoute(
@@ -3844,61 +4091,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                               ),
                             ));
                             if (_addNewFiles(oldFiles)) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    content: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.cleaning_services_rounded, color: Colors.white, size: 28),
-                                            const SizedBox(width: 12),
-                                            const Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text('동기화가 완료되어 기존 로그는 필요가 없습니다.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                                  SizedBox(height: 2),
-                                                  Text('불필요한 기존 로그 삭제를 권장합니다.', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                                ],
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            const BouncingArrow(),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        SizedBox(
-                                          width: double.infinity,
-                                          child: ElevatedButton.icon(
-                                            onPressed: () {
-                                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                              launchUrl(Uri.parse('tel:*%239900%23'));
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.white,
-                                              foregroundColor: const Color(0xFF3366FF),
-                                              elevation: 0,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                              padding: const EdgeInsets.symmetric(vertical: 10),
-                                            ),
-                                            icon: const Icon(Icons.delete_sweep, size: 20),
-                                            label: const Text('*#9900# (덤프 삭제하러 가기)', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    duration: const Duration(seconds: 7),
-                                    backgroundColor: const Color(0xFF3366FF),
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                    elevation: 8,
-                                    margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
-                                  ),
-                                );
-                              }
+                              _watchLogsAddedToZip = true;
                             }
                           },
                           child: const Text('워치와 연결 시작', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -5368,7 +5561,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         });
       },
       backgroundColor: const Color(0xFF1E2020),
-      selectedItemColor: const Color(0xFF3366FF),
+      selectedItemColor: Colors.white,
       unselectedItemColor: Colors.white38,
       showSelectedLabels: true,
       showUnselectedLabels: true,
@@ -5450,6 +5643,67 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           },
         );
       },
+    );
+  }
+
+  void _showWatchLogCleanupSnackBar() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.cleaning_services_rounded, color: Colors.white, size: 28),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('동기화가 완료되어 기존 로그는 필요가 없습니다.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                      SizedBox(height: 2),
+                      Text('불필요한 기존 로그 삭제를 권장합니다.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const BouncingArrow(),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  const channel = MethodChannel('com.samsung.health.client/app_info');
+                  try {
+                    await channel.invokeMethod('openWatchSysDump');
+                  } catch (e) {
+                    debugPrint('워치 다이얼러 호출 실패: $e');
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF3366FF),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                icon: const Icon(Icons.delete_sweep, size: 20),
+                label: const Text('*#9900# (덤프 삭제하러 가기)', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 7),
+        backgroundColor: const Color(0xFF3366FF),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 8,
+        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+      ),
     );
   }
 }
