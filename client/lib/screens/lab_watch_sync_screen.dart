@@ -41,6 +41,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   int _syncTotalBytes = 0;
   String? _targetColaFilename;
   String? _targetLogFilename;
+  bool _autoDeleteWatchFiles = true;
 
   bool _isWatchAppInstalled = true; // Default to true
 
@@ -292,6 +293,20 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         setState(() => _autoSyncStage = 0);
         break;
 
+      case "deleteWatchFilesOk":
+        _addLog("워치 내부 잔여 파일 삭제 완료!");
+        setState(() => _autoSyncStage = 6);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('워치 동기화 및 잔여 파일 삭제가 모두 완료되었습니다!'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        break;
+
       case "error":
         _addLog("Native Error: $data");
         break;
@@ -509,8 +524,24 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         await compute(_recompressZipIsolate, "$targetFolder${_targetLogFilename!}");
       }
       
-      setState(() => _autoSyncStage = 5);
       _addLog("All sync & compression complete!");
+      
+      final prefs = await SharedPreferences.getInstance();
+      final bool autoDelete = prefs.getBool('auto_delete_watch_files') ?? true;
+      if (autoDelete) {
+        _deleteWatchFiles();
+      } else {
+        setState(() => _autoSyncStage = 6);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('워치 동기화가 완료되었습니다! (워치 잔여 파일 유지)'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
     } catch (e) {
       _addLog("Recompress error: $e");
       setState(() => _autoSyncStage = 0);
@@ -551,6 +582,17 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       await _wifiP2pChannel.invokeMethod("requestFileDownload", {"filename": filename});
     } catch (e) {
       _addLog("Request download error: $e");
+    }
+  }
+
+  void _deleteWatchFiles() {
+    setState(() => _autoSyncStage = 5);
+    _addLog("Requesting watch to delete sync files...");
+    try {
+      _wifiP2pChannel.invokeMethod("deleteWatchFiles");
+    } catch (e) {
+      _addLog("Delete watch files error: $e");
+      setState(() => _autoSyncStage = 6); // Just finish if fails
     }
   }
 
@@ -791,12 +833,20 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         _buildSyncStageRow(2, 'COLA 데이터 수신 중', _autoSyncStage > 2, _autoSyncStage == 2, progress: _autoSyncStage == 2 ? _syncProgress : null, transferred: _autoSyncStage == 2 ? _syncTransferredBytes : null, total: _autoSyncStage == 2 ? _syncTotalBytes : null, startTime: _autoSyncStage == 2 ? _syncStartTimeMs : null),
         _buildSyncStageRow(3, 'Log 데이터 수신 중', _autoSyncStage > 3, _autoSyncStage == 3, progress: _autoSyncStage == 3 ? _syncProgress : null, transferred: _autoSyncStage == 3 ? _syncTransferredBytes : null, total: _autoSyncStage == 3 ? _syncTotalBytes : null, startTime: _autoSyncStage == 3 ? _syncStartTimeMs : null),
         _buildSyncStageRow(4, '폰 단말 최적화 압축 진행 중', _autoSyncStage > 4, _autoSyncStage == 4),
-        _buildSyncStageRow(5, '동기화 완료!', _autoSyncStage == 5, false),
+        _buildSyncStageRow(
+          5, 
+          '워치 잔여 파일 정리 중', 
+          _autoSyncStage > 5, 
+          _autoSyncStage == 5,
+          isStrikeThrough: !_autoDeleteWatchFiles,
+          appendText: !_autoDeleteWatchFiles ? "(설정 > 워치 동기화 후 자동삭제 OFF)" : null,
+        ),
+        _buildSyncStageRow(6, '동기화 완료!', _autoSyncStage == 6, false),
       ],
     );
   }
 
-  Widget _buildSyncStageRow(int step, String label, bool isDone, bool isActive, {double? progress, int? transferred, int? total, int? startTime}) {
+  Widget _buildSyncStageRow(int step, String label, bool isDone, bool isActive, {double? progress, int? transferred, int? total, int? startTime, bool isStrikeThrough = false, String? appendText}) {
     String percentStr = "";
     String etaStr = "";
     if (isActive && progress != null) {
@@ -834,12 +884,27 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label + percentStr,
-                  style: TextStyle(
-                    color: isActive || isDone ? Colors.white : Colors.white54,
-                    fontWeight: isActive || isDone ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 15,
+                RichText(
+                  text: TextSpan(
+                    text: label + percentStr,
+                    style: TextStyle(
+                      color: isActive || isDone ? Colors.white : Colors.white54,
+                      fontWeight: isActive || isDone ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 15,
+                      decoration: isStrikeThrough ? TextDecoration.lineThrough : null,
+                    ),
+                    children: [
+                      if (appendText != null)
+                        TextSpan(
+                          text: " $appendText",
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontWeight: FontWeight.normal,
+                            fontSize: 13,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 if (isActive && etaStr.isNotEmpty) ...[

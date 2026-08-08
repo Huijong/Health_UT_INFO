@@ -71,6 +71,7 @@ class WifiP2pPlugin(private val context: Context) {
                     if (fn != null) { sendSocketLine("DOWNLOAD_FILE:$fn"); result.success(true) }
                     else result.error("BAD_ARGS", "filename required", null)
                 }
+                "deleteWatchFiles"    -> { sendSocketLine("DELETE_WATCH_FILES"); result.success(true) }
                 else -> result.notImplemented()
             }
         }
@@ -245,6 +246,8 @@ class WifiP2pPlugin(private val context: Context) {
                         }
                         line.startsWith("ERROR:") ->
                             sendEvent("downloadFailure", mapOf("error" to line.substring("ERROR:".length)))
+                        line == "DELETE_WATCH_FILES_OK" ->
+                            sendEvent("deleteWatchFilesOk", null)
                     }
                 }
             } catch (e: Exception) {
