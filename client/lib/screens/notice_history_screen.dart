@@ -303,28 +303,7 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
                       ),
                     ),
                     const Spacer(),
-                    // 정렬 단축키
-                    IconButton(
-                      icon: Icon(
-                        _isNewestFirst ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                        color: const Color(0xFF3366FF),
-                        size: 20,
-                      ),
-                      tooltip: _isNewestFirst ? '최신순 (누르면 오래된순)' : '오래된순 (누르면 최신순)',
-                      onPressed: () {
-                        setState(() {
-                          _isNewestFirst = !_isNewestFirst;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(_isNewestFirst ? '최신순으로 정렬되었습니다. ⬇️' : '오래된순으로 정렬되었습니다. ⬆️'),
-                            duration: const Duration(milliseconds: 800),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        );
-                      },
-                    ),
+
                     IconButton(
                       icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
                       onPressed: _fetchNotices,

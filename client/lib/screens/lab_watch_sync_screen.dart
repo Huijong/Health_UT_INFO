@@ -649,6 +649,16 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (mode == 'HOTSPOT')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('핫스팟', style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
               Icon(icon, color: isSelected ? Colors.white : Colors.white30, size: 20),
               const SizedBox(height: 4),
               Text(
@@ -812,6 +822,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
         ),
+
         const SizedBox(height: 32),
         ElevatedButton(
           onPressed: _isSearching ? null : _startDiscovery,

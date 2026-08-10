@@ -238,7 +238,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
               label: Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white70,
+                  color: Colors.white,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   fontSize: 13,
                 ),
@@ -252,12 +252,13 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                   _fetchRankings();
                 }
               },
-              selectedColor: const Color(0xFF3366FF),
+              selectedColor: const Color(0xFF1E2640),
               backgroundColor: Colors.white.withOpacity(0.06),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
-                  color: isSelected ? const Color(0xFF3366FF) : Colors.white.withOpacity(0.08),
+                  color: isSelected ? Colors.white.withOpacity(0.4) : Colors.white.withOpacity(0.08),
+                  width: isSelected ? 1.5 : 1.0,
                 ),
               ),
               showCheckmark: false,
@@ -275,7 +276,12 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
     return Row(
       children: [
         Expanded(
-          child: _GlassCard(
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E2640),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
               child: Column(
@@ -287,7 +293,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF3366FF),
+                      color: Colors.white,
                     ),
                   ),
                 ],
@@ -297,7 +303,12 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _GlassCard(
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E2640),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
               child: Column(
@@ -309,7 +320,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF3366FF),
+                      color: Colors.white,
                     ),
                   ),
                 ],
@@ -321,7 +332,12 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
         Expanded(
           child: GestureDetector(
             onTap: _showRankingRulesDialog,
-            child: _GlassCard(
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E2640),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+              ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                 child: Column(
@@ -331,14 +347,14 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: const [
-                        Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF3366FF)),
+                        Icon(Icons.info_outline_rounded, size: 14, color: Colors.white),
                         SizedBox(width: 4),
                         Text(
                           '상세 보기',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF3366FF),
+                            color: Colors.white,
                           ),
                         ),
                       ],
@@ -354,89 +370,102 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
   }
 
   void _showRankingRulesDialog() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E2640),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return DefaultTabController(
-              length: 3,
-              child: Dialog(
-                backgroundColor: const Color(0xFF161819),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Header
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-                        child: Row(
-                          children: const [
-                            Icon(Icons.stars_rounded, color: Color(0xFF3366FF), size: 24),
-                            SizedBox(width: 8),
-                            Text(
-                              '포인트 적립 기준 안내',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: Colors.white,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Tab Bar (Text Only for saving space)
-                      const TabBar(
-                        indicatorColor: Color(0xFF3366FF),
-                        labelColor: Color(0xFF3366FF),
-                        unselectedLabelColor: Colors.white38,
-                        labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                        padding: EdgeInsets.symmetric(horizontal: 8),
-                        tabs: [
-                          Tab(text: '러닝/걷기/하이킹'),
-                          Tab(text: '실외 자전거'),
-                          Tab(text: '기타 모든 운동'),
-                        ],
-                      ),
-                      // Tab Content
-                      SizedBox(
-                        height: 430,
-                        child: TabBarView(
+        return DefaultTabController(
+          length: 3,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 20,
+              top: 20,
+              left: 20,
+              right: 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.stars_rounded, color: Colors.amberAccent, size: 24),
+                    const SizedBox(width: 10),
+                    const Text('포인트 적립 기준 안내', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white54),
+                      onPressed: () => Navigator.pop(ctx),
+                    )
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 30),
+                Builder(
+                  builder: (ctx) {
+                    final tabController = DefaultTabController.of(ctx);
+                    return AnimatedBuilder(
+                      animation: tabController,
+                      builder: (ctx, child) {
+                        final currentIndex = tabController.index;
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
                           children: [
-                            _buildGroupARules(),
-                            _buildGroupBRules(),
-                            _buildOtherExerciseRules(),
-                          ],
-                        ),
-                      ),
-                      const Divider(color: Colors.white10, height: 1),
-                      // Footer Button
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            style: TextButton.styleFrom(
-                              backgroundColor: const Color(0xFF3366FF),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            const TabBar(
+                              indicatorColor: Color(0xFF3366FF),
+                              labelColor: Color(0xFF3366FF),
+                              unselectedLabelColor: Colors.white38,
+                              labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              padding: EdgeInsets.zero,
+                              tabs: [
+                                Tab(text: '러닝/걷기/하이킹'),
+                                Tab(text: '실외 자전거'),
+                                Tab(text: '기타 모든 운동'),
+                              ],
                             ),
-                            child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          ),
-                        ),
-                      ),
+                            if (currentIndex > 0)
+                              Positioned(
+                                left: -20,
+                                child: IconButton(
+                                  icon: const Icon(Icons.chevron_left, color: Colors.white54, size: 28),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => tabController.animateTo(currentIndex - 1),
+                                ),
+                              ),
+                            if (currentIndex < 2)
+                              Positioned(
+                                right: -20,
+                                child: IconButton(
+                                  icon: const Icon(Icons.chevron_right, color: Colors.white54, size: 28),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => tabController.animateTo(currentIndex + 1),
+                                ),
+                              ),
+                          ],
+                        );
+                      }
+                    );
+                  }
+                ),
+                SizedBox(
+                  height: 450,
+                  child: TabBarView(
+                    children: [
+                      _buildGroupARules(),
+                      _buildGroupBRules(),
+                      _buildOtherExerciseRules(),
                     ],
                   ),
                 ),
-              ),
-            );
-          },
+              ],
+            ),
+          ),
         );
       },
     );
@@ -444,7 +473,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
 
   Widget _buildGroupARules() {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       children: [
         _buildInfoBox('💡 아래 거리별 예시값은 건당 [기본 점수 1.0P (하이킹 3.0P)]가 미리 합산되어 최종 수령할 총 포인트 기준입니다.'),
         const SizedBox(height: 16),
@@ -461,7 +490,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
 
   Widget _buildGroupBRules() {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       children: [
         _buildInfoBox('💡 아래 거리별 예시값은 건당 [기본 점수 1.0P]가 미리 합산되어 최종 수령할 총 포인트 기준입니다.'),
         const SizedBox(height: 16),
@@ -476,7 +505,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
 
   Widget _buildOtherExerciseRules() {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       children: [
         _buildInfoBox('💡 수영, 근력 운동, 요가 등 기타 종목 대상\n💡 기본 점수 외에 거리 가산은 제외됩니다.'),
         const SizedBox(height: 16),
@@ -530,7 +559,14 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
         children: [
           Expanded(flex: 3, child: Text(range, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
           Expanded(flex: 4, child: Text(rule, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11))),
-          Expanded(flex: 3, child: Text(example, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFF3366FF), fontSize: 11, fontWeight: FontWeight.bold))),
+          Expanded(flex: 3, child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00FF7F).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(example, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFF00FF7F), fontSize: 11, fontWeight: FontWeight.bold)),
+          )),
         ],
       ),
     );
@@ -574,7 +610,9 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
       motivationText = '첫 제출을 완료하셨네요! 상위 랭킹을 향해 조금 더 도전해 보세요! 🚀';
     }
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _showTesterHistory(myName),
+      child: Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(
@@ -648,6 +686,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
             ),
           ],
         ),
+      ),
       ),
     );
   }
