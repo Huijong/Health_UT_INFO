@@ -20,6 +20,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
   late String _selectedMonth;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _isMyRankHidden = false;
 
   List<dynamic> _rankings = [];
   Map<String, dynamic> _meta = {};
@@ -36,6 +37,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
       curve: Curves.easeInOut,
     ));
     _glowController.repeat(reverse: true);
+    _isMyRankHidden = widget.prefs.hideMyRank;
     _months = _getRecentMonths();
     _selectedMonth = _months.first;
     _fetchRankings();
@@ -279,15 +281,15 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
           child: Container(
             decoration: BoxDecoration(
               color: const Color(0xFF1E2640),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
               child: Column(
                 children: [
                   const Text('전체 인원', style: TextStyle(color: Colors.white60, fontSize: 11)),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     '$totalTesters명',
                     style: const TextStyle(
@@ -306,15 +308,15 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
           child: Container(
             decoration: BoxDecoration(
               color: const Color(0xFF1E2640),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
               child: Column(
                 children: [
                   const Text('평균 포인트', style: TextStyle(color: Colors.white60, fontSize: 11)),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     '${_formatPoints(avgSubmissions)}P',
                     style: const TextStyle(
@@ -335,15 +337,15 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
             child: Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF1E2640),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                 child: Column(
                   children: [
                     const Text('랭킹 기준', style: TextStyle(color: Colors.white60, fontSize: 11)),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: const [
@@ -538,9 +540,9 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
       padding: const EdgeInsets.only(bottom: 8, left: 4, right: 4),
       child: Row(
         children: const [
-          Expanded(flex: 3, child: Text('거리 구간', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold))),
-          Expanded(flex: 4, child: Text('구간 가산 규칙', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold))),
-          Expanded(flex: 3, child: Text('예시 값', textAlign: TextAlign.right, style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold))),
+          Expanded(flex: 3, child: Text('거리 구간', textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold))),
+          Expanded(flex: 4, child: Text('구간 가산 규칙', textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold))),
+          Expanded(flex: 3, child: Text('예시 값', textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold))),
         ],
       ),
     );
@@ -557,16 +559,16 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
       ),
       child: Row(
         children: [
-          Expanded(flex: 3, child: Text(range, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
-          Expanded(flex: 4, child: Text(rule, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11))),
-          Expanded(flex: 3, child: Container(
+          Expanded(flex: 3, child: Text(range, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+          Expanded(flex: 4, child: Text(rule, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11))),
+          Expanded(flex: 3, child: Center(child: Container(
             padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
             decoration: BoxDecoration(
               color: const Color(0xFF00FF7F).withOpacity(0.1),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Text(example, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFF00FF7F), fontSize: 11, fontWeight: FontWeight.bold)),
-          )),
+            child: Text(example, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF00FF7F), fontSize: 11, fontWeight: FontWeight.bold)),
+          ))),
         ],
       ),
     );
@@ -614,7 +616,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
       onTap: () => _showTesterHistory(myName),
       child: Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -640,50 +642,139 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '$myName님의 랭킹',
-                      style: const TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.w600),
+                    Row(
+                      children: [
+                        Text(
+                          '$myName님의 랭킹',
+                          style: const TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(width: 8),
+                        Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _isMyRankHidden = !_isMyRankHidden;
+                                  widget.prefs.saveHideMyRank(_isMyRankHidden);
+                                  if (!widget.prefs.hasClickedHideRank) {
+                                    widget.prefs.saveHasClickedHideRank(true);
+                                  }
+                                });
+                              },
+                              child: Icon(
+                                _isMyRankHidden ? Icons.visibility_off : Icons.visibility,
+                                size: 18,
+                                color: Colors.white54,
+                              ),
+                            ),
+                            if (!widget.prefs.hasClickedHideRank)
+                              Positioned(
+                                bottom: 24,
+                                child: AnimatedBuilder(
+                                  animation: _glowAnimation,
+                                  builder: (context, child) {
+                                    return Transform.translate(
+                                      offset: Offset(0, -(_glowAnimation.value * 5)),
+                                      child: child,
+                                    );
+                                  },
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF3366FF),
+                                          borderRadius: BorderRadius.circular(12),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFF3366FF).withOpacity(0.3),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Text(
+                                          '클릭해서 랭킹 숨기기',
+                                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      Transform.translate(
+                                        offset: const Offset(0, -4),
+                                        child: Transform.rotate(
+                                          angle: 0.785398, // 45 degrees
+                                          child: Container(
+                                            width: 8,
+                                            height: 8,
+                                            color: const Color(0xFF3366FF),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      rankText,
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
+                    if (!_isMyRankHidden) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        rankText,
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ],
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3366FF).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3)),
-                  ),
-                  child: Text(
-                    '${_formatPoints(myCount)}포인트 ($mySubmissions건)',
-                    style: const TextStyle(
-                      color: Color(0xFF3366FF),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                if (!_isMyRankHidden)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3366FF).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      '${_formatPoints(myCount)}포인트 ($mySubmissions건)',
+                      style: const TextStyle(
+                        color: Color(0xFF3366FF),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
-            const SizedBox(height: 14),
-            Divider(color: Colors.white.withOpacity(0.1), height: 1),
-            const SizedBox(height: 14),
-            Text(
-              motivationText,
-              style: const TextStyle(
-                fontSize: 12.5,
-                color: Colors.white70,
-                height: 1.5,
+            if (_isMyRankHidden) ...[
+              const SizedBox(height: 16),
+              const Center(
+                child: Text(
+                  '나의 랭킹 숨김 상태입니다.',
+                  style: TextStyle(color: Colors.white54, fontSize: 13),
+                ),
               ),
-            ),
+            ],
+            if (!_isMyRankHidden) ...[
+              const SizedBox(height: 14),
+              Divider(color: Colors.white.withOpacity(0.1), height: 1),
+              const SizedBox(height: 14),
+              Text(
+                motivationText,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: Colors.white70,
+                  height: 1.5,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -888,7 +979,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                   color: themeColor,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Container(
                 height: barHeight,
                 width: 60,
@@ -1267,13 +1358,13 @@ class _GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(12),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
         child: Container(
           decoration: BoxDecoration(
             color: backgroundColor ?? Colors.white.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: borderColor ?? Colors.white.withOpacity(0.08),
               width: 1.0,

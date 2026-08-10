@@ -66,6 +66,8 @@ class PrefsService {
   bool get emailMigrationDone => _prefs.getBool(_keyEmailMigrationDone) ?? false;
   String get deviceUuid => _prefs.getString(_keyDeviceUuid) ?? '';
   bool get hideP2pBanner => _prefs.getBool('hide_p2p_banner') ?? false;
+  bool get hideMyRank => _prefs.getBool('hide_my_rank') ?? false;
+  bool get hasClickedHideRank => _prefs.getBool('has_clicked_hide_rank') ?? false;
   bool get hasSeenNewLabMenu => _prefs.getBool('has_seen_new_lab_menu') ?? false;
 
   /// 운동 종목별 디테일 설정 로드
@@ -103,6 +105,8 @@ class PrefsService {
   Future<void> saveLastPopupDismissedVersion(String value) => _prefs.setString('last_popup_dismissed_version', value);
   Future<void> saveHideQuickShareGuide(bool value) => _prefs.setBool('hide_quick_share_guide', value);
   Future<void> saveHideP2pBanner(bool value) => _prefs.setBool('hide_p2p_banner', value);
+  Future<void> saveHideMyRank(bool value) => _prefs.setBool('hide_my_rank', value);
+  Future<void> saveHasClickedHideRank(bool value) => _prefs.setBool('has_clicked_hide_rank', value);
   Future<void> saveHasSeenNewLabMenu(bool value) => _prefs.setBool('has_seen_new_lab_menu', value);
   Future<void> saveEmailMigrationDone(bool value) => _prefs.setBool(_keyEmailMigrationDone, value);
 
