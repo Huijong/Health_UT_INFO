@@ -96,6 +96,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_strap.isEmpty) _strap = kStrapOptions.first['name']!;
     _checkWatchAppInstalled();
     
+    // Mark the new Lab menu as seen when Settings is opened
+    if (!widget.prefs.hasSeenNewLabMenu) {
+      widget.prefs.saveHasSeenNewLabMenu(true);
+    }
+    
     SharedPreferences.getInstance().then((p) {
       if (mounted) {
         setState(() {
@@ -471,6 +476,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: '실험실',
                         subtitle: '워치 연동, 모바일 핫스팟, SysDump 등 연구/검증 기능 목록으로 이동합니다.',
                         icon: Icons.biotech_rounded,
+                        showBadge: !widget.prefs.hasSeenNewLabMenu,
                         onTap: () {
                           Navigator.push(
                             context,
