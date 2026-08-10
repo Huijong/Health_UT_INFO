@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/attached_file.dart';
+import 'auto_scroll_text.dart';
 
 /// 첨부 파일 목록 한 줄 — 아이콘·이름·크기 + 삭제 버튼
 class AttachedFileTile extends StatelessWidget {
@@ -24,11 +25,8 @@ class AttachedFileTile extends StatelessWidget {
         visualDensity: const VisualDensity(vertical: -4),
         minVerticalPadding: 0,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-        leading: _typeAvatar(cs),
-        title: Text(
-          file.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        title: AutoScrollText(
+          text: file.name,
           style: const TextStyle(fontSize: 13),
         ),
         subtitle: Text(

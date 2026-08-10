@@ -79,6 +79,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _blinkHighlightActive = false;
   bool _blinkState = false;
+  bool _showNewLabBadge = false;
   Timer? _blinkTimer;
 
   @override
@@ -96,8 +97,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_strap.isEmpty) _strap = kStrapOptions.first['name']!;
     _checkWatchAppInstalled();
     
-    // Mark the new Lab menu as seen when Settings is opened
-    if (!widget.prefs.hasSeenNewLabMenu) {
+    // Determine if we should show the new lab menu badge for this visit
+    _showNewLabBadge = !widget.prefs.hasSeenNewLabMenu;
+    if (_showNewLabBadge) {
       widget.prefs.saveHasSeenNewLabMenu(true);
     }
     
@@ -476,7 +478,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: '실험실',
                         subtitle: '워치 연동, 모바일 핫스팟, SysDump 등 연구/검증 기능 목록으로 이동합니다.',
                         icon: Icons.biotech_rounded,
-                        showBadge: !widget.prefs.hasSeenNewLabMenu,
+                        showBadge: _showNewLabBadge,
                         onTap: () {
                           Navigator.push(
                             context,
@@ -776,13 +778,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            Switch(
-              value: value,
-              onChanged: onChanged,
-              activeColor: Colors.white,
-              activeTrackColor: const Color(0xFF3366FF),
-              inactiveThumbColor: Colors.white54,
-              inactiveTrackColor: Colors.white.withOpacity(0.1),
+            Transform.scale(
+              scale: 0.8,
+              child: Switch(
+                value: value,
+                onChanged: onChanged,
+                activeColor: Colors.white,
+                activeTrackColor: const Color(0xFF3366FF),
+                inactiveThumbColor: Colors.white54,
+                inactiveTrackColor: Colors.white.withOpacity(0.1),
+              ),
             ),
           ],
         ),
@@ -1989,6 +1994,7 @@ class LabSubScreen extends StatelessWidget {
     required String subtitle,
     required IconData icon,
     required VoidCallback onTap,
+    Widget? titleBadge,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -2020,9 +2026,20 @@ class LabSubScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (titleBadge != null) ...[
+                            const SizedBox(width: 8),
+                            titleBadge,
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -2082,25 +2099,18 @@ class LabSubScreen extends StatelessWidget {
                       subtitle: '워치와 연동하여 자동으로 로그를 동기화해 보세요.',
                       icon: Icons.watch_outlined,
                       onTap: onInstallWatchApp,
-                    ),
-                    Transform.translate(
-                      offset: const Offset(12, -80),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isWatchAppInstalled ? const Color(0xFF3366FF).withOpacity(0.2) : Colors.redAccent.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: isWatchAppInstalled ? const Color(0xFF3366FF) : Colors.redAccent),
-                          ),
-                          child: Text(
-                            isWatchAppInstalled ? '설치됨(Connected)' : '설치 필요',
-                            style: TextStyle(
-                              color: isWatchAppInstalled ? const Color(0xFF3366FF) : Colors.redAccent,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
+                      titleBadge: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isWatchAppInstalled ? const Color(0xFF3366FF).withOpacity(0.15) : Colors.redAccent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          isWatchAppInstalled ? '설치됨' : '설치 필요',
+                          style: TextStyle(
+                            color: isWatchAppInstalled ? const Color(0xFF3366FF) : Colors.redAccent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
