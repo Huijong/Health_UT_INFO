@@ -21,7 +21,6 @@ import '../services/prefs_service.dart';
 import '../services/share_service.dart';
 import '../services/email_service.dart';
 import '../widgets/attached_file_tile.dart';
-import '../widgets/auto_scroll_text.dart';
 import 'settings_screen.dart';
 import 'location_picker_screen.dart';
 import 'notice_history_screen.dart';
@@ -254,7 +253,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   // 5단계 디테일 및 첨부파일
   final List<AttachedFile> _fitFiles = [];
   final List<AttachedFile> _garminFiles = [];
-  DateTime? _garminDownloadStartTime;
   final List<AttachedFile> _colaFiles = [];
   final List<AttachedFile> _logFiles = [];
   final List<AttachedFile> _captureFiles = [];
@@ -1539,9 +1537,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         _checkHotspotStatus();
       }
       if (_currentStep == 4) _scanGarminFilesFromDownload();
-      if (_currentStep == 5 && _garminDownloadStartTime != null) {
-        _scanForNewGarminZip();
-      }
     }
     if (state == AppLifecycleState.resumed && _packResult != null) {
       Future.delayed(const Duration(milliseconds: 400), _checkClipboard);
@@ -2143,7 +2138,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
 
     if (action == 'yes') {
-      _garminDownloadStartTime = DateTime.now();
       // await _launchUrl('https://connect.garmin.com/app/');
       await _launchUrl('https://connect.garmin.com/signin/');
     } else if (action == 'no') {
@@ -3757,7 +3751,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         children: [
                           const Icon(Icons.wifi_tethering, color: Colors.white, size: 24),
                           const SizedBox(width: 10),
-                          const Text('핫스팟 정보 일치 안내(1회성)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                          const Text('핫스팟 정보 설정 가이드', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                           const Spacer(),
                           IconButton(
                             icon: const Icon(Icons.close, color: Colors.white54),
@@ -3765,7 +3759,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                           )
                         ],
                       ),
-                      const Divider(color: Colors.white12, height: 20),
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Divider(color: Colors.white12, height: 32),
+                          Positioned(
+                            left: 110,
+                            top: -6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF3366FF),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: Radius.circular(0), // Points UP to '설정'
+                                  topRight: Radius.circular(12),
+                                  bottomRight: Radius.circular(12),
+                                  bottomLeft: Radius.circular(12),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  )
+                                ],
+                              ),
+                              child: const Text("한 번 세팅 끝! 다음부턴 프리패스 🎫", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
                       
                       GlassCard(
                         padding: const EdgeInsets.all(16),
@@ -3992,60 +4015,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
-
-  Future<void> _scanForNewGarminZip() async {
-    try {
-      final downloadDir = Directory('/storage/emulated/0/Download');
-      if (!downloadDir.existsSync()) return;
-
-      final files = downloadDir.listSync();
-      bool added = false;
-      
-      for (var entity in files) {
-        if (entity is File && entity.path.toLowerCase().endsWith('.zip')) {
-          final fileName = entity.path.split('/').last;
-          // Check if it's a numeric zip name like 123456789.zip
-          if (RegExp(r'^\d+\.zip$').hasMatch(fileName)) {
-            final stat = entity.statSync();
-            // If modified after we went to the browser
-            if (stat.modified.isAfter(_garminDownloadStartTime!)) {
-              // Check if already in _garminFiles
-              final alreadyAdded = _garminFiles.any((f) => f.originalPath == entity.path || (f.tempPath != null && f.tempPath == entity.path));
-              if (!alreadyAdded) {
-                // Add to list
-                final pFile = AttachedFile(
-                  name: fileName,
-                  originalPath: entity.path,
-                  type: AttachType.fit,
-                  sizeBytes: stat.size,
-                );
-                setState(() {
-                  _garminFiles.add(pFile);
-                });
-                added = true;
-              }
-            }
-          }
-        }
-      }
-      
-      if (added) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ 다운로드 폴더에서 최신 Garmin 파일을 자동 첨부했습니다.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              duration: Duration(seconds: 3),
-              backgroundColor: Color(0xFF3366FF),
-            ),
-          );
-        }
-        // Reset the start time so we don't keep adding it on every resume if they stay on step 5
-        _garminDownloadStartTime = null; 
-      }
-    } catch (e) {
-      debugPrint('Error scanning for new Garmin ZIP: ');
-    }
-  }
   void _scanGarminFilesFromDownload() {
     final dir = Directory('/storage/emulated/0/Download');
     if (dir.existsSync()) {
@@ -4387,7 +4356,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 30),
           
           // --- SECTION 2: 자동화 첨부 (비교 데이터) ---
-          Text('섹션 2: 비교 데이터 (자동화)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.bold)),
+          Text('섹션 2: 비교 데이터 (자동)', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           _buildAttachCard(icon: Icons.file_copy, title: '3. Garmin Fit 파일', hint: 'Download 폴더 자동 스캔됨', busy: _fileBusy, onTap: _pickGarminFit, files: _garminFiles),
           const SizedBox(height: 12),
@@ -4777,7 +4746,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.only(top: 20, bottom: 4, left: 16, right: 16),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.05),
               border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3)),
@@ -4796,7 +4765,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: _fitFiles.isNotEmpty
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _fitFiles.map((f) => AutoScrollText(text: f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
+                                children: _fitFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis)).toList(),
                               )
                             : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
                       ),
@@ -4815,7 +4784,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: _garminFiles.isNotEmpty
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _garminFiles.map((f) => AutoScrollText(text: f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
+                                children: _garminFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis)).toList(),
                               )
                             : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
                       ),
@@ -4834,7 +4803,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: _colaFiles.isNotEmpty
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _colaFiles.map((f) => AutoScrollText(text: f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
+                                children: _colaFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis)).toList(),
                               )
                             : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
                       ),
@@ -4853,7 +4822,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: _logFiles.isNotEmpty
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _logFiles.map((f) => AutoScrollText(text: f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
+                                children: _logFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis)).toList(),
                               )
                             : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
                       ),
@@ -4872,7 +4841,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: _captureFiles.isNotEmpty
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _captureFiles.map((f) => AutoScrollText(text: f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
+                                children: _captureFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis)).toList(),
                               )
                             : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
                       ),
@@ -5828,9 +5797,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           _currentTab = index;
         });
       },
-      backgroundColor: const Color(0xFF1E2020),
-      selectedItemColor: Colors.white,
-      unselectedItemColor: Colors.white38,
+      backgroundColor: const Color(0xFF0C0F0F),
+      selectedItemColor: const Color(0xFFFFD043),
+      unselectedItemColor: const Color(0xFFFFD043).withOpacity(0.4),
       showSelectedLabels: true,
       showUnselectedLabels: true,
       selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
@@ -6381,4 +6350,3 @@ class _BouncingArrowState extends State<BouncingArrow> with SingleTickerProvider
     );
   }
 }
-
