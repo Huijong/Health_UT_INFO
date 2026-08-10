@@ -24,7 +24,7 @@ class AttachedFileTile extends StatelessWidget {
         dense: true,
         visualDensity: const VisualDensity(vertical: -4),
         minVerticalPadding: 0,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        contentPadding: const EdgeInsets.only(left: 12, right: 4),
         title: AutoScrollText(
           text: file.name,
           style: const TextStyle(fontSize: 13),
@@ -33,10 +33,13 @@ class AttachedFileTile extends StatelessWidget {
           file.sizeLabel,
           style: TextStyle(fontSize: 11, color: cs.outline),
         ),
-        trailing: IconButton(
-          icon: Icon(Icons.close, size: 18, color: cs.error),
-          tooltip: '삭제',
-          onPressed: onDelete,
+        trailing: InkWell(
+          onTap: onDelete,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Icon(Icons.close, size: 16, color: cs.error),
+          ),
         ),
       ),
     );
