@@ -168,6 +168,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   String? _hotspotPwd;
   bool _isHotspotOn = false;
   bool _wentToHotspotSettings = false;
+  bool _isWizardExpanded = false;
   StateSetter? _wizardSetState;
   static const _appChannel = MethodChannel('com.samsung.health.client/app_info');
   bool _watchLogsAddedToZip = false;
@@ -4365,123 +4366,155 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 12),
           _buildAttachCard(icon: Icons.watch, title: '1. 자사 FIT 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickFit, files: _fitFiles),
           const SizedBox(height: 12),
-          
-          // 2. 워치 COLA / Log 동기화 마법사 (선택)
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              InkWell(
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      backgroundColor: const Color(0xFF1E2640),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      title: const Row(
-                        children: [
-                          Icon(Icons.info_outline, color: Colors.orangeAccent),
-                          SizedBox(width: 8),
-                          Text('준비 중 (TBD)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      content: Text.rich(
-                        TextSpan(
-                          style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
-                          children: [
-                            const TextSpan(text: '해당 기능은 COLA/Log 파일을 원터치로 가져올 수 있도록 향후 업데이트될 예정입니다.\n\n현재 SDK 문제로 인해 워치 앱의 정식 스토어(Google Play Store, Galaxy Store) 등록이 제한된 상태입니다.\n\n사용자분들께서 쉽게 앱을 설치하실 수 있도록 우회 방법 및 대안을 적극적으로 찾고 있습니다. 조금만 기다려 주세요!\n\n'),
-                            TextSpan(
-                              text: '💡 기능 릴리즈 전, 먼저 앱을 사용해보고 싶으신 분은 [유희종 프로]님에게 오시면 워치에 직접 설치해 드립니다!',
-                              style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 14.5),
-                            ),
-                          ],
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('닫기', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3366FF),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+
+          // 2. 워치 COLA / Log 동기화 마법사 (선택 - 아코디언)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _isWizardExpanded = !_isWizardExpanded;
+                });
+              },
+              icon: Icon(_isWizardExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: const Color(0xFF8B5CF6), size: 18),
+              label: Text(
+                _isWizardExpanded ? 'Cola Manager 미사용자이신가요? (접기)' : 'Cola Manager 미사용자이신가요? (펼치기)', 
+                style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 13, fontWeight: FontWeight.bold)
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 300),
+            crossFadeState: _isWizardExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  InkWell(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: const Color(0xFF1E2640),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          title: const Row(
+                            children: [
+                              Icon(Icons.info_outline, color: Colors.orangeAccent),
+                              SizedBox(width: 8),
+                              Text('준비 중 (TBD)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                            ],
                           ),
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            _showWatchSyncWizard();
-                          },
-                          child: const Text('사용해 보기', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.5)), // Purple point
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
-                        child: const Icon(Icons.cloud_sync, color: Colors.white, size: 22),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                          content: Text.rich(
+                            TextSpan(
+                              style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
                               children: [
-                                const Text('2. 워치 COLA / Log 파일 동기화', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: Colors.white.withOpacity(0.2)),
-                                  ),
-                                  child: const Text('선택', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                                const TextSpan(text: '해당 기능은 COLA/Log 파일을 원터치로 가져올 수 있도록 향후 업데이트될 예정입니다.\n\n현재 SDK 문제로 인해 워치 앱의 정식 스토어(Google Play Store, Galaxy Store) 등록이 제한된 상태입니다.\n\n사용자분들께서 쉽게 앱을 설치하실 수 있도록 우회 방법 및 대안을 적극적으로 찾고 있습니다. 조금만 기다려 주세요!\n\n'),
+                                const TextSpan(text: '💡 기능 릴리즈 전, 먼저 앱을 사용해보고 싶으신 분은 '),
+                                TextSpan(
+                                  text: '유희종 프로',
+                                  style: TextStyle(color: Colors.orangeAccent.withOpacity(0.9), fontWeight: FontWeight.bold, fontSize: 14.5, decoration: TextDecoration.underline),
                                 ),
+                                const TextSpan(text: '에게 오시면 워치에 직접 설치해 드립니다!'),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            Text('터치 한 번으로 워치의 파일(Cola/Log) 자동 추가', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                          ),
+                          actionsAlignment: MainAxisAlignment.spaceBetween,
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('닫기', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF3366FF),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _showWatchSyncWizard();
+                              },
+                              child: const Text('사용해 보기', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
                           ],
                         ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.5)), // Purple point
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 12,
-                top: -12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF8B5CF6),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(8),
-                      topRight: Radius.circular(8),
-                      bottomLeft: Radius.circular(8),
-                      bottomRight: Radius.circular(0),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                            child: const Icon(Icons.cloud_sync, color: Colors.white, size: 22),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text('2. 워치 COLA / Log 파일 동기화', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orangeAccent.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: Colors.orangeAccent.withOpacity(0.5)),
+                                      ),
+                                      child: const Text('TBD', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text('터치 한 번으로 워치의 파일(Cola/Log) 자동 추가', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
+                        ],
+                      ),
                     ),
-                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
                   ),
-                  child: const Text("Cola Manager 없이 자동 동기화 🚀", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                ),
+                  Positioned(
+                    right: 12,
+                    top: -16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF8B5CF6),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          topRight: Radius.circular(8),
+                          bottomLeft: Radius.circular(0),
+                          bottomRight: Radius.circular(8),
+                        ),
+                        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
+                      ),
+                      child: const Text("Cola Manager 없이 자동 동기화 🚀", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
+
           const SizedBox(height: 12),
           
           _buildAttachCard(icon: Icons.bar_chart, title: '3. Cola 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickCola, files: _colaFiles),
