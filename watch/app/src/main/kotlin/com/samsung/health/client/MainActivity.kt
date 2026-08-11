@@ -194,7 +194,6 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
         val missingPermissions = permissions.filter {
