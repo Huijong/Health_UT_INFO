@@ -4368,33 +4368,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 12),
 
           // 2. 워치 COLA / Log 동기화 마법사 (선택 - 아코디언)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _isWizardExpanded = !_isWizardExpanded;
-                });
-              },
-              icon: Icon(_isWizardExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: const Color(0xFF8B5CF6), size: 18),
-              label: Text(
-                _isWizardExpanded ? 'Cola Manager 미사용자이신가요? (접기)' : 'Cola Manager 미사용자이신가요? (펼치기)', 
-                style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 13, fontWeight: FontWeight.bold)
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ),
-          AnimatedCrossFade(
-            duration: const Duration(milliseconds: 300),
-            crossFadeState: _isWizardExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-            firstChild: const SizedBox(width: double.infinity, height: 0),
-            secondChild: Padding(
-              padding: const EdgeInsets.only(top: 16.0),
-              child: Stack(
+              Stack(
                 clipBehavior: Clip.none,
                 children: [
                   InkWell(
@@ -4511,9 +4485,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     ),
                   ),
                 ],
-              ),
             ),
-          ),
+
 
           const SizedBox(height: 12),
           

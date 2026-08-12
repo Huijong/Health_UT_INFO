@@ -221,13 +221,27 @@ class WifiP2pPlugin(private val context: Context) {
         }.start()
     }
 
+    private fun readLineFromStream(inStream: InputStream): String? {
+        val baos = ByteArrayOutputStream()
+        var b: Int
+        while (true) {
+            b = inStream.read()
+            if (b == -1) {
+                if (baos.size() == 0) return null
+                break
+            }
+            if (b == '\n'.code) break
+            if (b != '\r'.code) baos.write(b)
+        }
+        return baos.toString("UTF-8")
+    }
+
     private fun readSocketStream(socket: Socket) {
         Thread {
             try {
                 val inStream = BufferedInputStream(socket.getInputStream(), BUFFER_SIZE)
-                val reader = BufferedReader(InputStreamReader(inStream, Charsets.UTF_8))
                 while (isServerRunning) {
-                    val line = reader.readLine() ?: break
+                    val line = readLineFromStream(inStream) ?: break
                     Log.d(TAG, "Socket: $line")
                     when {
                         line == "HELLO_FROM_WATCH" -> {
