@@ -33,50 +33,61 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
         
         // Simple UI Layout
         // ScrollView wrapper to support circular screens perfectly
-        val scrollView = android.widget.ScrollView(this).apply {
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-            )
+        // FrameLayout: fills screen so child can be CENTER-gravity
+        val rootFrame = android.widget.FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.BLACK)
-            isVerticalScrollBarEnabled = false
+            layoutParams = android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            )
         }
 
         val rootLayout = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             gravity = android.view.Gravity.CENTER
-            setPadding(16, 24, 16, 24)
+            setPadding(24, 0, 24, 0)
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.view.Gravity.CENTER
+            )
         }
 
         statusText = TextView(this).apply {
             text = "HealthPort Sync\n대기 중"
             setTextColor(android.graphics.Color.WHITE)
-            textSize = 13f
+            textSize = 14f
             gravity = android.view.Gravity.CENTER
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
         rootLayout.addView(statusText)
 
         val spacer = android.view.View(this).apply {
-            layoutParams = android.widget.LinearLayout.LayoutParams(1, 8)
+            layoutParams = android.widget.LinearLayout.LayoutParams(1, 16)
         }
         rootLayout.addView(spacer)
 
         actionButton = Button(this).apply {
             text = "연동 시작"
-            textSize = 12f
+            textSize = 13f
             setBackgroundColor(android.graphics.Color.parseColor("#2E5BFF"))
             setTextColor(android.graphics.Color.WHITE)
             layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                120
             ).apply {
                 gravity = android.view.Gravity.CENTER
+                leftMargin = 16
+                rightMargin = 16
             }
         }
         rootLayout.addView(actionButton)
 
-        scrollView.addView(rootLayout)
-        setContentView(scrollView)
+        rootFrame.addView(rootLayout)
+        setContentView(rootFrame)
 
         actionButton.setOnClickListener {
             if (isServiceRunning) {
