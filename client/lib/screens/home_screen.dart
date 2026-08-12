@@ -168,7 +168,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   String? _hotspotPwd;
   bool _isHotspotOn = false;
   bool _wentToHotspotSettings = false;
-  bool _isWizardExpanded = false;
   StateSetter? _wizardSetState;
   static const _appChannel = MethodChannel('com.samsung.health.client/app_info');
   bool _watchLogsAddedToZip = false;
@@ -180,10 +179,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       if (mounted) {
         setState(() {
           _isHotspotOn = isEnabled;
+          if (isEnabled) _isNetworkExpanded = true;
         });
         if (_wizardSetState != null) {
           _wizardSetState!(() {
             _isHotspotOn = isEnabled;
+            if (isEnabled) _isNetworkExpanded = true;
           });
         }
       }
@@ -212,6 +213,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   // 동의서 관련 상태 변수
   bool _agreePersonal = false;
   bool _agreeLocation = false;
+  bool _isNetworkExpanded = false;
 
   // 현재 위저드 단계 (1 ~ 6)
   int _currentStep = 1;
@@ -224,6 +226,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   final _nameCtrl = TextEditingController();
   final _nameFocusNode = FocusNode();
   final _emailFocusNode = FocusNode();
+  final _ssidFocusNode = FocusNode();
+  final _ssidCtrl = TextEditingController();
+  final _pwdCtrl = TextEditingController();
   bool _isEmailReadOnly = true;
   final _heightCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
@@ -1512,6 +1517,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     _nameCtrl.dispose();
     _nameFocusNode.dispose();
     _emailFocusNode.dispose();
+    _ssidFocusNode.dispose();
+    _ssidCtrl.dispose();
+    _pwdCtrl.dispose();
     _heightCtrl.dispose();
     _weightCtrl.dispose();
     _customWatchCtrl.dispose();
@@ -1536,6 +1544,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       if (_wentToHotspotSettings) {
         _wentToHotspotSettings = false;
         _checkHotspotStatus();
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted && _ssidFocusNode.canRequestFocus) {
+            _ssidFocusNode.requestFocus();
+          }
+        });
       }
       if (_currentStep == 4) _scanGarminFilesFromDownload();
     }
@@ -3567,13 +3580,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFD043).withOpacity(0.2),
+                        color: const Color(0xFF3366FF).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFFFD043), width: 1),
+                        border: Border.all(color: const Color(0xFF3366FF), width: 1),
                       ),
                       child: const Text(
                         '필독',
-                        style: TextStyle(fontSize: 10, color: Color(0xFFFFD043), fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 10, color: Color(0xFF3366FF), fontWeight: FontWeight.bold),
                       ),
                     ),
                 ],
@@ -3712,8 +3725,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   Future<void> _loadHotspotConfig() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _hotspotSsid = prefs.getString('hotspot_ssid') ?? 'healthport';
-      _hotspotPwd = prefs.getString('hotspot_pwd') ?? '12345678';
+      _hotspotSsid = prefs.getString('hotspot_ssid') ?? '';
+      _hotspotPwd = prefs.getString('hotspot_pwd') ?? '';
+      _ssidCtrl.text = _hotspotSsid!;
+      _pwdCtrl.text = _hotspotPwd!;
     });
   }
 
@@ -3723,261 +3738,94 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   }
 
   Future<void> _openHotspotSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final bool hideDialog = prefs.getBool('hide_hotspot_info_dialog') ?? false;
-
-    if (hideDialog) {
-      await _launchHotspotIntent();
-      return;
-    }
-
-    bool localHide = false;
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              backgroundColor: const Color(0xFF1E2640),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+    if (!_isHotspotOn) {
+      bool? goNext = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) {
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            backgroundColor: const Color(0xFF1E2640),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(Icons.wifi_tethering, color: Colors.white, size: 24),
-                          const SizedBox(width: 10),
-                          const Text('핫스팟 정보 설정 가이드', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                          const Spacer(),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.white54),
-                            onPressed: () => Navigator.pop(context),
-                          )
+                          Icon(Icons.wifi_tethering, color: Colors.white, size: 24),
+                          SizedBox(width: 10),
+                          Text('핫스팟 설정 안내', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         ],
                       ),
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          const Divider(color: Colors.white12, height: 32),
-                          Positioned(
-                            left: 110,
-                            top: -6,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF3366FF),
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(0), // Points UP to '설정'
-                                  topRight: Radius.circular(12),
-                                  bottomRight: Radius.circular(12),
-                                  bottomLeft: Radius.circular(12),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 4,
-                                    offset: Offset(0, 2),
-                                  )
-                                ],
-                              ),
-                              child: const Text("한 번 세팅 끝! 다음부턴 프리패스 🎫", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      
-                      GlassCard(
-                        padding: const EdgeInsets.all(16),
-                        radius: 16,
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Column(
-                              children: [
-                                Icon(Icons.phone_android, color: Colors.white70, size: 28),
-                                SizedBox(height: 4),
-                                Text("앱 설정", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                              ],
-                            ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 24),
-                              child: Text("= 일치 =", style: TextStyle(color: Color(0xFF3366FF), fontWeight: FontWeight.bold, fontSize: 16)),
-                            ),
-                            Column(
-                              children: [
-                                Icon(Icons.settings, color: Colors.white70, size: 28),
-                                SizedBox(height: 4),
-                                Text("단말 핫스팟", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      GlassCard(
-                        padding: const EdgeInsets.all(16),
-                        radius: 16,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
-                                  child: const Text('1', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                ),
-                                const SizedBox(width: 12),
-                                const Expanded(child: Text("단말 핫스팟 기본값 변경 (권장)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15))),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Expanded(child: Text("네트워크 이름: healthport", style: TextStyle(color: Colors.white70, fontSize: 13))),
-                                InkWell(
-                                  onTap: () {
-                                    Clipboard.setData(const ClipboardData(text: 'healthport'));
-                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('healthport 복사 완료!')));
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(6)),
-                                    child: const Text("복사", style: TextStyle(color: Colors.white, fontSize: 12)),
-                                  ),
-                                )
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Expanded(child: Text("비밀번호: 12345678", style: TextStyle(color: Colors.white70, fontSize: 13))),
-                                InkWell(
-                                  onTap: () {
-                                    Clipboard.setData(const ClipboardData(text: '12345678'));
-                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('12345678 복사 완료!')));
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(6)),
-                                    child: const Text("복사", style: TextStyle(color: Colors.white, fontSize: 12)),
-                                  ),
-                                )
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Text("— 또는 —", style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold)),
-                      ),
-                      GlassCard(
-                        padding: const EdgeInsets.all(16),
-                        radius: 16,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
-                                  child: const Text('2', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                ),
-                                const SizedBox(width: 12),
-                                const Expanded(child: Text("단말 핫스팟 정보를 앱에 입력", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15))),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            const Text("현재 사용중인 핫스팟 정보를 앱에 적어주세요.", style: TextStyle(color: Colors.white70, fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE5B512).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE5B512).withOpacity(0.5)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.bolt, color: Color(0xFFE5B512), size: 24),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                "[강력 권장] 핫스팟 설정에서 대역을 '5GHz 우선'으로 변경하시면 전송이 훨씬 빠릅니다.",
-                                style: TextStyle(color: Color(0xFFE5B512), fontSize: 13, height: 1.4),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          GestureDetector(
-                            onTap: () => setState(() => localHide = !localHide),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: Checkbox(
-                                    value: localHide,
-                                    onChanged: (val) => setState(() => localHide = val ?? false),
-                                    side: const BorderSide(color: Colors.white54),
-                                    activeColor: const Color(0xFF3366FF),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text("다시 보지 않기", style: TextStyle(color: Colors.white70, fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF3366FF),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            ),
-                            onPressed: () async {
-                              if (localHide) {
-                                await prefs.setBool('hide_hotspot_info_dialog', true);
-                              }
-                              if (mounted) Navigator.pop(context);
-                              await _launchHotspotIntent();
-                            },
-                            child: const Text("설정 열기", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          ),
-                        ],
-                      ),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.close, color: Colors.white54),
+                        onPressed: () => Navigator.pop(context, false),
+                      )
                     ],
                   ),
-                ),
+                  const SizedBox(height: 24),
+                  const Icon(Icons.privacy_tip_outlined, color: Colors.lightBlueAccent, size: 48),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '모바일 핫스팟을 켜고,\n본인의 핫스팟 이름과 비밀번호를\n복사해 오세요!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, height: 1.4),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5B512).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE5B512).withOpacity(0.5)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.bolt, color: Color(0xFFE5B512), size: 24),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            "빠른 전송을 위해 밴드는\n'5GHz 우선'을 강력 추천합니다!",
+                            style: TextStyle(color: Color(0xFFE5B512), fontSize: 14, fontWeight: FontWeight.bold, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3366FF),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('확인', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
-        );
-      },
-    );
+            ),
+          );
+        },
+      );
+      if (goNext != true) return;
+    }
+    await _launchHotspotIntent();
   }
 
   Future<void> _launchHotspotIntent() async {
     _wentToHotspotSettings = true;
-    Clipboard.setData(const ClipboardData(text: 'healthport'));
-
     if (Platform.isAndroid) {
       final intent = const AndroidIntent(
         action: 'android.settings.TETHER_SETTINGS',
@@ -4155,7 +4003,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                             children: [
                               const Expanded(
                                 child: Text(
-                                  '💡 안심하세요! 워치와 스마트폰을 P2P(직접 연결) 방식으로 연결하므로, 모바일 데이터(LTE/5G)가 소모되거나 요금이 절대 발생하지 않습니다.',
+                                  '💡 안심하세요! 워치와 스마트폰을 P2P(직접 연결) 방식으로 연결하므로, 모바일 데이터소모되거나 요금이 절대 발생하지 않습니다.',
                                   style: TextStyle(color: Colors.white, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -4174,51 +4022,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         ),
                       ],
                       const SizedBox(height: 16),
-                      // Input Area Group
-                      const Text('네트워크 정보', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: _hotspotSsid ?? 'healthport',
-                              style: const TextStyle(color: Colors.white, fontSize: 14),
-                              decoration: InputDecoration(
-                                labelText: '네트워크 이름 (SSID)', 
-                                labelStyle: const TextStyle(color: Colors.white54),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                filled: true,
-                                fillColor: Colors.white.withOpacity(0.04),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                              ),
-                              onChanged: (val) {
-                                _hotspotSsid = val;
-                                _saveHotspotConfig('hotspot_ssid', val);
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: _hotspotPwd ?? '12345678',
-                              style: const TextStyle(color: Colors.white, fontSize: 14),
-                              decoration: InputDecoration(
-                                labelText: '비밀번호', 
-                                labelStyle: const TextStyle(color: Colors.white54),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                filled: true,
-                                fillColor: Colors.white.withOpacity(0.04),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                              ),
-                              onChanged: (val) {
-                                _hotspotPwd = val;
-                                _saveHotspotConfig('hotspot_pwd', val);
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(color: Colors.white12, height: 24),
                       // Status Area
                       const Text('핫스팟 설정 상태', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
@@ -4247,23 +4050,140 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                 ),
                               ),
                             ),
-                            if (!_isHotspotOn)
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white.withOpacity(0.15),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                                  minimumSize: const Size(60, 32),
-                                ),
-                                onPressed: _openHotspotSettings,
-                                icon: const Icon(Icons.settings, color: Colors.white, size: 14),
-                                label: const Text('설정 열기', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              )
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.15),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                minimumSize: const Size(60, 32),
+                              ),
+                              onPressed: _openHotspotSettings,
+                              icon: const Icon(Icons.settings, color: Colors.white, size: 14),
+                              label: const Text('핫스팟 설정 열기', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            )
                           ],
                         ),
                       ),
+                      const Divider(color: Colors.white12, height: 24),
+                      
+                      // Input Area Group (Collapsible)
+                      GestureDetector(
+                        onTap: () {
+                          if (_wizardSetState != null) {
+                            _wizardSetState!(() { _isNetworkExpanded = !_isNetworkExpanded; });
+                          } else {
+                            setState(() { _isNetworkExpanded = !_isNetworkExpanded; });
+                          }
+                        },
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('네트워크 정보', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600)),
+                            Row(
+                              children: [
+                                Text(_isNetworkExpanded ? '접기' : '클릭하여 펼치기', style: const TextStyle(color: Colors.white30, fontSize: 11)),
+                                const SizedBox(width: 4),
+                                Icon(_isNetworkExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: Colors.white30, size: 16),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_isNetworkExpanded) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(left: 4, bottom: 4),
+                                    child: Text('네트워크 이름 (SSID)', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                                  ),
+                                  TextFormField(
+                                    controller: _ssidCtrl,
+                                    focusNode: _ssidFocusNode,
+                                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      hintText: '본인의 핫스팟 이름 입력',
+                                      hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacity(0.04),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                      suffixIcon: IconButton(
+                                        icon: const Icon(Icons.paste, color: Colors.white54, size: 16),
+                                        onPressed: () async {
+                                          final data = await Clipboard.getData(Clipboard.kTextPlain);
+                                          if (data?.text != null && data!.text!.isNotEmpty) {
+                                            setState(() {
+                                              _ssidCtrl.text = data.text!;
+                                              _hotspotSsid = data.text!;
+                                              _saveHotspotConfig('hotspot_ssid', data.text!);
+                                            });
+                                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${data.text}" 붙여넣기 완료!')));
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    onChanged: (val) {
+                                      _hotspotSsid = val;
+                                      _saveHotspotConfig('hotspot_ssid', val);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(left: 4, bottom: 4),
+                                    child: Text('비밀번호', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                                  ),
+                                  TextFormField(
+                                    controller: _pwdCtrl,
+                                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      hintText: '본인의 비밀번호 입력',
+                                      hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacity(0.04),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                      suffixIcon: IconButton(
+                                        icon: const Icon(Icons.paste, color: Colors.white54, size: 16),
+                                        onPressed: () async {
+                                          final data = await Clipboard.getData(Clipboard.kTextPlain);
+                                          if (data?.text != null && data!.text!.isNotEmpty) {
+                                            setState(() {
+                                              _pwdCtrl.text = data.text!;
+                                              _hotspotPwd = data.text!;
+                                              _saveHotspotConfig('hotspot_pwd', data.text!);
+                                            });
+                                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('비밀번호 붙여넣기 완료!')));
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    onChanged: (val) {
+                                      _hotspotPwd = val;
+                                      _saveHotspotConfig('hotspot_pwd', val);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -4366,142 +4286,131 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 12),
           _buildAttachCard(icon: Icons.watch, title: '1. 자사 FIT 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickFit, files: _fitFiles),
           const SizedBox(height: 12),
-
-          // 2. 워치 COLA / Log 동기화 마법사 (선택 - 아코디언)
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  InkWell(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          backgroundColor: const Color(0xFF1E2640),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          title: const Row(
-                            children: [
-                              Icon(Icons.info_outline, color: Colors.orangeAccent),
-                              SizedBox(width: 8),
-                              Text('준비 중 (TBD)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          content: Text.rich(
+          
+          // 2. 워치 COLA / Log 파일 동기화
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              InkWell(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: const Color(0xFF1E2640),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      title: const Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.orangeAccent),
+                          SizedBox(width: 8),
+                          Text('준비 중 (TBD)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      content: Text.rich(
+                        TextSpan(
+                          style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                          children: [
+                            const TextSpan(text: '해당 기능은 COLA/Log 파일을 원터치로 가져올 수 있도록 향후 업데이트될 예정입니다.\n\n현재 SDK 문제로 인해 워치 앱의 정식 스토어(Google Play Store, Galaxy Store) 등록이 제한된 상태입니다.\n\n사용자분들께서 쉽게 앱을 설치하실 수 있도록 우회 방법 및 대안을 적극적으로 찾고 있습니다. 조금만 기다려 주세요!\n\n'),
                             TextSpan(
-                              style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
-                              children: [
-                                const TextSpan(text: '해당 기능은 COLA/Log 파일을 원터치로 가져올 수 있도록 향후 업데이트될 예정입니다.\n\n현재 SDK 문제로 인해 워치 앱의 정식 스토어(Google Play Store, Galaxy Store) 등록이 제한된 상태입니다.\n\n사용자분들께서 쉽게 앱을 설치하실 수 있도록 우회 방법 및 대안을 적극적으로 찾고 있습니다. 조금만 기다려 주세요!\n\n'),
-                                const TextSpan(text: '💡 기능 릴리즈 전, 먼저 앱을 사용해보고 싶으신 분은 '),
-                                TextSpan(
-                                  text: '유희종 프로',
-                                  style: TextStyle(color: Colors.orangeAccent.withOpacity(0.9), fontWeight: FontWeight.bold, fontSize: 14.5, decoration: TextDecoration.underline),
-                                ),
-                                const TextSpan(text: '에게 오시면 워치에 직접 설치해 드립니다!'),
-                              ],
-                            ),
-                          ),
-                          actionsAlignment: MainAxisAlignment.spaceBetween,
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('닫기', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-                            ),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF3366FF),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                _showWatchSyncWizard();
-                              },
-                              child: const Text('사용해 보기', style: TextStyle(fontWeight: FontWeight.bold)),
+                              text: '💡 기능 릴리즈 전, 먼저 앱을 사용해보고 싶으신 분은 [유희종 프로]님에게 오시면 워치에 직접 설치해 드립니다!',
+                              style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 14.5),
                             ),
                           ],
                         ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.5)), // Purple point
-                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
-                            child: const Icon(Icons.cloud_sync, color: Colors.white, size: 22),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('닫기', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3366FF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showWatchSyncWizard();
+                          },
+                          child: const Text('사용해 보기', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.cloud_sync, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    const Text('2. 워치 COLA / Log 파일 동기화', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.orangeAccent.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: Colors.orangeAccent.withOpacity(0.5)),
-                                      ),
-                                      child: const Text('TBD', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                                    ),
-                                  ],
+                                const Text('2. 워치 COLA / Log 파일 동기화', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.transparent,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: Colors.orangeAccent),
+                                  ),
+                                  child: const Text('TBD', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                                 ),
-                                const SizedBox(height: 4),
-                                Text('터치 한 번으로 워치의 파일(Cola/Log) 자동 추가', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
                               ],
                             ),
-                          ),
-                          const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 12,
-                    top: -16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF8B5CF6),
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(8),
-                          topRight: Radius.circular(8),
-                          bottomLeft: Radius.circular(0),
-                          bottomRight: Radius.circular(8),
+                            const SizedBox(height: 4),
+                            Text('터치 한 번으로 워치의 파일(Cola/Log) 자동 추가', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                          ],
                         ),
-                        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
                       ),
-                      child: const Text("Cola Manager 없이 자동 동기화 🚀", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
+                      const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
+                    ],
                   ),
-                ],
-            ),
-
-
+                ),
+              ),
+              Positioned(
+                top: -12,
+                right: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF8B5CF6),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))],
+                  ),
+                  child: const Text('Cola Manager 없이 자동 동기화 🚀', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
-          
           _buildAttachCard(icon: Icons.bar_chart, title: '3. Cola 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickCola, files: _colaFiles),
           const SizedBox(height: 12),
           _buildAttachCard(icon: Icons.article_outlined, title: '4. 단말 Log 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickLog, files: _logFiles),
           const SizedBox(height: 12),
-          _buildCaptureAttachCard(), 
+          _buildCaptureAttachCard(), // 5. 캡처 이미지
           const SizedBox(height: 30),
           
           // --- SECTION 2: 타사 운동 데이터 ---
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFD043).withOpacity(0.25),
+              color: const Color(0xFFB8860B).withOpacity(0.25),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -4509,7 +4418,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 Container(
                   width: 4, 
                   height: 18, 
-                  decoration: BoxDecoration(color: const Color(0xFFFFD043), borderRadius: BorderRadius.circular(2)),
+                  decoration: BoxDecoration(color: const Color(0xFFB8860B), borderRadius: BorderRadius.circular(2)),
                 ),
                 const SizedBox(width: 10),
                 const Text('섹션 2: 타사 운동 데이터', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
@@ -4520,7 +4429,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           _buildAttachCard(icon: Icons.file_copy, title: '6. Garmin Fit 파일', hint: 'Download 폴더 자동 스캔됨', busy: _fileBusy, onTap: _pickGarminFit, files: _garminFiles),
           const SizedBox(height: 30),
 
-          // --- SECTION 3: 운동 종합 데이터 입력 ---
+          // --- SECTION 3: 운동 종합 데이터 및 특이사항 ---
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
@@ -5872,9 +5781,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           _currentTab = index;
         });
       },
-      backgroundColor: const Color(0xFF0C0F0F),
-      selectedItemColor: const Color(0xFFFFD043),
-      unselectedItemColor: const Color(0xFFFFD043).withOpacity(0.4),
+      backgroundColor: const Color(0xFF1E2020),
+      selectedItemColor: Colors.white,
+      unselectedItemColor: Colors.white38,
       showSelectedLabels: true,
       showUnselectedLabels: true,
       selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
