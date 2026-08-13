@@ -511,56 +511,59 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     final targetFolder = "/sdcard/Documents/COLA_FILE/";
     
     try {
-      if (_targetColaFilename != null) {
+      if (_targetColaFilename != null && _targetColaFilename!.toLowerCase().endsWith('.zip')) {
         await compute(_recompressZipIsolate, "$targetFolder${_targetColaFilename!}");
       }
-      if (_targetLogFilename != null) {
+      if (_targetLogFilename != null && _targetLogFilename!.toLowerCase().endsWith('.zip')) {
         await compute(_recompressZipIsolate, "$targetFolder${_targetLogFilename!}");
       }
-      
-      _addLog("All sync & compression complete!");
-      
-      final prefs = await SharedPreferences.getInstance();
-      final bool autoDelete = prefs.getBool('auto_delete_watch_files') ?? true;
-      if (autoDelete) {
-        _deleteWatchFiles();
-      } else {
-        setState(() => _autoSyncStage = 6);
-        if (mounted) {
-          _showSuccessSnackBarAndPop('워치 동기화가 완료되었습니다! (워치 잔여 파일 유지)');
-        }
-      }
     } catch (e) {
-      _addLog("Recompress error: $e");
-      setState(() => _autoSyncStage = 0);
+      _addLog("Recompress error (ignored): $e");
+    }
+    
+    _addLog("All sync & compression complete!");
+    
+    final prefs = await SharedPreferences.getInstance();
+    final bool autoDelete = prefs.getBool('auto_delete_watch_files') ?? true;
+    if (autoDelete) {
+      _deleteWatchFiles();
+    } else {
+      setState(() => _autoSyncStage = 6);
+      if (mounted) {
+        _showSuccessSnackBarAndPop('워치 동기화가 완료되었습니다! (워치 잔여 파일 유지)');
+      }
     }
   }
 
   static void _recompressZipIsolate(String zipPath) {
-    final file = File(zipPath);
-    if (!file.existsSync()) return;
-    
-    final tempDir = Directory("${zipPath}_unzipped");
-    if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
-    tempDir.createSync();
-    
-    final bytes = file.readAsBytesSync();
-    final archive = ZipDecoder().decodeBytes(bytes);
-    for (final file in archive) {
-      final filename = file.name;
-      if (file.isFile) {
-        final data = file.content as List<int>;
-        File('${tempDir.path}/$filename')
-          ..createSync(recursive: true)
-          ..writeAsBytesSync(data);
-      } else {
-        Directory('${tempDir.path}/$filename').createSync(recursive: true);
+    try {
+      final file = File(zipPath);
+      if (!file.existsSync()) return;
+      
+      final tempDir = Directory("${zipPath}_unzipped");
+      if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      tempDir.createSync();
+      
+      final bytes = file.readAsBytesSync();
+      final archive = ZipDecoder().decodeBytes(bytes);
+      for (final file in archive) {
+        final filename = file.name;
+        if (file.isFile) {
+          final data = file.content as List<int>;
+          File('${tempDir.path}/$filename')
+            ..createSync(recursive: true)
+            ..writeAsBytesSync(data);
+        } else {
+          Directory('${tempDir.path}/$filename').createSync(recursive: true);
+        }
       }
+      
+      final encoder = ZipFileEncoder();
+      encoder.zipDirectory(tempDir, filename: zipPath);
+      tempDir.deleteSync(recursive: true);
+    } catch (e) {
+      debugPrint("Isolate Recompress error: $e");
     }
-    
-    final encoder = ZipFileEncoder();
-    encoder.zipDirectory(tempDir, filename: zipPath);
-    tempDir.deleteSync(recursive: true);
   }
 
   void _requestDownload(String filename) async {
