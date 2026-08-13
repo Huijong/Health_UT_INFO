@@ -251,7 +251,21 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
             _targetColaFilename = fileNames.where((n) => n.startsWith("COLA_FILE_")).lastOrNull;
             _targetLogFilename = fileNames.where((n) => n.startsWith("log_")).lastOrNull;
           });
-          _startNextAutoSyncPhase();
+          
+          String missingFiles = "";
+          if (_targetColaFilename == null && _targetLogFilename == null) {
+            missingFiles = "COLA, Log 파일이";
+          } else if (_targetColaFilename == null) {
+            missingFiles = "COLA 파일이";
+          } else if (_targetLogFilename == null) {
+            missingFiles = "Log 파일이";
+          }
+
+          if (missingFiles.isNotEmpty) {
+            _showMissingFileDialog(missingFiles);
+          } else {
+            _startNextAutoSyncPhase();
+          }
         } catch (e) {
           _addLog("JSON Parse error: $e");
           setState(() => _autoSyncStage = 0);
@@ -305,6 +319,100 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         _addLog("Native Error: $data");
         break;
     }
+  }
+
+  void _showMissingFileDialog(String missingFiles) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: _GlassCard(
+          padding: const EdgeInsets.all(20),
+          radius: 20,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('알림', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      Navigator.pop(context);
+                    },
+                    child: const Icon(Icons.close_rounded, color: Colors.white54, size: 24),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                missingFiles == "COLA, Log 파일이" 
+                  ? '$missingFiles 없습니다. 동기화를 진행할 수 없습니다.' 
+                  : '$missingFiles 없습니다. 계속 하시겠습니까?',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  if (missingFiles != "COLA, Log 파일이") ...[
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          Navigator.pop(context);
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          backgroundColor: Colors.white.withOpacity(0.05),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('아니요', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _startNextAutoSyncPhase();
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: const Color(0xFF2E5BFF),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('예', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ] else ...[
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          Navigator.pop(context);
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: const Color(0xFF2E5BFF),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('확인', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showHotspotInfoDialog(String ssid, String password) {
