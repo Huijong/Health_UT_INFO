@@ -3771,10 +3771,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     ],
                   ),
                   const SizedBox(height: 24),
-                  const Icon(Icons.privacy_tip_outlined, color: Colors.lightBlueAccent, size: 48),
-                  const SizedBox(height: 16),
+                  // const Icon(Icons.privacy_tip_outlined, color: Colors.lightBlueAccent, size: 48),
+                  // const SizedBox(height: 16),
                   const Text(
-                    '모바일 핫스팟을 켜고,\n본인의 핫스팟 이름과 비밀번호를\n복사해 오세요!',
+                    '모바일 핫스팟을 켜고,\n본인의 네트워크 이름(SSID)과 비밀번호를\nHealtPort 앱에 입력해주세요!',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, height: 1.4),
                   ),

@@ -644,11 +644,11 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   }
 
   static void _recompressZipIsolate(String zipPath) {
+    final tempDir = Directory("${zipPath}_unzipped");
     try {
       final file = File(zipPath);
       if (!file.existsSync()) return;
       
-      final tempDir = Directory("${zipPath}_unzipped");
       if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
       tempDir.createSync();
       
@@ -667,10 +667,22 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       }
       
       final encoder = ZipFileEncoder();
-      encoder.zipDirectory(tempDir, filename: zipPath);
-      tempDir.deleteSync(recursive: true);
+      final tempZipPath = "$zipPath.tmp";
+      encoder.zipDirectory(tempDir, filename: tempZipPath);
+      
+      final tempZipFile = File(tempZipPath);
+      if (tempZipFile.existsSync()) {
+        file.deleteSync();
+        tempZipFile.renameSync(zipPath);
+      }
     } catch (e) {
       debugPrint("Isolate Recompress error: $e");
+    } finally {
+      if (tempDir.existsSync()) {
+        try {
+          tempDir.deleteSync(recursive: true);
+        } catch (_) {}
+      }
     }
   }
 
