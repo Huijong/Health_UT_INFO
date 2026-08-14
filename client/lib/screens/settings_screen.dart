@@ -76,6 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late String _customStrap;
   bool _hasUpdate = false;
   bool _autoDeleteWatchFiles = true;
+  bool _showTbdPopup = true;
 
   bool _blinkHighlightActive = false;
   bool _blinkState = false;
@@ -107,6 +108,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         setState(() {
           _autoDeleteWatchFiles = p.getBool('auto_delete_watch_files') ?? true;
+          _showTbdPopup = p.getBool('show_tbd_popup') ?? true;
         });
       }
     });
@@ -468,6 +470,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           await p.setBool('auto_delete_watch_files', val);
                           setState(() {
                             _autoDeleteWatchFiles = val;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSwitchCard(
+                        title: '워치 COLA 동기화 TBD 팝업 표시',
+                        subtitle: '해당 메뉴 진입 시 기능 준비 중(TBD) 안내 팝업을 먼저 띄웁니다.',
+                        icon: Icons.info_outline_rounded,
+                        value: _showTbdPopup,
+                        onChanged: (val) async {
+                          final p = await SharedPreferences.getInstance();
+                          await p.setBool('show_tbd_popup', val);
+                          setState(() {
+                            _showTbdPopup = val;
                           });
                         },
                       ),
