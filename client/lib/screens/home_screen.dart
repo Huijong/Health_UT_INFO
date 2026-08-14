@@ -211,9 +211,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   String _updateVersionName = '';
 
   // 동의서 관련 상태 변수
+  AnimationController? _emptyFieldPulseController;
   bool _agreePersonal = false;
   bool _agreeLocation = false;
-  bool _isNetworkExpanded = false;
+  bool _isNetworkExpanded = true;
 
   // 현재 위저드 단계 (1 ~ 6)
   int _currentStep = 1;
@@ -505,6 +506,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         duration: const Duration(milliseconds: 1000),
       );
       _updateNoticePulseController?.repeat(reverse: true);
+
+      _emptyFieldPulseController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 500),
+      );
+      _emptyFieldPulseController?.repeat(reverse: true);
 
       // Foreground FCM 수신 대기 설정
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -1533,6 +1540,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     _guidePulseController?.dispose();
     _noticePulseController?.dispose();
     _updateNoticePulseController?.dispose();
+    _emptyFieldPulseController?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -1544,11 +1552,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       if (_wentToHotspotSettings) {
         _wentToHotspotSettings = false;
         _checkHotspotStatus();
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted && _ssidFocusNode.canRequestFocus) {
-            _ssidFocusNode.requestFocus();
-          }
-        });
       }
       if (_currentStep == 4) _scanGarminFilesFromDownload();
     }
@@ -3737,18 +3740,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     await prefs.setString(key, value);
   }
 
-  Future<void> _openHotspotSettings() async {
-    if (!_isHotspotOn) {
+  Future<void> _openHotspotSettings({bool skipGuidePopup = false}) async {
+    if (!_isHotspotOn && !skipGuidePopup) {
       bool? goNext = await showDialog<bool>(
         context: context,
         barrierDismissible: true,
         builder: (context) {
           return Dialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
             backgroundColor: const Color(0xFF1E2640),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 20.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -3771,12 +3774,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     ],
                   ),
                   const SizedBox(height: 24),
-                  // const Icon(Icons.privacy_tip_outlined, color: Colors.lightBlueAccent, size: 48),
-                  // const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assert/hotspot_guide_2.png',
+                        fit: BoxFit.fitWidth,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
                   const Text(
-                    '모바일 핫스팟을 켜고,\n본인의 네트워크 이름(SSID)과 비밀번호를\nHealtPort 앱에 입력해주세요!',
+                    '핫스팟 화면에서 네트워크 이름과 비밀번호를\n확인한 후, 앱에 똑같이 입력해 주세요!',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, height: 1.4),
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold, height: 1.4),
                   ),
                   const SizedBox(height: 20),
                   Container(
@@ -3791,9 +3807,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         Icon(Icons.bolt, color: Color(0xFFE5B512), size: 24),
                         SizedBox(width: 12),
                         Expanded(
-                          child: Text(
-                            "빠른 전송을 위해 밴드는\n'5GHz 우선'을 강력 추천합니다!",
-                            style: TextStyle(color: Color(0xFFE5B512), fontSize: 14, fontWeight: FontWeight.bold, height: 1.4),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text.rich(
+                              const TextSpan(
+                                text: "빠른 전송을 위해 밴드는 ",
+                                style: TextStyle(color: Color(0xFFE5B512), fontSize: 14, fontWeight: FontWeight.bold),
+                                children: [
+                                  TextSpan(
+                                    text: "'5GHz 우선'",
+                                    style: TextStyle(
+                                      fontSize: 16, 
+                                      fontWeight: FontWeight.w900, 
+                                      color: Colors.white,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: Colors.white,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: "을 강력 추천합니다!!",
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -4093,95 +4130,95 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                       ),
                       if (_isNetworkExpanded) ...[
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Padding(
-                                    padding: EdgeInsets.only(left: 4, bottom: 4),
-                                    child: Text('네트워크 이름 (SSID)', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                                  ),
-                                  TextFormField(
-                                    controller: _ssidCtrl,
-                                    focusNode: _ssidFocusNode,
-                                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                                    decoration: InputDecoration(
-                                      isDense: true,
-                                      hintText: '본인의 핫스팟 이름 입력',
-                                      hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                      filled: true,
-                                      fillColor: Colors.white.withOpacity(0.04),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                                      suffixIcon: IconButton(
-                                        icon: const Icon(Icons.paste, color: Colors.white54, size: 16),
-                                        onPressed: () async {
-                                          final data = await Clipboard.getData(Clipboard.kTextPlain);
-                                          if (data?.text != null && data!.text!.isNotEmpty) {
-                                            setState(() {
-                                              _ssidCtrl.text = data.text!;
-                                              _hotspotSsid = data.text!;
-                                              _saveHotspotConfig('hotspot_ssid', data.text!);
-                                            });
-                                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${data.text}" 붙여넣기 완료!')));
-                                          }
+                        AnimatedBuilder(
+                          animation: _emptyFieldPulseController!,
+                          builder: (context, child) {
+                            final blinkColor = const Color(0xFF3366FF).withOpacity(0.1 + 0.9 * _emptyFieldPulseController!.value);
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Padding(
+                                        padding: EdgeInsets.only(left: 4, bottom: 4),
+                                        child: Text('네트워크 이름 (SSID)', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                                      ),
+                                      TextFormField(
+                                        controller: _ssidCtrl,
+                                        focusNode: _ssidFocusNode,
+                                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          hintText: '본인의 핫스팟 ID 입력',
+                                          hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                          filled: true,
+                                          fillColor: Colors.white.withOpacity(0.04),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: _ssidCtrl.text.isEmpty
+                                                ? BorderSide(color: blinkColor, width: 3.0)
+                                                : BorderSide.none,
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: const BorderSide(color: Color(0xFF3366FF), width: 1.5),
+                                          ),
+                                        ),
+                                        onChanged: (val) {
+                                          if (_wizardSetState != null) _wizardSetState!((){});
+                                          _hotspotSsid = val;
+                                          _saveHotspotConfig('hotspot_ssid', val);
                                         },
                                       ),
-                                    ),
-                                    onChanged: (val) {
-                                      _hotspotSsid = val;
-                                      _saveHotspotConfig('hotspot_ssid', val);
-                                    },
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Padding(
-                                    padding: EdgeInsets.only(left: 4, bottom: 4),
-                                    child: Text('비밀번호', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                                  ),
-                                  TextFormField(
-                                    controller: _pwdCtrl,
-                                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                                    decoration: InputDecoration(
-                                      isDense: true,
-                                      hintText: '본인의 비밀번호 입력',
-                                      hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                      filled: true,
-                                      fillColor: Colors.white.withOpacity(0.04),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                                      suffixIcon: IconButton(
-                                        icon: const Icon(Icons.paste, color: Colors.white54, size: 16),
-                                        onPressed: () async {
-                                          final data = await Clipboard.getData(Clipboard.kTextPlain);
-                                          if (data?.text != null && data!.text!.isNotEmpty) {
-                                            setState(() {
-                                              _pwdCtrl.text = data.text!;
-                                              _hotspotPwd = data.text!;
-                                              _saveHotspotConfig('hotspot_pwd', data.text!);
-                                            });
-                                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('비밀번호 붙여넣기 완료!')));
-                                          }
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Padding(
+                                        padding: EdgeInsets.only(left: 4, bottom: 4),
+                                        child: Text('비밀번호', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                                      ),
+                                      TextFormField(
+                                        controller: _pwdCtrl,
+                                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          hintText: '본인의 비밀번호 입력',
+                                          hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                          filled: true,
+                                          fillColor: Colors.white.withOpacity(0.04),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: _pwdCtrl.text.isEmpty
+                                                ? BorderSide(color: blinkColor, width: 3.0)
+                                                : BorderSide.none,
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: const BorderSide(color: Color(0xFF3366FF), width: 1.5),
+                                          ),
+                                        ),
+                                        onChanged: (val) {
+                                          if (_wizardSetState != null) _wizardSetState!((){});
+                                          _hotspotPwd = val;
+                                          _saveHotspotConfig('hotspot_pwd', val);
                                         },
                                       ),
-                                    ),
-                                    onChanged: (val) {
-                                      _hotspotPwd = val;
-                                      _saveHotspotConfig('hotspot_pwd', val);
-                                    },
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
+                                ),
+                              ],
+                            );
+                          }
                         ),
                       ],
                     ],
@@ -4193,57 +4230,78 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 const SizedBox(height: 16),
 
                 // Step 2 GlassCard
-                GlassCard(
-                  padding: const EdgeInsets.all(16),
-                  radius: 16,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    GlassCard(
+                      padding: const EdgeInsets.all(16),
+                      radius: 16,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
-                            child: const Text('2', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                                child: const Text('2', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text('워치 연결 시작', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          const Text('워치 연결 시작', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF3366FF),
+                                disabledBackgroundColor: Colors.white12,
+                                disabledForegroundColor: Colors.white38,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: (!_isHotspotOn || _ssidCtrl.text.trim().isEmpty || _pwdCtrl.text.trim().isEmpty) ? null : () async {
+                                final oldFiles = _getSnapshotFiles();
+                                Navigator.pop(ctx);
+                                await Navigator.push(context, MaterialPageRoute(
+                                  builder: (_) => LabWatchSyncScreen(
+                                    autoStart: true,
+                                    initialSyncMode: 'HOTSPOT',
+                                    hotspotSsid: _hotspotSsid ?? 'healthport',
+                                    hotspotPwd: _hotspotPwd ?? '12345678',
+                                  ),
+                                ));
+                                if (_addNewFiles(oldFiles)) {
+                                  _watchLogsAddedToZip = true;
+                                }
+                              },
+                              child: const Text('워치와 연결 시작', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3366FF),
-                            disabledBackgroundColor: Colors.white12,
-                            disabledForegroundColor: Colors.white38,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: !_isHotspotOn ? null : () async {
-                            final oldFiles = _getSnapshotFiles();
-                            Navigator.pop(ctx);
-                            await Navigator.push(context, MaterialPageRoute(
-                              builder: (_) => LabWatchSyncScreen(
-                                autoStart: true,
-                                initialSyncMode: 'HOTSPOT',
-                                hotspotSsid: _hotspotSsid ?? 'healthport',
-                                hotspotPwd: _hotspotPwd ?? '12345678',
-                              ),
-                            ));
-                            if (_addNewFiles(oldFiles)) {
-                              _watchLogsAddedToZip = true;
+                    ),
+                    if (!_isHotspotOn || _ssidCtrl.text.trim().isEmpty || _pwdCtrl.text.trim().isEmpty)
+                      Positioned(
+                        right: 16,
+                        bottom: 56,
+                        child: BouncingTooltip(
+                          text: !_isHotspotOn ? '💡 먼저 핫스팟을 켜주세요' : '💡 ID와 비밀번호를 입력해주세요',
+                          buttonText: !_isHotspotOn ? '핫스팟 켜기' : '입력하기',
+                          onTap: () {
+                            if (!_isHotspotOn) {
+                              _openHotspotSettings(skipGuidePopup: true);
+                            } else {
+                              _ssidFocusNode.requestFocus();
                             }
                           },
-                          child: const Text('워치와 연결 시작', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                       ),
-                    ],
-                  ),
-                ),                
+                  ],
+                ),
               ],
             ),
           );
@@ -6331,6 +6389,86 @@ class _BouncingArrowState extends State<BouncingArrow> with SingleTickerProvider
         );
       },
       child: const Icon(Icons.keyboard_double_arrow_down, color: Colors.white38, size: 30),
+    );
+  }
+}
+
+class BouncingTooltip extends StatefulWidget {
+  final VoidCallback onTap;
+  final String text;
+  final String buttonText;
+  const BouncingTooltip({super.key, required this.onTap, required this.text, required this.buttonText});
+
+  @override
+  State<BouncingTooltip> createState() => _BouncingTooltipState();
+}
+
+class _BouncingTooltipState extends State<BouncingTooltip> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 600))..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0, end: 6).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _animation.value),
+          child: child,
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E2640),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF3366FF).withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            )
+          ]
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.text, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3366FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(widget.buttonText, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  )
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
