@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../services/prefs_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:client/utils/toast_util.dart';
+
 
 class NoticeHistoryScreen extends StatefulWidget {
   final PrefsService prefs;
@@ -206,14 +208,10 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
                     if (await canLaunchUrl(url)) {
                       await launchUrl(url, mode: LaunchMode.externalApplication);
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('링크를 열 수 없습니다: $part')),
-                      );
+                      ToastUtil.showToast(context, '링크를 열 수 없습니다: $part');
                     }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('오류 발생: $e')),
-                    );
+                    ToastUtil.showToast(context, '오류 발생: $e');
                   }
                 },
                 child: Text(
@@ -240,14 +238,7 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
       _deletedIds.add(noticeId);
     });
     widget.prefs.saveDeletedNoticeIds(_deletedIds);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('공지사항이 목록에서 삭제되었습니다.'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    ToastUtil.showToast(context, '공지사항이 목록에서 삭제되었습니다.');
   }
 
   @override

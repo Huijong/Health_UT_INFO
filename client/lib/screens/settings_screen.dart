@@ -14,6 +14,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:client/config/app_config.dart';
 import 'package:client/screens/lab_watch_sync_screen.dart';
 import 'package:client/config/options.dart';
+import 'package:client/utils/toast_util.dart';
+
 
 ThemeData getSettingsTheme(BuildContext context) {
   return ThemeData.dark().copyWith(
@@ -156,11 +158,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await _appChannel.invokeMethod('launchWatchPlayStore');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('워치에서 플레이 스토어가 열렸습니다. 설치를 진행해 주세요.'), backgroundColor: Color(0x26FFFFFF)));
+        ToastUtil.showToast(context, '워치에서 플레이 스토어가 열렸습니다. 설치를 진행해 주세요.');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('워치 호출 실패: $e'), backgroundColor: Colors.redAccent));
+        ToastUtil.showToast(context, '워치 호출 실패: $e');
       }
     }
   }
@@ -216,12 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _name = newName;
             });
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('프로필이 성공적으로 변경되었습니다.'),
-                  backgroundColor: Color(0x26FFFFFF),
-                ),
-              );
+              ToastUtil.showToast(context, '프로필이 성공적으로 변경되었습니다.');
             }
           }
         } catch (e) {
@@ -384,13 +381,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             });
 
                             if (mounted && context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('착용 워치 설정이 저장되었습니다.'),
-                                  backgroundColor: Color(0x26FFFFFF),
-                                  duration: Duration(seconds: 1),
-                                ),
-                              );
+                              ToastUtil.showToast(context, '착용 워치 설정이 저장되었습니다.');
                             }
                           }
                         },
@@ -423,13 +414,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             });
 
                             if (mounted && context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('착용 스트랩 설정이 저장되었습니다.'),
-                                  backgroundColor: Color(0x26FFFFFF),
-                                  duration: Duration(seconds: 1),
-                                ),
-                              );
+                              ToastUtil.showToast(context, '착용 스트랩 설정이 저장되었습니다.');
                             }
                           }
                         },
@@ -681,9 +666,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await launchUrl(Uri.parse(webUrl), mode: LaunchMode.externalApplication);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('스토어 링크를 열 수 없습니다.')),
-          );
+          ToastUtil.showToast(context, '스토어 링크를 열 수 없습니다.');
         }
       }
     }
@@ -994,59 +977,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
     super.dispose();
   }
 
-  void _showToast(String message) {
-    final overlay = Overlay.of(context);
-    final entry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).size.height * 0.45,
-        left: 24,
-        right: 24,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF23293F),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3), width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(entry);
-    Future.delayed(const Duration(seconds: 2), () {
-      entry.remove();
-    });
-  }
+  
 
   void _showEmailActionDialog() {
     showDialog(
@@ -1093,11 +1024,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
                       _emailCtrl.text = email;
                     });
                     if (mounted) {
-                      _showToast('이메일을 성공적으로 가져왔습니다! 저장해주세요!');
+                      ToastUtil.showToast(context, '이메일을 성공적으로 가져왔습니다! 저장해주세요!');
                     }
                   } else {
                     if (mounted) {
-                      _showToast('등록된 구글 계정이 없습니다. 직접 입력해 주세요.');
+                      ToastUtil.showToast(context, '등록된 구글 계정이 없습니다. 직접 입력해 주세요.');
                       setState(() {
                         _isEmailReadOnly = false;
                       });
@@ -1107,7 +1038,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
                 } catch (e) {
                   debugPrint('[getGoogleEmail Error] $e');
                   if (mounted) {
-                    _showToast('이메일을 가져오지 못했습니다. 직접 입력해 주세요.');
+                    ToastUtil.showToast(context, '이메일을 가져오지 못했습니다. 직접 입력해 주세요.');
                     setState(() {
                       _isEmailReadOnly = false;
                     });
@@ -1135,12 +1066,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> with SingleTickerProv
             final res = jsonDecode(response.body);
             if (res['status'] == 'success' && res['exists'] == true) {
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('이미 등록된 닉네임입니다. 다른 닉네임을 입력해 주세요.'),
-                    backgroundColor: Colors.redAccent,
-                  ),
-                );
+                ToastUtil.showToast(context, '이미 등록된 닉네임입니다. 다른 닉네임을 입력해 주세요.');
               }
               return;
             }
@@ -1549,9 +1475,7 @@ class _StrapEditPageState extends State<StrapEditPage> {
     final Uri url = Uri.parse(urlString);
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('링크를 열 수 없습니다: $urlString')),
-        );
+        ToastUtil.showToast(context, '링크를 열 수 없습니다: $urlString');
       }
     }
   }
@@ -1921,12 +1845,7 @@ class _DownloadDialogState extends State<DownloadDialog> {
       final result = await OpenFilex.open(savePath);
       debugPrint('[APK Install] Open file result: ${result.message}');
       if (result.type != ResultType.done && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('설치 관리자를 실행할 수 없습니다: ${result.message}'),
-            backgroundColor: const Color(0xFFFF5252),
-          ),
-        );
+        ToastUtil.showToast(context, '설치 관리자를 실행할 수 없습니다: ${result.message}');
       }
     } catch (e) {
       if (!mounted) return;
@@ -1938,12 +1857,7 @@ class _DownloadDialogState extends State<DownloadDialog> {
         if (e is DioException && e.response?.statusCode == 404) {
           errorMsg = '서버에 설치 파일(APK)이 존재하지 않습니다. (404 에러)';
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: const Color(0xFFFF5252),
-          ),
-        );
+        ToastUtil.showToast(context, errorMsg);
       }
     }
   }
@@ -2153,9 +2067,7 @@ class LabSubScreen extends StatelessWidget {
                         try {
                           await channel.invokeMethod('openHotspotSettings');
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('핫스팟 설정 화면 이동 실패: $e')),
-                          );
+                          ToastUtil.showToast(context, '핫스팟 설정 화면 이동 실패: $e');
                         }
                       },
                     ),
@@ -2168,9 +2080,7 @@ class LabSubScreen extends StatelessWidget {
                         try {
                           await channel.invokeMethod('openSysDump');
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('SysDump 화면 이동 실패: $e')),
-                          );
+                          ToastUtil.showToast(context, 'SysDump 화면 이동 실패: $e');
                         }
                       },
                     ),
@@ -2183,18 +2093,12 @@ class LabSubScreen extends StatelessWidget {
                         try {
                           final bool result = await channel.invokeMethod('openWatchSysDump');
                           if (result) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('워치에 SysDump 호출 요청을 전송했습니다.')),
-                            );
+                            ToastUtil.showToast(context, '워치에 SysDump 호출 요청을 전송했습니다.');
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('페어링된 워치 노드를 찾을 수 없습니다.')),
-                            );
+                            ToastUtil.showToast(context, '페어링된 워치 노드를 찾을 수 없습니다.');
                           }
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('워치 SysDump 호출 실패: $e')),
-                          );
+                          ToastUtil.showToast(context, '워치 SysDump 호출 실패: $e');
                         }
                       },
                     ),
@@ -2207,18 +2111,12 @@ class LabSubScreen extends StatelessWidget {
                         try {
                           final bool result = await channel.invokeMethod('requestWatchWifiJoin');
                           if (result) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('워치에 와이파이 가입 요청을 전송했습니다.')),
-                            );
+                            ToastUtil.showToast(context, '워치에 와이파이 가입 요청을 전송했습니다.');
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('페어링된 워치 노드를 찾을 수 없습니다.')),
-                            );
+                            ToastUtil.showToast(context, '페어링된 워치 노드를 찾을 수 없습니다.');
                           }
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('가입 요청 전송 실패: $e')),
-                          );
+                          ToastUtil.showToast(context, '가입 요청 전송 실패: $e');
                         }
                       },
                     ),
