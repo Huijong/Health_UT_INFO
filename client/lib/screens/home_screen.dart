@@ -33,6 +33,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:confetti/confetti.dart';
+import 'package:client/utils/toast_util.dart';
+
 
 /// Galaxy Watch 드롭다운 선택지 (2단계 전용)
 const List<String> kWatchOptions = [
@@ -302,59 +304,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   String _step6State = 'waiting'; // waiting, sending, success
   DateTime? _shareSheetOpenTime;
 
-  void _showToast(String message) {
-    final overlay = Overlay.of(context);
-    final entry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).size.height * 0.45,
-        left: 24,
-        right: 24,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF23293F),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3), width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(entry);
-    Future.delayed(const Duration(seconds: 2), () {
-      entry.remove();
-    });
-  }
+  
 
   DeviceSession? _session;
   PrefsService? _prefs;
@@ -528,30 +478,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             _sendNoticeAck(noticeId, testerName);
           }
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.notifications_active_rounded, color: Colors.white),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(notification.title ?? '공지사항', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        Text(notification.body ?? '', style: const TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              duration: const Duration(seconds: 4),
-              backgroundColor: const Color(0xFF1429A0).withOpacity(0.9),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
+          ToastUtil.showToast(context, notification.title ?? '공지사항');
         }
       });
 
@@ -900,9 +827,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         await launchUrl(Uri.parse(webUrl), mode: LaunchMode.externalApplication);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('스토어 링크를 열 수 없습니다.')),
-          );
+          ToastUtil.showToast(context, '스토어 링크를 열 수 없습니다.');
         }
       }
     }
@@ -1669,13 +1594,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             
             if (hidePopup) {
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('데이터 제출이 완료되었습니다. 새로운 검증을 시작합니다.'),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
+                ToastUtil.showToast(context, '데이터 제출이 완료되었습니다. 새로운 검증을 시작합니다.');
               }
               return;
             }
@@ -2113,12 +2032,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           _isPackaging = false;
           _currentStep = 5; // 실패 시 다시 5단계로 복귀
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('압축 실패: $e'),
-            backgroundColor: const Color(0xFFFF5252),
-          ),
-        );
+        ToastUtil.showToast(context, '압축 실패: $e');
       }
     }
   }
@@ -2411,12 +2325,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   void _showFileError(String label, Object e) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$label 선택 오류: $e'),
-        backgroundColor: const Color(0xFFFF5252),
-      ),
-    );
+    ToastUtil.showToast(context, '$label 선택 오류: $e');
   }
 
   // ── 빌드 영역 ──────────────────────────────────────────────────
@@ -2763,10 +2672,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                               setState(() {
                                 _emailCtrl.text = email;
                               });
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('이메일을 성공적으로 가져왔습니다!')));
+                              ToastUtil.showToast(context, '이메일을 성공적으로 가져왔습니다!');
                               _checkEmailAndReuse(email);
                             } else {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('등록된 구글 계정이 없습니다. 직접 입력해 주세요.')));
+                              ToastUtil.showToast(context, '등록된 구글 계정이 없습니다. 직접 입력해 주세요.');
                               setState(() {
                                 _isEmailReadOnly = false;
                               });
@@ -2774,7 +2683,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                             }
                           } catch (e) {
                             debugPrint('[getGoogleEmail Error] $e');
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('이메일을 가져오지 못했습니다. 직접 입력해 주세요.')));
+                            ToastUtil.showToast(context, '이메일을 가져오지 못했습니다. 직접 입력해 주세요.');
                             setState(() {
                               _isEmailReadOnly = false;
                             });
@@ -3185,9 +3094,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       final Uri url = Uri.parse(urlString);
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('링크를 열 수 없습니다: $urlString')),
-          );
+          ToastUtil.showToast(context, '링크를 열 수 없습니다: $urlString');
         }
       }
     }
@@ -4009,22 +3916,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       final bool result = await channel.invokeMethod('openWatchSysDump');
       if (result) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('워치에 SysDump 호출 요청을 전송했습니다.')),
-          );
+          ToastUtil.showToast(context, '워치에 SysDump 호출 요청을 전송했습니다.');
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('페어링된 워치 노드를 찾을 수 없습니다.')),
-          );
+          ToastUtil.showToast(context, '페어링된 워치 노드를 찾을 수 없습니다.');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('워치 SysDump 호출 실패: $e')),
-        );
+        ToastUtil.showToast(context, '워치 SysDump 호출 실패: $e');
       }
     }
   }
@@ -5809,7 +5710,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     final distText = _distanceCtrl.text.trim();
                     final parsedDist = double.tryParse(distText) ?? 0.0;
                     if (distText.isEmpty || parsedDist <= 0) {
-                      _showToast('운동 거리를 입력해 주세요 (0보다 커야 합니다)');
+                      ToastUtil.showToast(context, '운동 거리를 입력해 주세요 (0보다 커야 합니다)');
                       _distanceFocusNode.requestFocus();
                       return;
                     }
@@ -5880,18 +5781,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     if (_currentStep == 4) return;
                   } else if (_currentStep == 2) {
                     if (_selectedWatch == '직접입력' && _customWatchCtrl.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('워치 기종명을 입력해 주세요')),
-                      );
+                      ToastUtil.showToast(context, '워치 기종명을 입력해 주세요');
                       return;
                     }
                     _prefs?.saveWatch(_selectedWatch);
                     _prefs?.saveCustomWatch(_customWatchCtrl.text.trim());
                   } else if (_currentStep == 3) {
                     if (_selectedStrap == '직접입력' && _customStrapCtrl.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('스트랩 종류를 입력해 주세요')),
-                      );
+                      ToastUtil.showToast(context, '스트랩 종류를 입력해 주세요');
                       return;
                     }
                     _prefs?.saveStrap(_selectedStrap);
@@ -6149,12 +6046,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     Navigator.pop(context); // Close loading dialog
 
     if (nicknames.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('등록된 닉네임이 없거나 서버 연결에 실패했습니다.'),
-          backgroundColor: Color(0xFFFF5252),
-        ),
-      );
+      ToastUtil.showToast(context, '등록된 닉네임이 없거나 서버 연결에 실패했습니다.');
       return;
     }
 
@@ -6182,64 +6074,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   }
 
   void _showWatchLogCleanupSnackBar() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.cleaning_services_rounded, color: Colors.white, size: 28),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('동기화가 완료되어 기존 로그는 필요가 없습니다.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                      SizedBox(height: 2),
-                      Text('불필요한 기존 로그 삭제를 권장합니다.', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const BouncingArrow(),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  const channel = MethodChannel('com.samsung.health.client/app_info');
-                  try {
-                    await channel.invokeMethod('openWatchSysDump');
-                  } catch (e) {
-                    debugPrint('워치 다이얼러 호출 실패: $e');
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF3366FF),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-                icon: const Icon(Icons.delete_sweep, size: 20),
-                label: const Text('*#9900# (덤프 삭제하러 가기)', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(seconds: 7),
-        backgroundColor: const Color(0xFF3366FF),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        elevation: 8,
-        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
-      ),
-    );
+    ToastUtil.showToast(context, '동기화가 완료되어 기존 로그는 필요가 없습니다.');
   }
 }
 

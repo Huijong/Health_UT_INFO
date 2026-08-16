@@ -9,6 +9,8 @@ import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:client/utils/toast_util.dart';
+
 
 class LabWatchSyncScreen extends StatefulWidget {
   final bool autoStart;
@@ -505,9 +507,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   Future<void> _remoteInstallWatchApp() async {
     try {
       await _appChannel.invokeMethod("launchWatchPlayStore");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("워치 플레이 스토어로 설치 명령을 전송했습니다.")),
-      );
+      ToastUtil.showToast(context, "워치 플레이 스토어로 설치 명령을 전송했습니다.");
     } catch (e) {
       debugPrint("Remote install failed: $e");
     }
@@ -697,28 +697,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   }
 
   void _showSuccessSnackBarAndPop(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_outline, color: Colors.white, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message, 
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(seconds: 2),
-        backgroundColor: const Color(0xFF3366FF),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 8,
-        margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
-      ),
-    );
+    ToastUtil.showToast(context, message);
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) Navigator.pop(context);
     });
