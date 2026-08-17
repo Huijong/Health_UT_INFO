@@ -2374,31 +2374,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         ),
       );
 
-    if (_prefs != null && !_prefs!.consentGiven) {
-      return Theme(
-        data: mainTheme,
-        child: Scaffold(
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF1429A0),
-                  Color(0xFF0A0F24),
-                  Color(0xFF05060C),
-                ],
-                stops: [0.0, 0.6, 1.0],
-              ),
-            ),
-            child: SafeArea(
-              child: _buildConsentView(),
-            ),
-          ),
-        ),
-      );
-    }
-
     return Theme(
       data: mainTheme,
       child: PopScope(
@@ -5771,14 +5746,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                       debugPrint('닉네임 중복 검사 실패: $e');
                     }
 
+                    final newEmail = _emailCtrl.text.trim();
+                    if (_prefs != null && _prefs!.googleEmail != newEmail) {
+                      _prefs!.saveConsentGiven(false);
+                      _prefs!.saveConsentDate('');
+                    }
+                    
                     _prefs?.saveName(nickname);
-                    _prefs?.saveGoogleEmail(_emailCtrl.text.trim());
+                    _prefs?.saveGoogleEmail(newEmail);
                     _updateNotificationTopic(nickname);
                     _sendDevicePing(); // Bind UUID immediately
                     _prefs?.saveHeight(double.tryParse(_heightCtrl.text) ?? 0.0);
                     _prefs?.saveWeight(double.tryParse(_weightCtrl.text) ?? 0.0);
                     
                     if (_currentStep == 4) return;
+                    await _verifyConsentAndProceed();
+                    return;
                   } else if (_currentStep == 2) {
                     if (_selectedWatch == '직접입력' && _customWatchCtrl.text.trim().isEmpty) {
                       ToastUtil.showToast(context, '워치 기종명을 입력해 주세요');
@@ -5823,164 +5806,243 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     return null;
   }
 
-  Widget _buildConsentView() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 20),
-          const Center(
-            child: Icon(Icons.security_rounded, color: Colors.white, size: 48),
-          ),
-          const SizedBox(height: 16),
-          const Center(
-            child: Text(
-              'HealthPort 서비스 동의',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: Text(
-              '서비스 이용을 위해 아래 동의가 필요합니다.',
-              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.6)),
-            ),
-          ),
-          const SizedBox(height: 32),
+  
+  Future<void> _verifyConsentAndProceed() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) return;
+    
+    bool serverHasAgreed = false;
+    try {
+      final emailUrl = Uri.parse('${AppConfig.apiUrl}/api/devices?check_email=${Uri.encodeComponent(email)}');
+      final emailResponse = await http.get(emailUrl);
+      if (emailResponse.statusCode == 200) {
+        final emailRes = jsonDecode(emailResponse.body);
+        if (emailRes['status'] == 'success' && emailRes['has_agreed'] == true) {
+          serverHasAgreed = true;
+        }
+      }
+    } catch (e) {
+      debugPrint('[Consent Check Error] $e');
+    }
 
-          // 1. 개인정보 & 민감정보 동의서
-          const Text(
-            '개인정보 및 민감정보 수집·이용 동의 (필수)',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            height: 120,
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
-            ),
-            child: const SingleChildScrollView(
-              child: Text(
-                '1. 개인정보 수집·이용 동의 (필수)\n'
-                '[HealthPort] 서비스 제공을 위한 개인정보 수집∙이용에 대한 안내입니다.\n\n'
-                '[HealthPort] 은(는) 개인의 운동(달리기, 실외자전거, 트레일 러닝 등) 기록 및 분석 서비스를 제공하며, 이를 위해 아래와 같이 개인정보를 수집∙이용합니다.\n\n'
-                '• 이름 (또는 닉네임): 회원 식별 및 서비스 이용 (보유기간: 회원 탈퇴 시까지)\n'
-                '• 위치정보 (GPS): 운동 경로, 거리, 속도 기록 및 분석 (보유기간: 회원 탈퇴 시까지)\n\n'
-                '※ 위 필수항목 수집·이용에 대한 동의를 거부하실 수 있으나, 이 경우 [HealthPort] 서비스의 핵심 기능 이용이 제한됩니다.\n\n'
-                '2. 민감정보 수집·이용 동의 (필수)\n'
-                '[HealthPort] 서비스는 운동 강도 분석 등 개인 맞춤형 서비스 제공을 위해 아래와 같이 민감정보를 수집∙이용합니다.\n\n'
-                '• 심박수: 운동 중 건강 상태 모니터링 및 운동 강도 분석 (보유기간: 회원 탈퇴 시까지)\n\n'
-                '※ 민감정보는 「개인정보 보호법」에 따라 별도의 동의를 받아야 하며, 동의를 거부하실 경우 운동 강도 분석 등 일부 맞춤형 기능 이용이 제한될 수 있습니다.',
-                style: TextStyle(fontSize: 12, color: Colors.white54, height: 1.5),
+    if (serverHasAgreed || (_prefs != null && _prefs!.consentGiven)) {
+      if (_prefs != null) {
+        final nowStr = DateTime.now().toString().substring(0, 19);
+        await _prefs!.saveConsentGiven(true);
+        if (_prefs!.consentDate.isEmpty) {
+          await _prefs!.saveConsentDate(nowStr);
+        }
+      }
+      setState(() => _currentStep = 2);
+    } else {
+      await _showConsentDialog();
+    }
+  }
+
+    Future<void> _showConsentDialog() async {
+    bool localAgreePersonal = false;
+    bool localAgreeLocation = false;
+    final ScrollController scrollController = ScrollController();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.90,
               ),
-            ),
-          ),
-          CheckboxListTile(
-            title: const Text('위 개인정보 및 민감정보 수집·이용에 동의합니다.', style: TextStyle(fontSize: 12, color: Colors.white70)),
-            value: _agreePersonal,
-            activeColor: const Color(0xFF3366FF),
-            checkColor: Colors.white,
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            onChanged: (val) {
-              setState(() => _agreePersonal = val ?? false);
-            },
-          ),
-          const SizedBox(height: 24),
-
-          // 2. 개인정보 처리방침 동의서
-          const Text(
-            '개인정보 처리방침 (필수)',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            height: 120,
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
-            ),
-            child: const SingleChildScrollView(
-              child: Text(
-                '[HealthPort] 개인정보 처리방침\n\n'
-                '제1조 (개인정보의 처리 목적)\n'
-                '회사는 다음의 목적을 위하여 개인정보를 처리합니다. 처리하고 있는 개인정보는 다음의 목적 이외의 용도로는 이용되지 않으며, 이용 목적이 변경되는 경우에는 「개인정보 보호법」 제18조에 따라 별도의 동의를 받는 등 필요한 조치를 이행할 예정입니다.\n'
-                '- 서비스 제공: 운동 기록(경로, 거리, 속도, 심박수 등) 저장, 통계, 분석 데이터 제공 등 서비스 제공과 관련된 목적으로 개인정보를 처리합니다.\n'
-                '- 회원 관리: 회원제 서비스 이용에 따른 본인 확인, 개인 식별, 불량회원의 부정 이용 방지와 비인가 사용 방지, 분쟁 조정을 위한 기록 보존 등을 목적으로 개인정보를 처리합니다.\n\n'
-                '제2조 (처리하는 개인정보의 항목 및 보유 기간)\n'
-                '회사는 법령에 따른 개인정보 보유·이용기간 또는 정보주체로부터 개인정보를 수집 시에 동의받은 개인정보 보유·이용기간 내에서 개인정보를 처리·보유합니다.\n'
-                '- 수집항목: 이름(또는 닉네임), 위치정보(GPS), 심박수\n'
-                '- 보유기간: 회원 탈퇴 시까지. (단, 관계 법령 위반에 따른 수사·조사 등이 진행 중인 경우에는 해당 수사·조사 종료 시까지)\n\n'
-                '제3조 (개인정보의 제3자 제공)\n'
-                '회사는 정보주체의 개인정보를 제1조(개인정보의 처리 목적)에서 명시한 범위 내에서만 처리하며, 원칙적으로 정보주체의 동의 없이 외부에 제공하지 않습니다.\n\n'
-                '제4조 (개인정보처리의 위탁)\n'
-                '회사는 원활한 개인정보 업무처리를 위하여 다음과 같이 개인정보 처리업무를 위탁할 수 있습니다.\n'
-                '- 위탁받는 자 (수탁자): 자체 서버\n'
-                '- 위탁하는 업무의 내용: 서비스 제공을 위한 데이터 저장 및 시스템 운영\n\n'
-                '제5조 (정보주체와 법정대리인의 권리·의무 및 그 행사방법)\n'
-                '이용자는 개인정보주체로서 언제든지 개인정보 열람, 정정, 삭제, 처리정지 요구 등의 권리를 행사할 수 있습니다.\n\n'
-                '제6조 (개인정보의 파기)\n'
-                '회사는 개인정보 보유기간의 경과, 처리목적 달성 등 개인정보가 불필요하게 되었을 때에는 지체없이 해당 개인정보를 파기합니다.\n\n'
-                '제7조 (개인정보의 안전성 확보 조치)\n'
-                '회사는 개인정보의 안전성 확보를 위해 기술적/관리적 및 물리적 조치를 하고 있습니다.\n\n'
-                '제8조 (개인정보 보호책임자)\n'
-                '- 성명: 유희종\n'
-                '- 직책: 과장\n'
-                '- 연락처: yhj2222@gmail.com\n\n'
-                '부칙\n'
-                '이 개인정보 처리방침은 2026년 7월 14일부터 적용됩니다.',
-                style: TextStyle(fontSize: 12, color: Colors.white54, height: 1.5),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E2640),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-            ),
-          ),
-          CheckboxListTile(
-            title: const Text('위 개인정보 처리방침에 동의합니다.', style: TextStyle(fontSize: 12, color: Colors.white70)),
-            value: _agreeLocation,
-            activeColor: const Color(0xFF3366FF),
-            checkColor: Colors.white,
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            onChanged: (val) {
-              setState(() => _agreeLocation = val ?? false);
-            },
-          ),
-          const SizedBox(height: 40),
-
-          // 동의 완료 버튼
-          ElevatedButton(
-            onPressed: (_agreePersonal && _agreeLocation)
-                ? () async {
-                    if (_prefs == null) return;
-                    final nowStr = DateTime.now().toString().substring(0, 19); // YYYY-MM-DD HH:MM:SS
-                    await _prefs!.saveConsentGiven(true);
-                    await _prefs!.saveConsentDate(nowStr);
-                    setState(() {});
-                    // _checkDeviceUuidAndPrompt(); // 불필요해진 UUID 기반 복원 팝업 주석 처리
-                  }
-                : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3366FF),
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: Colors.white.withOpacity(0.12),
-              disabledForegroundColor: Colors.white38,
-              minimumSize: const Size.fromHeight(54),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-            child: const Text(
-              '동의하고 시작하기',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-          ),
-        ],
-      ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  const Center(
+                    child: Icon(Icons.security_rounded, color: Colors.white, size: 36),
+                  ),
+                  const SizedBox(height: 8),
+                  const Center(
+                    child: Text(
+                      'HealthPort 서비스 동의',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Center(
+                    child: Text(
+                      '서비스 이용을 위해 아래 동의가 필요합니다.',
+                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. 개인정보 & 민감정보 동의서
+                          const Text(
+                            '개인정보 및 민감정보 수집·이용 동의 (필수)',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white70),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            height: 150,
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.04),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white.withOpacity(0.08)),
+                            ),
+                            child: const SingleChildScrollView(
+                              child: Text(
+                                '1. 개인정보 수집·이용 동의 (필수)\n'
+                                '[HealthPort] 서비스 제공을 위한 개인정보 수집∙이용에 대한 안내입니다.\n\n'
+                                '[HealthPort] 은(는) 개인의 운동(달리기, 실외자전거, 트레일 러닝 등) 기록 및 분석 서비스를 제공하며, 이를 위해 아래와 같이 개인정보를 수집∙이용합니다.\n\n'
+                                '• 이름 (또는 닉네임): 회원 식별 및 서비스 이용 (보유기간: 회원 탈퇴 시까지)\n'
+                                '• 위치정보 (GPS): 운동 경로, 거리, 속도 기록 및 분석 (보유기간: 회원 탈퇴 시까지)\n\n'
+                                '※ 위 필수항목 수집·이용에 대한 동의를 거부하실 수 있으나, 이 경우 [HealthPort] 서비스의 핵심 기능 이용이 제한됩니다.\n\n'
+                                '2. 민감정보 수집·이용 동의 (필수)\n'
+                                '[HealthPort] 서비스는 운동 강도 분석 등 개인 맞춤형 서비스 제공을 위해 아래와 같이 민감정보를 수집∙이용합니다.\n\n'
+                                '• 심박수: 운동 중 건강 상태 모니터링 및 운동 강도 분석 (보유기간: 회원 탈퇴 시까지)\n\n'
+                                '※ 민감정보는 「개인정보 보호법」에 따라 별도의 동의를 받아야 하며, 동의를 거부하실 경우 운동 강도 분석 등 일부 맞춤형 기능 이용이 제한될 수 있습니다.',
+                                style: TextStyle(fontSize: 11, color: Colors.white54, height: 1.4),
+                              ),
+                            ),
+                          ),
+                          CheckboxListTile(
+                            title: const Text('위 개인정보 및 민감정보 수집·이용에 동의합니다.', style: TextStyle(fontSize: 12, color: Colors.white70)),
+                            value: localAgreePersonal,
+                            activeColor: const Color(0xFF3366FF),
+                            checkColor: Colors.white,
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            onChanged: (val) {
+                              setModalState(() => localAgreePersonal = val ?? false);
+                              if (val == true) {
+                                Future.delayed(const Duration(milliseconds: 100), () {
+                                  if (scrollController.hasClients) {
+                                    scrollController.animateTo(
+                                      scrollController.position.maxScrollExtent,
+                                      duration: const Duration(milliseconds: 300),
+                                      curve: Curves.easeOut,
+                                    );
+                                  }
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                
+                          // 2. 개인정보 처리방침 동의서
+                          const Text(
+                            '개인정보 처리방침 (필수)',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white70),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            height: 150,
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.04),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white.withOpacity(0.08)),
+                            ),
+                            child: const SingleChildScrollView(
+                              child: Text(
+                                '[HealthPort] 개인정보 처리방침\n\n'
+                                '제1조 (개인정보의 처리 목적)\n'
+                                '회사는 다음의 목적을 위하여 개인정보를 처리합니다. 처리하고 있는 개인정보는 다음의 목적 이외의 용도로는 이용되지 않으며, 이용 목적이 변경되는 경우에는 「개인정보 보호법」 제18조에 따라 별도의 동의를 받는 등 필요한 조치를 이행할 예정입니다.\n'
+                                '- 서비스 제공: 운동 기록(경로, 거리, 속도, 심박수 등) 저장, 통계, 분석 데이터 제공 등 서비스 제공과 관련된 목적으로 개인정보를 처리합니다.\n'
+                                '- 회원 관리: 회원제 서비스 이용에 따른 본인 확인, 개인 식별, 불량회원의 부정 이용 방지와 비인가 사용 방지, 분쟁 조정을 위한 기록 보존 등을 목적으로 개인정보를 처리합니다.\n\n'
+                                '제2조 (처리하는 개인정보의 항목 및 보유 기간)\n'
+                                '회사는 법령에 따른 개인정보 보유·이용기간 또는 정보주체로부터 개인정보를 수집 시에 동의받은 개인정보 보유·이용기간 내에서 개인정보를 처리·보유합니다.\n'
+                                '- 수집항목: 이름(또는 닉네임), 위치정보(GPS), 심박수\n'
+                                '- 보유기간: 회원 탈퇴 시까지. (단, 관계 법령 위반에 따른 수사·조사 등이 진행 중인 경우에는 해당 수사·조사 종료 시까지)\n\n'
+                                '제3조 (개인정보의 제3자 제공)\n'
+                                '회사는 정보주체의 개인정보를 제1조(개인정보의 처리 목적)에서 명시한 범위 내에서만 처리하며, 원칙적으로 정보주체의 동의 없이 외부에 제공하지 않습니다.\n\n'
+                                '제4조 (개인정보처리의 위탁)\n'
+                                '회사는 원활한 개인정보 업무처리를 위하여 다음과 같이 개인정보 처리업무를 위탁할 수 있습니다.\n'
+                                '- 위탁받는 자 (수탁자): 자체 서버\n'
+                                '- 위탁하는 업무의 내용: 서비스 제공을 위한 데이터 저장 및 시스템 운영\n\n'
+                                '제5조 (정보주체와 법정대리인의 권리·의무 및 그 행사방법)\n'
+                                '이용자는 개인정보주체로서 언제든지 개인정보 열람, 정정, 삭제, 처리정지 요구 등의 권리를 행사할 수 있습니다.\n\n'
+                                '제6조 (개인정보의 파기)\n'
+                                '회사는 개인정보 보유기간의 경과, 처리목적 달성 등 개인정보가 불필요하게 되었을 때에는 지체없이 해당 개인정보를 파기합니다.\n\n'
+                                '제7조 (개인정보의 안전성 확보 조치)\n'
+                                '회사는 개인정보의 안전성 확보를 위해 기술적/관리적 및 물리적 조치를 하고 있습니다.\n\n'
+                                '제8조 (개인정보 보호책임자)\n'
+                                '- 성명: 유희종\n'
+                                '- 직책: 과장\n'
+                                '- 연락처: yhj2222@gmail.com\n\n'
+                                '부칙\n'
+                                '이 개인정보 처리방침은 2026년 7월 14일부터 적용됩니다.',
+                                style: TextStyle(fontSize: 11, color: Colors.white54, height: 1.4),
+                              ),
+                            ),
+                          ),
+                          CheckboxListTile(
+                            title: const Text('위 개인정보 처리방침에 동의합니다.', style: TextStyle(fontSize: 12, color: Colors.white70)),
+                            value: localAgreeLocation,
+                            activeColor: const Color(0xFF3366FF),
+                            checkColor: Colors.white,
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            onChanged: (val) {
+                              setModalState(() => localAgreeLocation = val ?? false);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: (localAgreePersonal && localAgreeLocation)
+                        ? () async {
+                            if (_prefs == null) return;
+                            final nowStr = DateTime.now().toString().substring(0, 19);
+                            await _prefs!.saveConsentGiven(true);
+                            await _prefs!.saveConsentDate(nowStr);
+                            Navigator.pop(ctx);
+                            setState(() {
+                              _currentStep = 2;
+                            });
+                          }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3366FF),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.white.withOpacity(0.12),
+                      disabledForegroundColor: Colors.white38,
+                      minimumSize: const Size.fromHeight(50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text(
+                      '동의하고 다음 단계로',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ),
+                  SizedBox(height: MediaQuery.of(ctx).padding.bottom + 8),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
