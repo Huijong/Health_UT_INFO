@@ -1586,7 +1586,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         Future.delayed(const Duration(seconds: 1), () async {
           if (mounted) {
             _watchLogsAddedToZip = false; // Reset the flag unconditionally
-            
             _resetVerification();
             
             final prefs = await SharedPreferences.getInstance();
@@ -1600,38 +1599,90 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             }
             
             bool dontShowAgain = false;
+            int? myRank;
             
-            final List<Map<String, String>> praiseList = [
-              {'msg': '테스터님 덕분에 워치가 한층 더 똑똑해졌습니다! 😎', 'emoji': '🎉'},
-              {'msg': '이 데이터, 삼성이 아주 귀하게 쓰겠습니다! 🏆', 'emoji': '🏆'},
-              {'msg': '오늘도 완벽한 데이터를 낚으셨군요! 대어입니다 🎣', 'emoji': '🎣'},
-              {'msg': '휴먼, 당신의 노고에 시스템이 감동의 눈물을 흘립니다. 🤖💦', 'emoji': '🤖'},
-              {'msg': '갓벽한 데이터 제출! 당신이 바로 이 구역의 에이스 ✨', 'emoji': '✨'},
-              {'msg': '오늘도 칼퇴를 향한 위대한 한 걸음! 🏃‍♂️💨', 'emoji': '🏃‍♂️'},
-              {'msg': '데이터 제출 완료! 이제 커피 한 잔의 여유를 즐기세요 ☕', 'emoji': '☕'},
-              {'msg': '이 데이터만 제출하면 퇴근 시간이 5분 앞당겨진다는 소문이...? 👀', 'emoji': '👀'},
-              {'msg': '버그는 줄이고! 퇴근은 당기고! 오늘도 수고하셨습니다 🏠', 'emoji': '🏠'},
-              {'msg': '데이터도 완벽, 타이밍도 완벽! 완벽한 하루네요 👍', 'emoji': '👍'},
-              {'msg': '테스터님의 땀방울이 담긴 소중한 데이터 획득 완료! 💓', 'emoji': '💓'},
-              {'msg': '워치: "주인님 수고하셨습니다. 저도 조금만 쉴게요" ⌚💤', 'emoji': '⌚'},
-              {'msg': '최고의 데이터입니다! 혹시 태릉선수촌에서 오셨나요? 🥇', 'emoji': '🥇'},
-              {'msg': '칼로리는 태우고, 데이터는 남기고! 완벽한 테스팅 🔥', 'emoji': '🔥'},
-              {'msg': '워치가 당신의 체력을 존경하기 시작했습니다. 👏', 'emoji': '👏'},
-              {'msg': '데이터 전송 속도 무엇...? ⚡ 플래시인 줄 알았습니다!', 'emoji': '⚡'},
-              {'msg': '성공! 너무 완벽해서 개발자가 기립 박수를 치고 있습니다 👨‍💻', 'emoji': '👨‍💻'},
-              {'msg': '축하합니다! 오늘 제출하신 데이터 중 가장 아름다운 데이터입니다 🌸', 'emoji': '🌸'},
-              {'msg': '데이터 요정님이 성공적으로 파일을 물어갔습니다! 🧚‍♂️', 'emoji': '🧚‍♂️'},
-              {'msg': '(시스템 메시지) : 테스터님의 노고에 깊은 감사를 표합니다. 띠링-! 💡', 'emoji': '💡'},
-            ];
-            final randomItem = praiseList[Random().nextInt(praiseList.length)];
-            final _randomMsg = randomItem['msg']!;
-            final _randomEmoji = randomItem['emoji']!;
+            // Fetch real-time rank
+            try {
+              final now = DateTime.now();
+              final monthStr = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+              final rankUrl = Uri.parse('${AppConfig.apiUrl}/api/devices?rankings=true&month=$monthStr&tester_name=${Uri.encodeComponent(prefs.getString('name') ?? '')}');
+              final response = await http.get(rankUrl).timeout(const Duration(seconds: 3));
+              if (response.statusCode == 200) {
+                final res = jsonDecode(response.body);
+                if (res['status'] == 'success') {
+                  myRank = res['data']['meta']['my_rank'];
+                }
+              }
+            } catch (e) {
+              debugPrint('[Rank Fetch Error] $e');
+            }
+            
+            String _randomMsg = '제출 완료! 오늘 하루도 고생 많으셨습니다 👏';
+            String _randomEmoji = '🎉';
+            
+            final Random rand = Random();
+            if (myRank == 1) {
+              final msgs = [
+                {'msg': '👑 전 우주 1등! 외계인도 당신의 데이터를 탐냅니다!', 'emoji': '👑'},
+                {'msg': '🥇 1위의 공기는 좀 다를까요? 완벽 그 자체입니다!', 'emoji': '🥇'},
+                {'msg': '전설의 레전드 등극! 뒤에서 2위가 매섭게 쫓아오고 있어요!', 'emoji': '🔥'},
+                {'msg': '왕관의 무게를 견디는 자! 데이터의 신입니다.', 'emoji': '👑'},
+                {'msg': '더 이상 올라갈 곳이 없네요. 완벽한 1위입니다!', 'emoji': '💯'},
+              ];
+              final item = msgs[rand.nextInt(msgs.length)];
+              _randomMsg = item['msg']!;
+              _randomEmoji = item['emoji']!;
+            } else if (myRank != null && myRank <= 3) {
+              final msgs = [
+                {'msg': '🥇 메달권 진입! 1등의 숨결이 느껴지는 거리입니다.', 'emoji': '🥈'},
+                {'msg': '은빛, 동빛 찬란한 당신의 데이터! 1위가 코앞이에요.', 'emoji': '✨'},
+                {'msg': '시상대의 공기를 만끽하세요! 훌륭한 순위입니다.', 'emoji': '🏆'},
+                {'msg': 'TOP 3 달성! 멈추지 않는 열정에 박수를 보냅니다.', 'emoji': '👏'},
+                {'msg': '거의 다 왔어요! 다음 제출로 1위를 노려볼까요?', 'emoji': '🎯'},
+              ];
+              final item = msgs[rand.nextInt(msgs.length)];
+              _randomMsg = '현재 $myRank위! ' + item['msg']!;
+              _randomEmoji = item['emoji']!;
+            } else if (myRank != null && myRank <= 10) {
+              final msgs = [
+                {'msg': '🔥 TOP 10! 상위 1%의 미친 열정! 조금만 더 쥐어짜볼까요?', 'emoji': '🔥'},
+                {'msg': '이 구역의 데이터 수집기! 순위권이 코앞입니다.', 'emoji': '🔋'},
+                {'msg': '한 단계만 더! 어제보다 강해진 당신의 순위입니다.', 'emoji': '📈'},
+                {'msg': '대단한 끈기입니다! TOP 3 진입을 응원합니다.', 'emoji': '🏃‍♂️'},
+                {'msg': '당신의 기록이 상위권을 뒤흔들고 있어요!', 'emoji': '🌪️'},
+              ];
+              final item = msgs[rand.nextInt(msgs.length)];
+              _randomMsg = '현재 $myRank위! ' + item['msg']!;
+              _randomEmoji = item['emoji']!;
+            } else if (myRank != null && myRank <= 50) {
+              final msgs = [
+                {'msg': '🏃‍♂️ 달리는 인간 백과사전! 데이터가 쌓일수록 랭킹도 쑥쑥!', 'emoji': '📚'},
+                {'msg': '폭풍 성장 중! 매일매일 랭킹이 쑥쑥 오르고 있어요.', 'emoji': '🌪️'},
+                {'msg': '지치지 않는 체력! 조만간 TOP 10에서 뵙겠습니다.', 'emoji': '💪'},
+                {'msg': '데이터가 쌓일수록 당신의 가치도 올라갑니다 🚀', 'emoji': '🚀'},
+                {'msg': '좋은 페이스입니다! 멈추지 말고 계속 달려주세요!', 'emoji': '⏱️'},
+              ];
+              final item = msgs[rand.nextInt(msgs.length)];
+              _randomMsg = '현재 $myRank위! ' + item['msg']!;
+              _randomEmoji = item['emoji']!;
+            } else {
+              final msgs = [
+                {'msg': '🌱 위대한 여정의 시작! 오늘의 땀방울이 내일의 순위를 바꿉니다.', 'emoji': '🌱'},
+                {'msg': '아직 보여줄 게 많잖아요? 숨겨둔 에너지를 폭발시켜 보세요!', 'emoji': '💥'},
+                {'msg': '한 걸음씩 꾸준하게! 조용히 순위표를 등반해 봅시다.', 'emoji': '🧗‍♂️'},
+                {'msg': '시작이 반! 꾸준함이 모여 기적을 만듭니다.', 'emoji': '✨'},
+                {'msg': '오늘의 제출이 내일의 레전드를 만듭니다!', 'emoji': '🌟'},
+              ];
+              final item = msgs[rand.nextInt(msgs.length)];
+              _randomMsg = (myRank != null ? '현재 $myRank위! ' : '') + item['msg']!;
+              _randomEmoji = item['emoji']!;
+            }
             
             showDialog(
               context: context,
               barrierDismissible: false,
               builder: (ctx) => StatefulBuilder(
-                builder: (context, setState) => AlertDialog(
+                builder: (context, setDialogState) => AlertDialog(
                 backgroundColor: const Color(0xFF1E2640),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 title: Row(
@@ -1651,85 +1702,146 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 ),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     const SizedBox(height: 10),
-                    Center(child: BouncingEmojiWidget(emoji: _randomEmoji)),
+                    BouncingEmojiWidget(emoji: _randomEmoji),
                     const SizedBox(height: 20),
                     Text(
                       _randomMsg,
                       style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold, height: 1.4),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      '원활한 다음 검증을 위해 워치의 잔여 용량을 미리 확보해 주시기를 권장합니다.\n번거로우시겠지만 워치에서 아래 항목을 실행해 주세요.',
-                      style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 32),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.black26,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orangeAccent.withOpacity(0.5)),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withOpacity(0.08)),
                       ),
-                      child: const Text(
-                        'Watch > *#9900# > DELETE DUMPSTATE',
-                        style: TextStyle(color: Colors.orangeAccent, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                        textAlign: TextAlign.center,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.cleaning_services_rounded, color: Colors.amberAccent, size: 20),
+                              const SizedBox(width: 8),
+                              const Text('워치 저장공간 비우기 (권장)', style: TextStyle(color: Colors.amberAccent, fontSize: 14, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            '제출된 데이터는 워치에서 지워주셔야\n빠르게 로그를 전송할 수 있습니다.',
+                            style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '① 아래 버튼 클릭 ➡️ ② *#9900# 입력\n➡️ ③ DELETE DUMPSTATE 클릭!',
+                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, height: 1.5),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
                 actions: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      InkWell(
-                        onTap: () {
-                          setState(() {
-                            dontShowAgain = !dontShowAgain;
-                          });
-                        },
-                        child: Row(
+                      // 말풍선 애니메이션
+                      BouncingWidget(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Icon(
-                              dontShowAgain ? Icons.check_box : Icons.check_box_outline_blank,
-                              color: dontShowAgain ? Colors.blueAccent : Colors.white54,
-                              size: 20,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.amberAccent,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 4, offset: const Offset(0, 2))
+                                ],
+                              ),
+                              child: const Text(
+                                '👇 클릭하고 워치 확인!',
+                                style: TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
                             ),
-                            const SizedBox(width: 8),
-                            const Text('다시 보지 않기', style: TextStyle(color: Colors.white70, fontSize: 13, letterSpacing: -0.5)),
+                            // 꼬리 부분
+                            Padding(
+                              padding: const EdgeInsets.only(right: 32),
+                              child: Transform.translate(
+                                offset: const Offset(0, -4),
+                                child: Transform.rotate(
+                                  angle: 3.141592 / 4,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    color: Colors.amberAccent,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3366FF),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      // 체크박스와 버튼
+                      Transform.translate(
+                        offset: const Offset(0, -8), // 꼬리가 버튼에 살짝 겹치도록 위로 당김
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                setDialogState(() {
+                                  dontShowAgain = !dontShowAgain;
+                                });
+                              },
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    dontShowAgain ? Icons.check_box : Icons.check_box_outline_blank,
+                                    color: dontShowAgain ? Colors.blueAccent : Colors.white54,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('다시 보지 않기', style: TextStyle(color: Colors.white70, fontSize: 13, letterSpacing: -0.5)),
+                                ],
+                              ),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF3366FF),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () async {
+                                if (dontShowAgain) prefs.setBool('hide_log_cleanup_popup', true);
+                                Navigator.pop(ctx);
+                                const channel = MethodChannel('com.samsung.health.client/app_info');
+                                try {
+                                  await channel.invokeMethod('openWatchSysDump');
+                                } catch (e) {
+                                  debugPrint('워치 다이얼러 호출 실패: $e');
+                                }
+                              },
+                              child: const Text('로그 삭제하러 가기', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            ),
+                          ],
                         ),
-                        onPressed: () async {
-                          if (dontShowAgain) prefs.setBool('hide_log_cleanup_popup', true);
-                          Navigator.pop(ctx);
-                          const channel = MethodChannel('com.samsung.health.client/app_info');
-                          try {
-                            await channel.invokeMethod('openWatchSysDump');
-                          } catch (e) {
-                            debugPrint('워치 다이얼러 호출 실패: $e');
-                          }
-                        },
-                        child: const Text('로그 삭제하러 가기', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
                     ],
                   ),
                 ],
-              ),
-            ),
+              )),
             );
           }
         });
@@ -6672,6 +6784,52 @@ class _BouncingEmojiWidgetState extends State<BouncingEmojiWidget> with SingleTi
         widget.emoji,
         style: const TextStyle(fontSize: 48),
       ),
+    );
+  }
+}
+
+class BouncingWidget extends StatefulWidget {
+  final Widget child;
+  const BouncingWidget({Key? key, required this.child}) : super(key: key);
+
+  @override
+  State<BouncingWidget> createState() => _BouncingWidgetState();
+}
+
+class _BouncingWidgetState extends State<BouncingWidget> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.0, end: -6.0).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutSine,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _animation.value),
+          child: child,
+        );
+      },
+      child: widget.child,
     );
   }
 }
