@@ -538,11 +538,17 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         _addLog("Waiting for WearOS Data Layer to initialize...");
         await Future.delayed(const Duration(milliseconds: 1500));
         
-        _addLog("Sending Wi-Fi Join Request to watch for SSID: ${widget.hotspotSsid}...");
-        await _appChannel.invokeMethod("requestWatchWifiJoin", {
-          "ssid": widget.hotspotSsid,
-          "pwd": widget.hotspotPwd,
-        });
+        // 2번째 자동 동기화 시 이미 워치가 백그라운드에서 연결을 완료했을 수 있으므로,
+        // 연결이 완료된 상태라면 와이파이 조인 요청을 보내지 않음 (워치의 네트워크 재설정 및 통신 끊김 방지)
+        if (_connectedEndpointId == null && mounted) {
+          _addLog("Sending Wi-Fi Join Request to watch for SSID: ${widget.hotspotSsid}...");
+          await _appChannel.invokeMethod("requestWatchWifiJoin", {
+            "ssid": widget.hotspotSsid,
+            "pwd": widget.hotspotPwd,
+          });
+        } else {
+          _addLog("Watch already connected. Skipping Wi-Fi Join Request.");
+        }
       }
       
       if (_syncMode == 'BT') {
