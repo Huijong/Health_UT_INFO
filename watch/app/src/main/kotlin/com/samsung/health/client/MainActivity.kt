@@ -164,11 +164,9 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
                 action = "ACTION_TRIGGER_WIFI_JOIN"
                 intent?.extras?.let { putExtras(it) }
             }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
-        }
+        // 서비스가 이미 실행 중이므로, startForegroundService 대신 startService를 호출하여
+        // ForegroundService 시작 후 5초 내 startForeground 미호출로 인한 강제 종료(Crash)를 방지합니다.
+        startService(serviceIntent)
         wifiJoinPending = false
     }
 
