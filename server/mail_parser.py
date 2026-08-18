@@ -193,7 +193,24 @@ def fetch_and_parse_emails():
                         # 1. Determine base exercise points
                         exercise_name = parsed_data.get("exercise", "").strip()
                         is_hiking = "하이킹" in exercise_name or "Hiking" in exercise_name
-                        base_points = 3.0 if is_hiking else 1.0
+                        
+                        # Group A: Walking, Running, Hiking
+                        is_group_a = any(k in exercise_name for k in ["걷기", "달리기", "러닝", "하이킹", "Hiking", "Walk", "Run"])
+                        # Group B: Cycling
+                        is_group_b = any(k in exercise_name for k in ["자전거", "사이클", "Cycling", "Bike"])
+                        
+                        received_date = parsed_data.get("received_at", "")
+                        apply_new_policy = received_date >= "2026-09-01"
+                        
+                        if apply_new_policy:
+                            if is_hiking:
+                                base_points = 3.0
+                            elif is_group_a or is_group_b:
+                                base_points = 0.0
+                            else:
+                                base_points = 1.0
+                        else:
+                            base_points = 3.0 if is_hiking else 1.0
 
                         # 2. Parse and round distance
                         dist_val = 0.0

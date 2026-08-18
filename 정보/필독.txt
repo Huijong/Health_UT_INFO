@@ -1,0 +1,60 @@
+D:\HealthApp_V1-main\HealthApp_V1-main>uvicorn main:app --host 127.0.0.1 --port 8000
+
+cloudflared tunnel run --protocol http2 --cred-file "C:\Users\user\.cloudflared\c6765f9d-7d98-4a4a-8416-fd9d78ce59ce.json" health-server
+
+
+
+간단 설치
+
+1. docker로 설치
+
+docker가 커버가 다 안된다...ㅡㅡ 삽질 시작
+
+1. python 12 수동 설치
+
+2. git에서 코드 다운로드
+
+3. MongoDB Compass 설치
+
+지금부터 까다로운 작업
+- MongoDB 설치 및 엔진 가동 (가장 까다로운 부분 성공!)
+
+- FastAPI 서버 환경 구축 (Firebase 초기화까지 완벽!)
+
+- 서버-DB 연동 확인 (health_db 생성 완료!)
+
+- 사내 보안망을 뚫는 터널 설정 (HTTP/2 프로토콜 적용!)
+
+
+※ 터널 작업
+삭제
+cloudflared tunnel delete health-server
+
+추가
+cloudflared tunnel create health-server
+
+실행
+1. cloudflared tunnel run --cred-file "C:\Users\user\.cloudflared\[새로생긴ID].json" health-server
+
+2. cloudflared tunnel run health-server
+
+
+
+3. https://dash.cloudflare.com/359d23ca26a537ea52ad3131f759673a/home/overview 에서 도메인 ( health-port.work ) 확인
+
+4. health-port.work라는 이름의 표지판이 다른 곳을 가리키고 있어서, 새 터널을 등록할 수 없다"는 뜻입니다. 예전 PC 설정이나 아까 테스트하면서 만들어진 옛날 레코드가 길막~!~!
+
+이건 명령어로 안 될 때가 많아서, 클라우드플레어 웹사이트(대시보드)에서 수동으로 슥삭 지워주는 게 제일 빠름
+
+Cloudflare 대시보드 > health-port.work 클릭
+
+왼쪽 메뉴에서 [DNS] -> [Records]를 클릭합니다.
+
+목록에서 이름이 health-port.work인 항목을 찾으세요. (아마 Type이 A나 CNAME일 겁니다.)
+
+그 줄 우측에 있는 [Edit] -> [Delete]를 눌러 과감하게 삭제하세요!
+
+그리고 cmd에서
+cloudflared tunnel route dns health-server health-port.work
+
+5. 메인화면 > Networking > Tunnuls > health-server 상태 초록색인거 확인
