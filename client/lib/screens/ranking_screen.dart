@@ -15,7 +15,7 @@ class RankingScreen extends StatefulWidget {
   State<RankingScreen> createState() => _RankingScreenState();
 }
 
-class _RankingScreenState extends State<RankingScreen> with SingleTickerProviderStateMixin {
+class _RankingScreenState extends State<RankingScreen> with TickerProviderStateMixin {
   late List<String> _months;
   late String _selectedMonth;
   bool _isLoading = true;
@@ -28,6 +28,9 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
 
+  late AnimationController _bounceController;
+  late Animation<double> _bounceAnimation;
+
   @override
   void initState() {
     super.initState();
@@ -37,6 +40,14 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
       curve: Curves.easeInOut,
     ));
     _glowController.repeat(reverse: true);
+
+    _bounceController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _bounceAnimation = Tween<double>(begin: 0.0, end: 6.0).animate(CurvedAnimation(
+      parent: _bounceController,
+      curve: Curves.easeInOut,
+    ));
+    _bounceController.repeat(reverse: true);
+
     _isMyRankHidden = widget.prefs.hideMyRank;
     _months = _getRecentMonths();
     _selectedMonth = _months.first;
@@ -62,6 +73,7 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
   @override
   void dispose() {
     _glowController.dispose();
+    _bounceController.dispose();
     super.dispose();
   }
 
@@ -153,10 +165,6 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                           _buildSummaryBoard(),
                           const SizedBox(height: 12),
                           
-                          // 내 랭킹 하이라이트 카드
-                          _buildMyRankHighlightCard(),
-                          const SizedBox(height: 16),
-                          
                           // 랭킹 리스트 타이틀 및 포디움 / 목록
                           if (_rankings.isEmpty) ...[
                             const Padding(
@@ -195,19 +203,28 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
                                   ),
                                 ),
                               ),
-                              ...List.generate(_rankings.length - 3, (index) {
-                                final actualIndex = index + 3;
-                                final item = _rankings[actualIndex];
+                              ..._rankings.sublist(3).asMap().entries.map((entry) {
+                                final actualIndex = entry.key + 3;
+                                final item = entry.value;
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: _buildRankingItem(item, actualIndex),
                                 );
                               }),
-                            ], // if length > 3 닫기
-                          ], // else 블록 닫기
-                        ], // ListView children 닫기
+                            ],
+                          ],
+                        ],
                       ),
                     ),
+        ),
+        
+        // 하단 고정 내 랭킹 하이라이트 카드 (네비게이션 바 위)
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            child: _buildMyRankHighlightCard(),
+          ),
         ),
       ],
     );
@@ -585,206 +602,144 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
 
   Widget _buildMyRankHighlightCard() {
     final myRank = _meta['my_rank'];
-    final myCount = _meta['my_count'] ?? 0;
-    final mySubmissions = _meta['my_submissions'] ?? 0;
-    final nextRank = _meta['next_rank'];
+    if (myRank == null) return const SizedBox.shrink();
 
     final myName = widget.prefs.name.trim();
-
-    if (myRank == null) {
-      return Container();
-    }
-
-    String medalEmoji = '';
-    if (myRank == 1) medalEmoji = '🥇';
-    else if (myRank == 2) medalEmoji = '🥈';
-    else if (myRank == 3) medalEmoji = '🥉';
-
-    String rankText = medalEmoji.isNotEmpty ? '$medalEmoji 공동 $myRank위' : '$myRank위';
     
-    String motivationText = '';
-    if (myRank == 1) {
-      motivationText = '대단합니다! 명예로운 1위 자리를 굳건히 지키고 있습니다! 🏆';
-    } else if (nextRank != null) {
-      final aboveName = nextRank['tester_name'] ?? '상위 랭커';
-      final diff = nextRank['diff'] ?? 0;
-      final aboveRank = nextRank['rank'] ?? 1;
-      
-      String targetMedal = '';
-      if (aboveRank == 1) targetMedal = '🥇';
-      else if (aboveRank == 2) targetMedal = '🥈';
-      else if (aboveRank == 3) targetMedal = '🥉';
+    // Find the item in rankings to reuse standard list formatting (change, exact points)
+    final myItem = _rankings.firstWhere(
+      (item) => item['tester_name'] == myName, 
+      orElse: () => <String, dynamic>{}
+    );
 
-      final rankName = targetMedal.isNotEmpty ? '$targetMedal $aboveRank위' : '$aboveRank위';
-      motivationText = '$myName님은 현재 공동 $myRank위입니다. $rankName ($aboveName님)까지 앞으로 단 ${_formatPoints(diff)}포인트 남았습니다! 조금만 더 힘내세요! 🔥';
+    final change = myItem['change'] ?? '-';
+    final points = myItem['points'] ?? _meta['my_count'] ?? 0;
+    final submissions = myItem['submissions'] ?? _meta['my_submissions'] ?? 0;
+
+    // 랭킹 숫자를 크게 (일반 아이템 대비 약 10~20% 더 큼)
+    Widget rankWidget;
+    if (myRank == 1) {
+      rankWidget = const Text('🥇', style: TextStyle(fontSize: 28));
+    } else if (myRank == 2) {
+      rankWidget = const Text('🥈', style: TextStyle(fontSize: 28));
+    } else if (myRank == 3) {
+      rankWidget = const Text('🥉', style: TextStyle(fontSize: 28));
     } else {
-      motivationText = '첫 제출을 완료하셨네요! 상위 랭킹을 향해 조금 더 도전해 보세요! 🚀';
+      rankWidget = Container(
+        width: 32,
+        alignment: Alignment.center,
+        child: Text(
+          '$myRank',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+      );
     }
 
-    return GestureDetector(
-      onTap: () => _showTesterHistory(myName),
-      child: Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF3366FF).withOpacity(0.35),
-            const Color(0xFF1429A0).withOpacity(0.1),
-            const Color(0xFF3366FF).withOpacity(0.05),
-          ],
+    // 일반 리스트와 동일한 증감 UI
+    Widget changeWidget;
+    if (change == 'new') {
+      changeWidget = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+        decoration: BoxDecoration(
+          color: const Color(0xFF3366FF).withOpacity(0.2),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.4), width: 0.8),
         ),
-        border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF3366FF).withOpacity(0.1),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+        child: const Text(
+          'NEW',
+          style: TextStyle(color: Color(0xFF5E8BFF), fontSize: 9, fontWeight: FontWeight.bold),
+        ),
+      );
+    } else if (change.toString().startsWith('+')) {
+      changeWidget = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.arrow_drop_up_rounded, color: Color(0xFF10B981), size: 18),
+          Text(
+            change.toString().substring(1),
+            style: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold),
           )
         ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      );
+    } else if (change.toString().startsWith('-') && change != '0') {
+      changeWidget = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFFEF4444), size: 18),
+          Text(
+            change.toString().substring(1),
+            style: const TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold),
+          )
+        ],
+      );
+    } else {
+      changeWidget = const Text(
+        '-',
+        style: TextStyle(color: Colors.white30, fontSize: 13),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _bounceAnimation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, -_bounceAnimation.value),
+          child: child,
+        );
+      },
+      child: GestureDetector(
+        onTap: () => _showTesterHistory(myName),
+        child: Container(
+          // 둥둥 떠다니는 말풍선 느낌을 위한 그림자와 둥근 테두리
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E2020),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.6), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF3366FF).withOpacity(0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              rankWidget,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          '$myName님의 랭킹',
-                          style: const TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(width: 8),
-                        Stack(
-                          clipBehavior: Clip.none,
-                          alignment: Alignment.center,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _isMyRankHidden = !_isMyRankHidden;
-                                  widget.prefs.saveHideMyRank(_isMyRankHidden);
-                                  if (!widget.prefs.hasClickedHideRank) {
-                                    widget.prefs.saveHasClickedHideRank(true);
-                                  }
-                                });
-                              },
-                              child: Icon(
-                                _isMyRankHidden ? Icons.visibility_off : Icons.visibility,
-                                size: 18,
-                                color: Colors.white54,
-                              ),
-                            ),
-                            if (!widget.prefs.hasClickedHideRank)
-                              Positioned(
-                                bottom: 24,
-                                child: AnimatedBuilder(
-                                  animation: _glowAnimation,
-                                  builder: (context, child) {
-                                    return Transform.translate(
-                                      offset: Offset(0, -(_glowAnimation.value * 5)),
-                                      child: child,
-                                    );
-                                  },
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF3366FF),
-                                          borderRadius: BorderRadius.circular(12),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: const Color(0xFF3366FF).withOpacity(0.3),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ],
-                                        ),
-                                        child: const Text(
-                                          '클릭해서 랭킹 숨기기',
-                                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                      Transform.translate(
-                                        offset: const Offset(0, -4),
-                                        child: Transform.rotate(
-                                          angle: 0.785398, // 45 degrees
-                                          child: Container(
-                                            width: 8,
-                                            height: 8,
-                                            color: const Color(0xFF3366FF),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    if (!_isMyRankHidden) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        rankText,
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                    Text(
+                      myName,
+                      style: const TextStyle(
+                        fontSize: 16.5, // 기존 15에서 10% 증가
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 10),
+                    changeWidget,
                   ],
                 ),
-                if (!_isMyRankHidden)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF3366FF).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF3366FF).withOpacity(0.3)),
-                    ),
-                    child: Text(
-                      '${_formatPoints(myCount)}포인트 ($mySubmissions건)',
-                      style: const TextStyle(
-                        color: Color(0xFF3366FF),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            if (_isMyRankHidden) ...[
-              const SizedBox(height: 16),
-              const Center(
-                child: Text(
-                  '나의 랭킹 숨김 상태입니다.',
-                  style: TextStyle(color: Colors.white54, fontSize: 13),
-                ),
               ),
-            ],
-            if (!_isMyRankHidden) ...[
-              const SizedBox(height: 14),
-              Divider(color: Colors.white.withOpacity(0.1), height: 1),
-              const SizedBox(height: 14),
               Text(
-                motivationText,
+                '$submissions건 / ${_formatPoints(points)}포인트',
                 style: const TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 15.5, // 기존 14에서 10% 증가
+                  fontWeight: FontWeight.bold,
                   color: Colors.white70,
-                  height: 1.5,
                 ),
               ),
             ],
-          ],
+          ),
         ),
       ),
       ),
@@ -810,32 +765,16 @@ class _RankingScreenState extends State<RankingScreen> with SingleTickerProvider
             ),
           ),
         ),
-        _GlassCard(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(0.0, -0.1),
-                radius: 1.2,
-                colors: [
-                  const Color(0xFFFFD700).withOpacity(0.25), // 찬란한 황금빛 코어
-                  const Color(0xFFFDD835).withOpacity(0.08), // 퍼져나가는 옐로우 골드
-                  Colors.transparent,
-                ],
-                stops: const [0.0, 0.5, 1.0],
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.only(top: 64, bottom: 16, left: 12, right: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _buildPodiumColumn(rank2, 2, 45, rank1Item: rank1, rank2Item: rank2, rank3Item: rank3),
-                  _buildPodiumColumn(rank1, 1, 70, rank1Item: rank1, rank2Item: rank2, rank3Item: rank3),
-                  _buildPodiumColumn(rank3, 3, 35, rank1Item: rank1, rank2Item: rank2, rank3Item: rank3),
-                ],
-              ),
-            ),
+        Padding(
+          padding: const EdgeInsets.only(top: 40, bottom: 24, left: 0, right: 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildPodiumColumn(rank2, 2, 38, rank1Item: rank1, rank2Item: rank2, rank3Item: rank3),
+              _buildPodiumColumn(rank1, 1, 55, rank1Item: rank1, rank2Item: rank2, rank3Item: rank3),
+              _buildPodiumColumn(rank3, 3, 30, rank1Item: rank1, rank2Item: rank2, rank3Item: rank3),
+            ],
           ),
         ),
       ],
