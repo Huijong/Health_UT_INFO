@@ -1628,6 +1628,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 {'msg': '전설의 레전드 등극! 뒤에서 2위가 매섭게 쫓아오고 있어요!', 'emoji': '🔥'},
                 {'msg': '왕관의 무게를 견디는 자! 데이터의 신입니다.', 'emoji': '👑'},
                 {'msg': '더 이상 올라갈 곳이 없네요. 완벽한 1위입니다!', 'emoji': '💯'},
+                {'msg': '타의 추종을 불허하는 압도적 1위! 폼 미쳤다!', 'emoji': '⭐'},
               ];
               final item = msgs[rand.nextInt(msgs.length)];
               _randomMsg = item['msg']!;
@@ -1639,6 +1640,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 {'msg': '시상대의 공기를 만끽하세요! 훌륭한 순위입니다.', 'emoji': '🏆'},
                 {'msg': 'TOP 3 달성! 멈추지 않는 열정에 박수를 보냅니다.', 'emoji': '👏'},
                 {'msg': '거의 다 왔어요! 다음 제출로 1위를 노려볼까요?', 'emoji': '🎯'},
+                {'msg': '포디움 입성 축하드려요! 조금만 더 엑셀을 밟아주세요!', 'emoji': '🚀'},
               ];
               final item = msgs[rand.nextInt(msgs.length)];
               _randomMsg = '현재 $myRank위! ' + item['msg']!;
@@ -1650,6 +1652,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 {'msg': '한 단계만 더! 어제보다 강해진 당신의 순위입니다.', 'emoji': '📈'},
                 {'msg': '대단한 끈기입니다! TOP 3 진입을 응원합니다.', 'emoji': '🏃‍♂️'},
                 {'msg': '당신의 기록이 상위권을 뒤흔들고 있어요!', 'emoji': '🌪️'},
+                {'msg': '폭발적인 스퍼트! 순위표가 당신 덕분에 요동칩니다.', 'emoji': '⚡'},
               ];
               final item = msgs[rand.nextInt(msgs.length)];
               _randomMsg = '현재 $myRank위! ' + item['msg']!;
@@ -1661,6 +1664,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 {'msg': '지치지 않는 체력! 조만간 TOP 10에서 뵙겠습니다.', 'emoji': '💪'},
                 {'msg': '데이터가 쌓일수록 당신의 가치도 올라갑니다 🚀', 'emoji': '🚀'},
                 {'msg': '좋은 페이스입니다! 멈추지 말고 계속 달려주세요!', 'emoji': '⏱️'},
+                {'msg': '무서운 기세로 치고 올라가는 중! 랭커들이 긴장하고 있어요.', 'emoji': '🔥'},
               ];
               final item = msgs[rand.nextInt(msgs.length)];
               _randomMsg = '현재 $myRank위! ' + item['msg']!;
@@ -1672,6 +1676,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 {'msg': '한 걸음씩 꾸준하게! 조용히 순위표를 등반해 봅시다.', 'emoji': '🧗‍♂️'},
                 {'msg': '시작이 반! 꾸준함이 모여 기적을 만듭니다.', 'emoji': '✨'},
                 {'msg': '오늘의 제출이 내일의 레전드를 만듭니다!', 'emoji': '🌟'},
+                {'msg': '천리길도 한 걸음부터! 당신의 첫 데이터가 세상을 바꿀지도 몰라요.', 'emoji': '🐾'},
               ];
               final item = msgs[rand.nextInt(msgs.length)];
               _randomMsg = (myRank != null ? '현재 $myRank위! ' : '') + item['msg']!;
