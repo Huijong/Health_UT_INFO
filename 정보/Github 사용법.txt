@@ -1,0 +1,25 @@
+1. 수정 사항 추가
+D:\Health_UT\Health_UT_INFO> git add .
+
+2. Comment 추가
+D:\Health_UT\Health_UT_INFO> git commit -m "최신"
+
+3. Summit
+D:\Health_UT\Health_UT_INFO> git push -u origin dev   
+
+
+
+1. Revert
+Github > 수정 CL 선택 > Revert
+
+
+
+
+1. Github > Local PC 동기화
+D:\Health_UT\Health_UT_INFO> git pull origin main    
+
+
+1. commit 취소 후 수정 코드 모두 삭제
+D:\Health_UT\Health_UT_INFO> git reset --hard HEAD~1
+
+
