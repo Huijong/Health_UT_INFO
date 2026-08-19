@@ -19,7 +19,7 @@ Github > 수정 CL 선택 > Revert
 D:\Health_UT\Health_UT_INFO> git pull origin main    
 
 
-1. commit 취소 후 수정 코드 모두 삭제
-D:\Health_UT\Health_UT_INFO> git reset --hard HEAD~1
+1. commit 취소 후 수
+D:\Health_UT\Health_UT_INFO> 
 
 
