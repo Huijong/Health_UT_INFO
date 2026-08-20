@@ -272,6 +272,30 @@ class MainActivity : FlutterActivity() {
             super.onActivityResult(requestCode, resultCode, data)
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("SYNC_COMPLETE", false) == true) {
+            intent.removeExtra("SYNC_COMPLETE") // Consume it
+            
+            val manager = getSystemService(android.app.NotificationManager::class.java)
+            manager.cancel(1)
+
+            flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                MethodChannel(messenger, CHANNEL).invokeMethod("onSyncCompleteNotificationTapped", null)
+            }
+        }
+    }
+
     private fun writeClientLog(msg: String) {
         android.util.Log.d("HP_ClientMain", msg)
         try {

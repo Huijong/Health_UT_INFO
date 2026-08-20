@@ -5,6 +5,7 @@
     android:versionName="1.101" >
 
     <uses-sdk
+        android:maxSdkVersion="29"
         android:minSdkVersion="29"
         android:targetSdkVersion="29" />
 

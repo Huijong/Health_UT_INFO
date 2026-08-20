@@ -50,8 +50,12 @@ class ToastUtil {
     overlayState.insert(entry);
 
     Future.delayed(const Duration(seconds: 2), () {
-      if (entry.mounted) {
-        entry.remove();
+      try {
+        if (entry.mounted) {
+          entry.remove();
+        }
+      } catch (e) {
+        // ignore
       }
     });
   }

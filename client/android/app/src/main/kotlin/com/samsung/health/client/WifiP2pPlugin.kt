@@ -65,6 +65,13 @@ class WifiP2pPlugin(private val context: Context) {
                     result.success(true)
                 }
                 "stopServer"          -> { stopServer();  result.success(true) }
+                "updateNotification"  -> { 
+                    val message = call.argument<String>("message") ?: ""
+                    val progress = call.argument<Int>("progress") ?: -1
+                    val isComplete = call.argument<Boolean>("isComplete") ?: false
+                    updateNotification(message, progress, isComplete)
+                    result.success(true) 
+                }
                 "requestFileList"     -> { sendSocketLine("GET_FILE_LIST"); result.success(true) }
                 "requestFileDownload" -> {
                     val fn = call.argument<String>("filename")
@@ -92,6 +99,14 @@ class WifiP2pPlugin(private val context: Context) {
 
         val ip = getActiveIpAddress()
         Log.d(TAG, "Starting server in mode: $mode. Active IP: $ip")
+
+        // Start Foreground Service to keep app alive
+        val intent = android.content.Intent(context, SyncForegroundService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
 
         // 1. Start TCP ServerSocket
         startTcpServerThread()
@@ -195,6 +210,11 @@ class WifiP2pPlugin(private val context: Context) {
 
     private fun stopServer() {
         isServerRunning = false
+        
+        // Stop Foreground Service
+        val intent = android.content.Intent(context, SyncForegroundService::class.java)
+        context.stopService(intent)
+
         closeClientSocket()
         try { serverSocket?.close() } catch (_: Exception) {}
         serverSocket = null
@@ -202,6 +222,15 @@ class WifiP2pPlugin(private val context: Context) {
         hotspotReservation?.close()
         hotspotReservation = null
         sendEvent("connectionStateChanged", mapOf("connected" to false))
+    }
+
+    private fun updateNotification(message: String, progress: Int, isComplete: Boolean) {
+        val intent = android.content.Intent(context, SyncForegroundService::class.java).apply {
+            action = if (isComplete) SyncForegroundService.ACTION_COMPLETE_SYNC else SyncForegroundService.ACTION_UPDATE_PROGRESS
+            putExtra("message", message)
+            putExtra("progress", progress)
+        }
+        context.startService(intent)
     }
 
     // ────────────────────────────────────────────────────────────────

@@ -14,12 +14,10 @@ Github > 수정 CL 선택 > Revert
 
 
 
-
 1. Github > Local PC 동기화
 D:\Health_UT\Health_UT_INFO> git pull origin main    
 
 
-1. commit 취소 후 수
-D:\Health_UT\Health_UT_INFO> 
 
-
+1. 수정된 파일들을 마지막 커밋 상태로 되돌림
+D:\Health_UT\Health_UT_INFO>  git restore .

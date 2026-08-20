@@ -37,6 +37,11 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
   // List of files fetched from watch
   int _autoSyncStage = 0; // 0: 대기, 1: 연결 중, 2: COLA 수신 중, 3: Log 수신 중, 4: 압축 최적화, 5: 완료
+  
+  // Notification Throttle states
+  int _lastNotificationProg = -1;
+  int _lastNotificationTimeMs = 0;
+  int _lastSyncStage = -1;
   double _syncProgress = 0.0;
   int? _syncStartTimeMs;
   int _syncTransferredBytes = 0;
@@ -44,6 +49,8 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   String? _targetColaFilename;
   String? _targetLogFilename;
   bool _autoDeleteWatchFiles = true;
+
+  final Set<String> _downloadedFiles = {};
 
   bool _isWatchAppInstalled = true; // Default to true
 
@@ -230,7 +237,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
           setState(() {
             _connectedEndpointId = null;
             _connectedEndpointName = null;
-            _autoSyncStage = 0;
+            if (_autoSyncStage <= 1) {
+              _autoSyncStage = 0;
+            }
           });
         }
         break;
@@ -270,7 +279,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
           }
         } catch (e) {
           _addLog("JSON Parse error: $e");
-          setState(() => _autoSyncStage = 0);
+          setState(() {
+            if (_autoSyncStage <= 1) _autoSyncStage = 0;
+          });
         }
         break;
 
@@ -286,6 +297,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         
         setState(() {
           _syncProgress = progress;
+        });
+        _updateNativeNotification();
+        setState(() {
           if (transferred != null) _syncTransferredBytes = transferred;
           if (total != null) _syncTotalBytes = total;
           _syncStartTimeMs ??= DateTime.now().millisecondsSinceEpoch;
@@ -297,6 +311,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         final filename = completeMap["filename"] as String;
         final tempPath = completeMap["path"] as String;
         _addLog("Download finished for $filename.");
+        _downloadedFiles.add(filename);
         _moveToColaFolder(filename, tempPath).then((_) {
           _startNextAutoSyncPhase();
         });
@@ -306,12 +321,15 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         final failMap = Map<String, dynamic>.from(data);
         final error = failMap["error"] as String? ?? "Unknown error";
         _addLog("Download failed: $error");
-        setState(() => _autoSyncStage = 0);
+        setState(() {
+          if (_autoSyncStage <= 1) _autoSyncStage = 0;
+        });
         break;
 
       case "deleteWatchFilesOk":
         _addLog("워치 내부 잔여 파일 삭제 완료!");
         setState(() => _autoSyncStage = 6);
+        _updateNativeNotification(isComplete: true);
         if (mounted) {
           _showSuccessSnackBarAndPop('워치 동기화 및 잔여 파일 삭제가 모두 완료되었습니다!');
         }
@@ -524,8 +542,12 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   }
 
   void _startDiscovery() async {
+    _downloadedFiles.clear();
     setState(() {
       _isSearching = true;
+      if (_autoSyncStage <= 1) {
+        _autoSyncStage = 0;
+      }
     });
     _radarController?.repeat();
 
@@ -600,20 +622,67 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     }
   }
 
+  void _updateNativeNotification({bool isComplete = false}) {
+    String msg = "워치와 통신 중입니다...";
+    int prog = -1;
+    if (!isComplete) {
+      if (_autoSyncStage == 1) {
+        msg = "워치 연결 및 패키지 요청 중...";
+      } else if (_autoSyncStage == 2) {
+        msg = "COLA 데이터 수신 중...";
+        prog = (_syncProgress * 100).toInt();
+      } else if (_autoSyncStage == 3) {
+        msg = "Log 데이터 수신 중...";
+        prog = (_syncProgress * 100).toInt();
+      } else if (_autoSyncStage == 4) {
+        msg = "폰 단말 최적화 압축 진행 중...";
+      } else if (_autoSyncStage == 5) {
+        msg = "잔여 파일 정리 중...";
+      }
+    } else {
+      msg = "동기화 성공! 탭하여 검증 파일 및 디테일 등록 화면으로 이동하세요.";
+    }
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    
+    // Throttle progress updates: skip if percentage hasn't changed and stage is the same.
+    if (!isComplete && _autoSyncStage == _lastSyncStage) {
+      if (prog == _lastNotificationProg) {
+        return; 
+      }
+      // Also prevent updates faster than every 200ms
+      if (now - _lastNotificationTimeMs < 200 && prog != 0 && prog != 100) {
+        return;
+      }
+    }
+
+    _lastSyncStage = _autoSyncStage;
+    _lastNotificationProg = prog;
+    _lastNotificationTimeMs = now;
+
+    _wifiP2pChannel.invokeMethod("updateNotification", {
+      "message": msg,
+      "progress": prog,
+      "isComplete": isComplete,
+    });
+  }
+
   void _startNextAutoSyncPhase() {
-    if (_autoSyncStage <= 1 && _targetColaFilename != null) {
+    if (_targetColaFilename != null && !_downloadedFiles.contains(_targetColaFilename!)) {
       setState(() {
         _autoSyncStage = 2;
         _syncProgress = 0.0;
         _syncStartTimeMs = null;
       });
+      _updateNativeNotification();
       _requestDownload(_targetColaFilename!);
-    } else if (_autoSyncStage <= 2 && _targetLogFilename != null) {
+    } else if (_targetLogFilename != null && !_downloadedFiles.contains(_targetLogFilename!)) {
       setState(() {
         _autoSyncStage = 3;
         _syncProgress = 0.0;
         _syncStartTimeMs = null;
       });
+      _updateNativeNotification();
       _requestDownload(_targetLogFilename!);
     } else {
       _recompressDownloadedFiles();
@@ -622,6 +691,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
   Future<void> _recompressDownloadedFiles() async {
     setState(() => _autoSyncStage = 4);
+    _updateNativeNotification();
     final targetFolder = "/sdcard/Documents/COLA_FILE/";
     
     try {
@@ -643,8 +713,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       _deleteWatchFiles();
     } else {
       setState(() => _autoSyncStage = 6);
+      _updateNativeNotification(isComplete: true);
       if (mounted) {
-        _showSuccessSnackBarAndPop('워치 동기화가 완료되었습니다! (워치 잔여 파일 유지)');
+        _showSuccessSnackBarAndPop('동기화가 완료되었습니다! (잔여 파일 삭제 안함 설정됨)');
       }
     }
   }
@@ -703,7 +774,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   }
 
   void _showSuccessSnackBarAndPop(String message) {
-    ToastUtil.showToast(context, message);
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      ToastUtil.showToast(context, message);
+    }
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) Navigator.pop(context);
     });
@@ -711,6 +784,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
   void _deleteWatchFiles() {
     setState(() => _autoSyncStage = 5);
+    _updateNativeNotification();
     _addLog("Requesting watch to delete sync files...");
     try {
       _wifiP2pChannel.invokeMethod("deleteWatchFiles");
