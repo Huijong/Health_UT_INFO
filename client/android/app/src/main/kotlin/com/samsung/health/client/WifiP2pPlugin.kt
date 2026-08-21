@@ -69,7 +69,8 @@ class WifiP2pPlugin(private val context: Context) {
                     val message = call.argument<String>("message") ?: ""
                     val progress = call.argument<Int>("progress") ?: -1
                     val isComplete = call.argument<Boolean>("isComplete") ?: false
-                    updateNotification(message, progress, isComplete)
+                    val isResumed = call.argument<Boolean>("isResumed") ?: false
+                    updateNotification(message, progress, isComplete, isResumed)
                     result.success(true) 
                 }
                 "requestFileList"     -> { sendSocketLine("GET_FILE_LIST"); result.success(true) }
@@ -224,11 +225,12 @@ class WifiP2pPlugin(private val context: Context) {
         sendEvent("connectionStateChanged", mapOf("connected" to false))
     }
 
-    private fun updateNotification(message: String, progress: Int, isComplete: Boolean) {
+    private fun updateNotification(message: String, progress: Int, isComplete: Boolean, isResumed: Boolean) {
         val intent = android.content.Intent(context, SyncForegroundService::class.java).apply {
             action = if (isComplete) SyncForegroundService.ACTION_COMPLETE_SYNC else SyncForegroundService.ACTION_UPDATE_PROGRESS
             putExtra("message", message)
             putExtra("progress", progress)
+            putExtra("isResumed", isResumed)
         }
         context.startService(intent)
     }

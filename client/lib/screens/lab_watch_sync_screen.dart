@@ -664,6 +664,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       "message": msg,
       "progress": prog,
       "isComplete": isComplete,
+      "isResumed": WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
     });
   }
 
