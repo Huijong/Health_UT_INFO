@@ -24,7 +24,6 @@ import '../services/share_service.dart';
 import '../services/email_service.dart';
 import '../widgets/custom_file_picker.dart';
 import '../widgets/attached_file_tile.dart';
-import '../widgets/auto_scroll_text.dart';
 import 'settings_screen.dart';
 import 'location_picker_screen.dart';
 import 'notice_history_screen.dart';
@@ -5070,7 +5069,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: _fitFiles.isNotEmpty
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _fitFiles.map((f) => AutoScrollText(text: f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
+                                children: _fitFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
                               )
                             : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
                       ),
@@ -5089,7 +5088,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: _garminFiles.isNotEmpty
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _garminFiles.map((f) => AutoScrollText(text: f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
+                                children: _garminFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
                               )
                             : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
                       ),
@@ -5108,7 +5107,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: _colaFiles.isNotEmpty
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _colaFiles.map((f) => AutoScrollText(text: f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
+                                children: _colaFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
                               )
                             : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
                       ),
@@ -5127,7 +5126,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: _logFiles.isNotEmpty
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _logFiles.map((f) => AutoScrollText(text: f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
+                                children: _logFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
                               )
                             : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
                       ),
@@ -5146,7 +5145,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: _captureFiles.isNotEmpty
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _captureFiles.map((f) => AutoScrollText(text: f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
+                                children: _captureFiles.map((f) => Text(f.name, style: const TextStyle(color: Colors.white70, fontSize: 12))).toList(),
                               )
                             : const Text('첨부 안됨', style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
                       ),
