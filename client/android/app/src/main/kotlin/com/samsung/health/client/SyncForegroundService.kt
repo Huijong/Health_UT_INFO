@@ -24,6 +24,7 @@ class SyncForegroundService : Service() {
         val action = intent?.action ?: ACTION_START_SYNC
         val message = intent?.getStringExtra("message") ?: "백그라운드에서 데이터를 수신하고 있습니다."
         val progress = intent?.getIntExtra("progress", -1) ?: -1
+        val isResumed = intent?.getBooleanExtra("isResumed", false) ?: false
         val isComplete = (action == ACTION_COMPLETE_SYNC)
 
         val mainIntent = Intent(this, MainActivity::class.java).apply {
@@ -62,11 +63,20 @@ class SyncForegroundService : Service() {
 
         if (isComplete) {
             val manager = getSystemService(NotificationManager::class.java)
-            manager.notify(1, notification)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_DETACH)
+            if (isResumed) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    stopForeground(true)
+                }
+                manager.cancel(1)
             } else {
-                stopForeground(false)
+                manager.notify(1, notification)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_DETACH)
+                } else {
+                    stopForeground(false)
+                }
             }
             stopSelf()
         } else {
