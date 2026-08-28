@@ -304,7 +304,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   String? _emailError;
   String _step6State = 'waiting'; // waiting, sending, success
   DateTime? _shareSheetOpenTime;
-
+  late TabController _deviceTabController;
   
 
   DeviceSession? _session;
@@ -314,6 +314,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   @override
   void initState() {
     super.initState();
+    _deviceTabController = TabController(length: 2, vsync: this);
+    _deviceTabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadHotspotConfig();
     WidgetsBinding.instance.addObserver(this);
     _confettiController = ConfettiController(duration: const Duration(seconds: 3));
@@ -1457,6 +1461,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   @override
   void dispose() {
+    _deviceTabController.dispose();
     _confettiController.dispose();
     _customCompetitorCtrl.removeListener(_saveSportDetails);
     _customTrainingCtrl.removeListener(_saveSportDetails);
@@ -2401,30 +2406,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     }
   }
 
-  Future<void> _pickLog() async {
+  Future<void> _pickLog({String? initialDirectory}) async {
     if (_fileBusy) return;
     setState(() => _fileBusy = true);
     try {
       final f = await CustomFilePicker.showPicker(
         context: context,
-        title: '단말 Log 파일 선택',
-        directoryPath: '/sdcard/Documents/COLA_FILE',
-        prefixFilters: ['COLA_FILE', 'log_'],
+        title: initialDirectory != null ? 'Log(Sensorlog 포함) 파일 선택' : '단말 Log 파일 선택',
+        directoryPath: initialDirectory ?? '/sdcard/Documents/COLA_FILE',
+        prefixFilters: initialDirectory != null ? null : ['COLA_FILE', 'log_', 'GearLog'],
         priorityPrefix: 'log_',
+        allowMultiple: true,
         onFreeSelect: () => FileService.pickLog(),
       );
       if (f != null && mounted) {
-        final pathStr = f is File ? f.path : f.originalPath;
-        final fileName = pathStr.split('/').last.split('\\').last;
-        if (!fileName.toLowerCase().startsWith('log_')) {
-          _showFileError('단말 Log 파일', '선택한 파일이 log_로 시작하는 zip 파일이 아닙니다.');
-          return;
-        }
-        if (f is File) {
-          final stat = f.statSync();
-          setState(() => _logFiles.add(AttachedFile(originalPath: f.path, name: fileName, sizeBytes: stat.size, type: AttachType.log)));
-        } else {
-          setState(() => _logFiles.add(f));
+        final List<dynamic> items = f is List ? f : [f];
+        for (final item in items) {
+          final pathStr = item is File ? item.path : (item as AttachedFile).originalPath;
+          final fileName = pathStr.split('/').last.split('\\').last;
+          
+          // Watch 탭인 경우(initialDirectory == null)에만 log_ 접두어 검사
+          if (initialDirectory == null && !fileName.toLowerCase().startsWith('log_')) {
+            _showFileError('단말 Log 파일', '선택한 파일($fileName)이 log_로 시작하는 zip 파일이 아닙니다.');
+            continue;
+          }
+          
+          if (item is File) {
+            final stat = item.statSync();
+            setState(() => _logFiles.add(AttachedFile(originalPath: item.path, name: fileName, sizeBytes: stat.size, type: AttachType.log)));
+          } else {
+            setState(() => _logFiles.add(item));
+          }
         }
       }
     } catch (e) {
@@ -4483,7 +4495,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Step 3 Header removed
+          // TabBar
+          Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TabBar(
+              controller: _deviceTabController,
+              indicator: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFF3366FF),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white54,
+              tabs: const [
+                Tab(text: 'Watch'),
+                Tab(text: 'Band'),
+              ],
+            ),
+          ),
           
           // --- SECTION 1: 자사 운동 데이터 ---
           Container(
@@ -4508,7 +4542,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           _buildAttachCard(icon: Icons.watch, title: '1. 자사 FIT 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickFit, files: _fitFiles),
           const SizedBox(height: 12),
           
-          // 2. 워치 COLA / Log 파일 동기화
+          if (_deviceTabController.index == 0) ...[
+            // 2. 워치 COLA / Log 파일 동기화
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -4723,7 +4758,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           const SizedBox(height: 12),
           _buildAttachCard(icon: Icons.article_outlined, title: '4. 단말 Log 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickLog, files: _logFiles),
           const SizedBox(height: 12),
-          _buildCaptureAttachCard(), // 5. 캡처 이미지
+          _buildCaptureAttachCard(title: '5. 캡처 이미지'), // 5. 캡처 이미지
+          ] else ...[
+            _buildAttachCard(
+              icon: Icons.article_outlined, 
+              title: '2. Log(Sensorlog 포함) 파일', 
+              hint: '(비어 있음) 터치하여 수동 선택', 
+              busy: _fileBusy, 
+              onTap: () => _pickLog(initialDirectory: '/sdcard/Download/log/GearLog/'), 
+              files: _logFiles
+            ),
+            const SizedBox(height: 12),
+            _buildCaptureAttachCard(title: '3. 캡처 이미지'),
+          ],
           const SizedBox(height: 30),
           
           // --- SECTION 2: 타사 운동 데이터 ---
@@ -4746,7 +4793,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             ),
           ),
           const SizedBox(height: 12),
-          _buildAttachCard(icon: Icons.file_copy, title: '6. Garmin Fit 파일', hint: 'Download 폴더 자동 스캔됨', busy: _fileBusy, onTap: _pickGarminFit, files: _garminFiles),
+          _buildAttachCard(
+            icon: Icons.file_copy, 
+            title: _deviceTabController.index == 0 ? '6. Garmin Fit 파일' : '4. Garmin Fit 파일', 
+            hint: 'Download 폴더 자동 스캔됨', 
+            busy: _fileBusy, 
+            onTap: _pickGarminFit, 
+            files: _garminFiles
+          ),
           const SizedBox(height: 30),
 
           // --- SECTION 3: 운동 종합 데이터 및 특이사항 ---
@@ -5419,7 +5473,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     );
   }
 
-  Widget _buildCaptureAttachCard() {
+  Widget _buildCaptureAttachCard({String title = '5. 캡처 이미지'}) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -5446,7 +5500,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('5. 캡처 이미지', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                        Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 4),
                         Text('갤러리 다중 이미지 첨부 가능', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
                       ],

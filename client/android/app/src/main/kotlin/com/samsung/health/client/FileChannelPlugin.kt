@@ -68,17 +68,18 @@ class FileChannelPlugin(
                         docId       = "primary:Documents/COLA_FILE"
                     )
                     "pickLog" -> openPicker(
-                        activity    = activity,
-                        requestCode = REQ_LOG,
-                        mimeType    = "application/zip",
-                        docId       = "primary:Documents/COLA_FILE"
+                        activity      = activity,
+                        requestCode   = REQ_LOG,
+                        mimeType      = "application/zip",
+                        docId         = "primary:",
+                        allowMultiple = true
                     )
                     else -> result.notImplemented()
                 }
             }
     }
 
-    private fun openPicker(activity: Activity, requestCode: Int, mimeType: String, docId: String) {
+    private fun openPicker(activity: Activity, requestCode: Int, mimeType: String, docId: String, allowMultiple: Boolean = false) {
         // EXTRA_INITIAL_URI 에 넣을 content URI 생성
         val initialUri = DocumentsContract.buildDocumentUri(AUTHORITY, docId)
 
@@ -86,6 +87,9 @@ class FileChannelPlugin(
             addCategory(Intent.CATEGORY_OPENABLE)
             type = mimeType
             putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri)
+            if (allowMultiple) {
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            }
         }
         @Suppress("DEPRECATION")
         activity.startActivityForResult(intent, requestCode)
@@ -98,8 +102,7 @@ class FileChannelPlugin(
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         if (requestCode != REQ_FIT && requestCode != REQ_COLA && requestCode != REQ_LOG && requestCode != REQ_GARMIN_FIT) return false
 
-        val uri = if (resultCode == Activity.RESULT_OK) data?.data else null
-        if (uri == null) {
+        if (resultCode != Activity.RESULT_OK || data == null) {
             // 취소
             pendingResult?.success(null)
             pendingResult = null
@@ -114,8 +117,27 @@ class FileChannelPlugin(
         }
 
         try {
-            val localPath = copyToCache(activity.contentResolver, activity.cacheDir, uri)
-            pendingResult?.success(localPath)
+            val clipData = data.clipData
+            if (clipData != null) {
+                val paths = mutableListOf<String>()
+                for (i in 0 until clipData.itemCount) {
+                    val uri = clipData.getItemAt(i).uri
+                    paths.add(copyToCache(activity.contentResolver, activity.cacheDir, uri))
+                }
+                pendingResult?.success(paths)
+            } else {
+                val uri = data.data
+                if (uri != null) {
+                    val localPath = copyToCache(activity.contentResolver, activity.cacheDir, uri)
+                    if (requestCode == REQ_LOG) {
+                        pendingResult?.success(listOf(localPath))
+                    } else {
+                        pendingResult?.success(localPath)
+                    }
+                } else {
+                    pendingResult?.success(null)
+                }
+            }
         } catch (e: Exception) {
             pendingResult?.error("COPY_ERROR", "파일 복사 실패: ${e.message}", null)
         }

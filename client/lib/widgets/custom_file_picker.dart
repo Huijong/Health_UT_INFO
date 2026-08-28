@@ -12,6 +12,7 @@ class CustomFilePicker {
     String? extensionFilter,
     List<String>? prefixFilters,
     String? priorityPrefix,
+    bool allowMultiple = false,
     required Future<dynamic> Function() onFreeSelect,
   }) async {
     // 권한 요청
@@ -40,6 +41,7 @@ class CustomFilePicker {
                 extensionFilter: extensionFilter,
                 prefixFilters: prefixFilters,
                 priorityPrefix: priorityPrefix,
+                allowMultiple: allowMultiple,
                 onFreeSelect: onFreeSelect,
               ),
             ),
@@ -68,6 +70,7 @@ class _CustomFilePickerPopup extends StatefulWidget {
   final String? extensionFilter;
   final List<String>? prefixFilters;
   final String? priorityPrefix;
+  final bool allowMultiple;
   final Future<dynamic> Function() onFreeSelect;
 
   const _CustomFilePickerPopup({
@@ -76,6 +79,7 @@ class _CustomFilePickerPopup extends StatefulWidget {
     this.extensionFilter,
     this.prefixFilters,
     this.priorityPrefix,
+    this.allowMultiple = false,
     required this.onFreeSelect,
   });
 
@@ -85,6 +89,7 @@ class _CustomFilePickerPopup extends StatefulWidget {
 
 class _CustomFilePickerPopupState extends State<_CustomFilePickerPopup> {
   List<File> _files = [];
+  Set<File> _selectedFiles = {};
   bool _isLoading = true;
   String _errorMsg = '';
 
@@ -213,25 +218,41 @@ class _CustomFilePickerPopupState extends State<_CustomFilePickerPopup> {
                 // SAF Fallback Button
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.15),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      if (widget.allowMultiple)
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3366FF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          ),
+                          onPressed: _selectedFiles.isEmpty ? null : () {
+                            Navigator.pop(context, _selectedFiles.toList());
+                          },
+                          child: Text('선택 완료 (${_selectedFiles.length})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      const Spacer(),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.15),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        ),
+                        onPressed: () async {
+                          final result = await widget.onFreeSelect();
+                          if (result != null && mounted) {
+                            Navigator.pop(context, result);
+                          }
+                        },
+                        icon: const Icon(Icons.search, size: 16),
+                        label: const Text('다른 폴더에서 찾기 (자유 선택)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
-                      onPressed: () async {
-                        final file = await widget.onFreeSelect();
-                        if (file != null && mounted) {
-                          Navigator.pop(context, file);
-                        }
-                      },
-                      icon: const Icon(Icons.search, size: 16),
-                      label: const Text('다른 폴더에서 찾기 (자유 선택)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -290,8 +311,25 @@ class _CustomFilePickerPopupState extends State<_CustomFilePickerPopup> {
                                         child: const Icon(Icons.insert_drive_file, color: Colors.white),
                                       ),
                                       title: Text(fileName, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
-
-                                      onTap: () => Navigator.pop(context, file),
+                                      trailing: widget.allowMultiple 
+                                          ? Icon(
+                                              _selectedFiles.contains(file) ? Icons.check_circle : Icons.circle_outlined,
+                                              color: _selectedFiles.contains(file) ? const Color(0xFF3366FF) : Colors.white38,
+                                            )
+                                          : null,
+                                      onTap: () {
+                                        if (widget.allowMultiple) {
+                                          setState(() {
+                                            if (_selectedFiles.contains(file)) {
+                                              _selectedFiles.remove(file);
+                                            } else {
+                                              _selectedFiles.add(file);
+                                            }
+                                          });
+                                        } else {
+                                          Navigator.pop(context, file);
+                                        }
+                                      },
                                     );
                                   },
                                 ),

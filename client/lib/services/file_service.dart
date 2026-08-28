@@ -39,10 +39,17 @@ class FileService {
   }
 
   // ── 로그 파일 선택 ─────────────────────────────────────────────
-  /// COLA_FILE 경로(primary:Documents/COLA_FILE)로 바로 이동 후 log_*.zip 선택
-  static Future<AttachedFile?> pickLog() async {
-    final path = await _ch.invokeMethod<String?>('pickLog');
-    return _fromLocalPath(path, AttachType.log);
+  /// COLA_FILE 경로(primary:Documents/COLA_FILE)로 바로 이동 후 log_*.zip 선택 (다중 선택 가능)
+  static Future<List<AttachedFile>> pickLog() async {
+    final paths = await _ch.invokeListMethod<String>('pickLog');
+    if (paths == null) return [];
+    
+    final result = <AttachedFile>[];
+    for (final p in paths) {
+      final f = await _fromLocalPath(p, AttachType.log);
+      if (f != null) result.add(f);
+    }
+    return result;
   }
 
   // ── 운동 캡처 다중 선택 ───────────────────────────────────────
