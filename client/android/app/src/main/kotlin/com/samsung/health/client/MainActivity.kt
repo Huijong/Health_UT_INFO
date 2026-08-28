@@ -46,7 +46,7 @@ class MainActivity : FlutterActivity() {
                     checkWatchAppInstalled(result)
                 }
                 "launchWatchPlayStore" -> {
-                    launchWatchPlayStore(result)
+                    launchWatchPlayStore(call, result)
                 }
                 "requestNearbyPermissions" -> {
                     requestNearbyPermissions(result)
@@ -217,7 +217,8 @@ class MainActivity : FlutterActivity() {
         }.start()
     }
 
-    private fun launchWatchPlayStore(result: MethodChannel.Result) {
+    private fun launchWatchPlayStore(call: MethodCall, result: MethodChannel.Result) {
+        val url = call.argument<String>("url") ?: "market://details?id=com.samsung.health.client"
         val context = this
         Thread {
             try {
@@ -233,7 +234,7 @@ class MainActivity : FlutterActivity() {
                 // Open Play Store details on the watch for the watch application package
                 val intent = Intent(Intent.ACTION_VIEW)
                     .addCategory(Intent.CATEGORY_BROWSABLE)
-                    .setData(Uri.parse("market://details?id=com.samsung.health.client"))
+                    .setData(Uri.parse(url))
                 
                 for (node in nodes) {
                     remoteActivityHelper.startRemoteActivity(intent, node.id)

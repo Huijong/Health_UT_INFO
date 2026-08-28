@@ -197,12 +197,15 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
     private fun checkPermissionsAndStart() {
         val permissions = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
+            Manifest.permission.ACCESS_COARSE_LOCATION
         )
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
         val missingPermissions = permissions.filter {
@@ -212,7 +215,41 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
         if (missingPermissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), 101)
         } else {
-            startSyncService()
+            checkManageExternalStorageAndStart()
+        }
+    }
+
+    private fun checkManageExternalStorageAndStart() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                AlertDialog.Builder(this)
+                    .setTitle("파일 접근 권한")
+                    .setMessage("설정 창이 열리면 [권한] -> [파일 및 미디어] 항목을 '항상 허용'으로 변경해주세요.")
+                    .setPositiveButton("확인") { _, _ ->
+                        launchStorageSettings()
+                    }
+                    .setNegativeButton("취소", null)
+                    .show()
+                return
+            }
+        }
+        startSyncService()
+    }
+
+    private fun launchStorageSettings() {
+        try {
+            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+            intent.data = Uri.parse("package:$packageName")
+            startActivityForResult(intent, 102)
+        } catch (e: Exception) {
+            try {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                intent.data = Uri.parse("package:$packageName")
+                startActivityForResult(intent, 102)
+            } catch (e2: Exception) {
+                Toast.makeText(this, "설정 화면을 열 수 없습니다.", Toast.LENGTH_LONG).show()
+                startSyncService()
+            }
         }
     }
 
@@ -222,7 +259,7 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
                 index < grantResults.size && grantResults[index] != PackageManager.PERMISSION_GRANTED 
             }
             if (denied.isEmpty() && grantResults.isNotEmpty()) {
-                startSyncService()
+                checkManageExternalStorageAndStart()
             } else {
                 Toast.makeText(this, "거부된 권한:\n${denied.joinToString("\n") { it.substringAfterLast(".") }}", Toast.LENGTH_LONG).show()
             }
@@ -232,11 +269,11 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 102) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 if (Environment.isExternalStorageManager()) {
                     startSyncService()
                 } else {
-                    Toast.makeText(this, "파일 접근 권한이 거부되었습니다.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "모든 파일 접근 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
                 }
             }
         }

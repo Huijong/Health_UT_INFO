@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.samsung.health.client"
-    android:versionCode="102"
-    android:versionName="1.101" >
+    android:versionCode="103"
+    android:versionName="1.103" >
 
     <uses-sdk
-        android:maxSdkVersion="29"
         android:minSdkVersion="29"
-        android:targetSdkVersion="29" />
+        android:targetSdkVersion="34" />
 
     <uses-feature android:name="android.hardware.type.watch" />
 
