@@ -1,0 +1,7 @@
+﻿.gradle/
+build/
+**/build/
+watch/.gradle/
+watch/app/build/
+*.apk
+*.aab
