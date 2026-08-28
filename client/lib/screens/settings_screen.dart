@@ -156,7 +156,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _installWatchApp() async {
     try {
-      await _appChannel.invokeMethod('launchWatchPlayStore');
+      // 워치에서 스토어 앱(HealthPort) 직접 열기
+      await _appChannel.invokeMethod('launchWatchPlayStore', {
+        'url': 'market://details?id=com.samsung.health.client'
+      });
+
       if (mounted) {
         ToastUtil.showToast(context, '워치에서 플레이 스토어가 열렸습니다. 설치를 진행해 주세요.');
       }
