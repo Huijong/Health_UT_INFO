@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import '../widgets/custom_file_picker.dart';
@@ -35,6 +36,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:confetti/confetti.dart';
 import 'package:client/utils/toast_util.dart';
+import '../main.dart'; // To use showLocalNotification
 
 
 /// Galaxy Watch 드롭다운 선택지 (2단계 전용)
@@ -197,6 +199,216 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       print('Hotspot check error: $e');
     }
   }
+
+  static const EventChannel _capabilityEventChannel = EventChannel('watch_capability');
+  StreamSubscription? _capabilitySubscription;
+
+  Future<void> _handleWatchSyncClick() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool showTbdPopup = prefs.getBool('show_tbd_popup') ?? false;
+    final bool hideGuide = prefs.getBool('hide_log_sync_guide') ?? false;
+
+    void proceedToNext() {
+      if (hideGuide) {
+        _showWatchSyncWizard();
+        return;
+      }
+
+      bool dontShowAgain = false;
+      showDialog(
+        context: context,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                backgroundColor: const Color(0xFF1E2640),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: Row(
+                  children: [
+                    const Icon(Icons.menu_book, color: Colors.blueAccent),
+                    const SizedBox(width: 8),
+                    const Text('COLA / Log 동기화 가이드', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white54),
+                      onPressed: () {
+                        if (dontShowAgain) prefs.setBool('hide_log_sync_guide', true);
+                        Navigator.pop(ctx);
+                        _showWatchSyncWizard();
+                      },
+                    )
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '스마트폰과 워치를 연결하여 Log 파일을 동기화하려면 기기 간 설정이 필요합니다.\n\n상세한 진행 방법은 웹 가이드 문서를 참고해 주세요!',
+                      style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              dontShowAgain = !dontShowAgain;
+                            });
+                          },
+                          child: Row(
+                            children: [
+                              Icon(
+                                dontShowAgain ? Icons.check_box : Icons.check_box_outline_blank,
+                                color: dontShowAgain ? Colors.blueAccent : Colors.white54,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text('다시 보지 않기', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3366FF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () async {
+                            if (dontShowAgain) prefs.setBool('hide_log_sync_guide', true);
+                            Navigator.pop(ctx);
+                            
+                            final Uri url = Uri.parse('https://huijong.github.io/Health_UT_INFO/');
+                            if (await canLaunchUrl(url)) {
+                              await launchUrl(url, mode: LaunchMode.externalApplication);
+                            }
+                            
+                            _showWatchSyncWizard();
+                          },
+                          child: const Text('가이드 보기', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
+
+    if (showTbdPopup) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1E2640),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.orangeAccent),
+              SizedBox(width: 8),
+              Text('준비 중 (TBD)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text.rich(
+            TextSpan(
+              style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+              children: [
+                const TextSpan(text: '해당 기능은 COLA/Log 파일을 원터치로 가져올 수 있도록 향후 업데이트될 예정입니다.\n\n현재 SDK 문제로 인해 워치 앱의 정식 스토어(Google Play Store, Galaxy Store) 등록이 제한된 상태입니다.\n\n사용자분들께서 쉽게 앱을 설치하실 수 있도록 우회 방법 및 대안을 적극적으로 찾고 있습니다. 조금만 기다려 주세요!\n\n'),
+                TextSpan(
+                  text: '💡 기능 릴리즈 전, 먼저 앱을 사용해보고 싶으신 분은 [유희종 프로]님에게 오시면 워치에 직접 설치해 드립니다!',
+                  style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 14.5),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('닫기', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3366FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                proceedToNext();
+              },
+              child: const Text('사용해 보기', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Check if watch app installed
+    final bool isInstalled = await _appChannel.invokeMethod('checkWatchAppInstalled') ?? false;
+    if (isInstalled) {
+      proceedToNext();
+      return;
+    }
+
+    // Show install popup
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        _capabilitySubscription = _capabilityEventChannel.receiveBroadcastStream().listen((event) {
+          if (event == true) {
+            _capabilitySubscription?.cancel();
+            _capabilitySubscription = null;
+            if (Navigator.canPop(ctx)) {
+              Navigator.pop(ctx);
+              proceedToNext();
+            }
+          }
+        });
+
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E2640),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.watch, color: Colors.blueAccent),
+              SizedBox(width: 8),
+              Text('워치 앱 설치 필요', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            '단말과 워치의 파일(COLA/Log)을 간편하게 자동 동기화하려면 워치용 HealthPort Sync 앱이 필요합니다.\n아래 버튼을 눌러 워치로 설치 링크를 전송해 주세요.\n\n(💡 워치에 앱 설치가 완료되면 이 창은 자동으로 닫힙니다.)',
+            style: TextStyle(color: Colors.white70, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _capabilitySubscription?.cancel();
+                _capabilitySubscription = null;
+                Navigator.pop(ctx);
+              },
+              child: const Text('취소', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3366FF)),
+              onPressed: () {
+                _appChannel.invokeMethod('launchWatchPlayStore', {'url': 'market://details?id=com.samsung.health.client'});
+              },
+              child: const Text('워치로 설치 링크 보내기', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      _capabilitySubscription?.cancel();
+      _capabilitySubscription = null;
+    });
+  }
+
   final _formKey5 = GlobalKey<FormState>();
 
   // 가이드 영상 관련 상태 변수 및 애니메이션 컨트롤러
@@ -484,8 +696,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
       // Foreground FCM 수신 대기 설정
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        final notification = message.notification;
-        if (notification != null && mounted) {
+        if (mounted) {
           // 공지사항 푸시 수신 시 실시간으로 공지 카드도 갱신
           _fetchLatestNotice();
 
@@ -495,7 +706,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             _sendNoticeAck(noticeId, testerName);
           }
 
-          ToastUtil.showToast(context, notification.title ?? '공지사항');
+          // 포그라운드 상태에서도 무조건 시스템 노티피케이션 (헤드업 알림) 띄우기
+          showLocalNotification(message);
         }
       });
 
@@ -2234,6 +2446,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
+        // Stream을 통해 자동 닫기 구현 (필요시)
         return Dialog(
           backgroundColor: Colors.transparent,
           child: GlassCard(
@@ -4155,7 +4368,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         ),
                         child: const Row(
                           children: [
-                            Icon(Icons.help_outline, color: Colors.white70, size: 14),
+                            Icon(Icons.help_outline, color: Colors.orangeAccent, size: 14),
                             SizedBox(width: 4),
                             Text('가이드 다시 보기', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
                           ],
@@ -4498,23 +4711,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           // TabBar
           Container(
             margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.white12, width: 1.5),
+              ),
             ),
             child: TabBar(
               controller: _deviceTabController,
-              indicator: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: const Color(0xFF3366FF),
+              indicator: const UnderlineTabIndicator(
+                borderSide: BorderSide(color: Color(0xFF3366FF), width: 3.0),
               ),
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
               labelColor: Colors.white,
+              labelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               unselectedLabelColor: Colors.white54,
+              unselectedLabelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.normal),
               tabs: const [
-                Tab(text: 'Watch'),
-                Tab(text: 'Band'),
+                Tab(text: 'Watch', height: 44),
+                Tab(text: 'Band', height: 44),
               ],
             ),
           ),
@@ -4548,150 +4763,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             clipBehavior: Clip.none,
             children: [
               InkWell(
-                onTap: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  final bool showTbdPopup = prefs.getBool('show_tbd_popup') ?? true;
-                  final bool hideGuide = prefs.getBool('hide_log_sync_guide') ?? false;
-
-                  void showNext() {
-                    if (hideGuide) {
-                      _showWatchSyncWizard();
-                      return;
-                    }
-
-                    bool dontShowAgain = false;
-                    showDialog(
-                      context: context,
-                      builder: (ctx) {
-                        return StatefulBuilder(
-                          builder: (context, setState) {
-                            return AlertDialog(
-                              backgroundColor: const Color(0xFF1E2640),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              title: Row(
-                                children: [
-                                  const Icon(Icons.menu_book, color: Colors.blueAccent),
-                                  const SizedBox(width: 8),
-                                  const Text('COLA / Log 동기화 가이드', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                                  const Spacer(),
-                                  IconButton(
-                                    icon: const Icon(Icons.close, color: Colors.white54),
-                                    onPressed: () {
-                                      if (dontShowAgain) prefs.setBool('hide_log_sync_guide', true);
-                                      Navigator.pop(ctx);
-                                      _showWatchSyncWizard();
-                                    },
-                                  )
-                                ],
-                              ),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    '스마트폰과 워치를 연결하여 Log 파일을 동기화하려면 기기 간 설정이 필요합니다.\n\n상세한 진행 방법은 웹 가이드 문서를 참고해 주세요!',
-                                    style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      InkWell(
-                                        onTap: () {
-                                          setState(() {
-                                            dontShowAgain = !dontShowAgain;
-                                          });
-                                        },
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              dontShowAgain ? Icons.check_box : Icons.check_box_outline_blank,
-                                              color: dontShowAgain ? Colors.blueAccent : Colors.white54,
-                                              size: 20,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            const Text('다시 보지 않기', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                                          ],
-                                        ),
-                                      ),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF3366FF),
-                                          foregroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                        ),
-                                        onPressed: () async {
-                                          if (dontShowAgain) prefs.setBool('hide_log_sync_guide', true);
-                                          Navigator.pop(ctx);
-                                          
-                                          final Uri url = Uri.parse('https://huijong.github.io/Health_UT_INFO/');
-                                          if (await canLaunchUrl(url)) {
-                                            await launchUrl(url, mode: LaunchMode.externalApplication);
-                                          }
-                                          
-                                          _showWatchSyncWizard();
-                                        },
-                                        child: const Text('가이드 보기', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    );
-                  }
-
-                  if (showTbdPopup) {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        backgroundColor: const Color(0xFF1E2640),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        title: const Row(
-                          children: [
-                            Icon(Icons.info_outline, color: Colors.orangeAccent),
-                            SizedBox(width: 8),
-                            Text('준비 중 (TBD)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        content: Text.rich(
-                          TextSpan(
-                            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
-                            children: [
-                              const TextSpan(text: '해당 기능은 COLA/Log 파일을 원터치로 가져올 수 있도록 향후 업데이트될 예정입니다.\n\n현재 SDK 문제로 인해 워치 앱의 정식 스토어(Google Play Store, Galaxy Store) 등록이 제한된 상태입니다.\n\n사용자분들께서 쉽게 앱을 설치하실 수 있도록 우회 방법 및 대안을 적극적으로 찾고 있습니다. 조금만 기다려 주세요!\n\n'),
-                              TextSpan(
-                                text: '💡 기능 릴리즈 전, 먼저 앱을 사용해보고 싶으신 분은 [유희종 프로]님에게 오시면 워치에 직접 설치해 드립니다!',
-                                style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 14.5),
-                              ),
-                            ],
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('닫기', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-                          ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF3366FF),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              showNext();
-                            },
-                            child: const Text('사용해 보기', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
-                    );
-                  } else {
-                    showNext();
-                  }
+                onTap: () {
+                  _handleWatchSyncClick();
                 },
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
@@ -4729,7 +4802,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Text('터치 한 번으로 워치의 파일(Cola/Log) 자동 추가', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                            Text('터치 한 번으로 워치의 파일(COLA/Log) 자동 추가', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
                           ],
                         ),
                       ),
@@ -4754,9 +4827,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             ],
           ),
           const SizedBox(height: 12),
-          _buildAttachCard(icon: Icons.bar_chart, title: '3. Cola 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickCola, files: _colaFiles),
+          _buildAttachCard(icon: Icons.bar_chart, title: '3. COLA 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickCola, files: _colaFiles),
           const SizedBox(height: 12),
-          _buildAttachCard(icon: Icons.article_outlined, title: '4. 단말 Log 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickLog, files: _logFiles),
+          _buildAttachCard(icon: Icons.article_outlined, title: '4. Log 파일', hint: '(비어 있음) 터치하여 수동 선택', busy: _fileBusy, onTap: _pickLog, files: _logFiles),
           const SizedBox(height: 12),
           _buildCaptureAttachCard(title: '5. 캡처 이미지'), // 5. 캡처 이미지
           ] else ...[

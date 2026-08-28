@@ -10,6 +10,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.EventChannel
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.CapabilityClient
@@ -21,13 +22,38 @@ class MainActivity : FlutterActivity() {
     private val fileChannel = FileChannelPlugin { this }
     private val wifiP2pPlugin by lazy { WifiP2pPlugin(this) }
     private val CHANNEL = "com.samsung.health.client/app_info"
+    private val CAPABILITY_EVENT_CHANNEL = "com.samsung.health.client/watch_capability"
     private var pendingEmailResult: MethodChannel.Result? = null
     private val REQUEST_CODE_PICK_ACCOUNT = 1001
+    
+    private var capabilityListener: CapabilityClient.OnCapabilityChangedListener? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         fileChannel.register(flutterEngine)
         wifiP2pPlugin.register(flutterEngine)
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, CAPABILITY_EVENT_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    capabilityListener = CapabilityClient.OnCapabilityChangedListener { capabilityInfo ->
+                        val isInstalled = capabilityInfo.nodes.isNotEmpty()
+                        runOnUiThread {
+                            events?.success(isInstalled)
+                        }
+                    }
+                    Wearable.getCapabilityClient(this@MainActivity)
+                        .addListener(capabilityListener!!, "watch_file_sync")
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    capabilityListener?.let {
+                        Wearable.getCapabilityClient(this@MainActivity).removeListener(it)
+                        capabilityListener = null
+                    }
+                }
+            }
+        )
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
