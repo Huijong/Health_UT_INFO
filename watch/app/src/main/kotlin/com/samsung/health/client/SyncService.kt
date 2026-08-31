@@ -57,6 +57,11 @@ class SyncService : Service() {
     // Service state
     private var isServiceActive = false
 
+    // Compression progress state
+    private var totalCompressionBytes: Long = 0L
+    private var currentCompressedBytes: Long = 0L
+    private var lastCompressionReportTime: Long = 0L
+
     // UDP Listener
     private var udpListenerThread: Thread? = null
     private var udpStarted = false
@@ -464,16 +469,21 @@ class SyncService : Service() {
         writeLog("CMD: $command")
         when {
             command == "GET_FILE_LIST" -> {
-                // Notify phone that compression is in progress
-                sendSocketLine("COMPRESSING")
-                // Compress any unzipped COLA folders into new naming format
-                compressColaFiles()
-                compressLogFiles()
-                // Send the final file list
+                // Calculate virtual zip names and send file list immediately (no local compression!)
                 sendSocketLine("FILE_LIST:${getFileListJson()}")
             }
             command.startsWith("DOWNLOAD_FILE:") -> {
-                sendSocketFile(command.substring("DOWNLOAD_FILE:".length).trim())
+                val filename = command.substring("DOWNLOAD_FILE:".length).trim()
+                val file = File("/sdcard/Documents/COLA_FILE/", filename)
+                if (file.exists()) {
+                    sendSocketFile(filename)
+                } else if (filename.startsWith("COLA_FILE_")) {
+                    streamColaZip(filename)
+                } else if (filename.startsWith("log_")) {
+                    streamLogZip(filename)
+                } else {
+                    sendSocketLine("ERROR:File not found")
+                }
             }
             command == "DELETE_WATCH_FILES" -> {
                 try {
@@ -498,6 +508,136 @@ class SyncService : Service() {
     // ────────────────────────────────────────────────────────────────
     // COLA FILE COMPRESSION
     // ────────────────────────────────────────────────────────────────
+
+    private var totalUncompressedBytes = 0L
+    private var currentUncompressedBytes = 0L
+    private var lastProgressReportTime = 0L
+
+    private fun streamColaZip(zipName: String) {
+        val folder = File("/sdcard/Documents/COLA_FILE/")
+        val colaPattern = Regex("^\\d{10}$")
+        val targets = folder.listFiles { f ->
+            f.isDirectory && colaPattern.matches(f.name)
+        }?.sortedBy { it.name }
+        
+        if (targets.isNullOrEmpty()) {
+            sendSocketLine("ERROR:COLA folder missing")
+            return
+        }
+        
+        totalUncompressedBytes = targets.sumOf { getFolderSize(it) }
+        currentUncompressedBytes = 0L
+        lastProgressReportTime = System.currentTimeMillis()
+        
+        try {
+            sendSocketLine("FILE_START_CHUNKED:$zipName")
+            socketWriter?.flush()
+            
+            val chunkedOut = ChunkedOutputStream(socketWriter!!, tcpSocket!!.getOutputStream())
+            this.activeChunkedOut = chunkedOut
+            try {
+                ZipOutputStream(chunkedOut).use { zos ->
+                    zos.setLevel(java.util.zip.Deflater.BEST_SPEED)
+                    for (target in targets) {
+                        addFolderToZip(target, target.name, zos)
+                    }
+                }
+            } finally {
+                this.activeChunkedOut = null
+                try { chunkedOut.close() } catch (_: Exception) {}
+            }
+            writeLog("Streaming zip $zipName completed")
+        } catch (e: Exception) {
+            writeLog("Streaming zip error: ${e.message}")
+        }
+    }
+
+    private fun streamLogZip(zipName: String) {
+        val logFolder = File("/sdcard/log/")
+        if (!logFolder.exists()) {
+            sendSocketLine("ERROR:Log folder missing")
+            return
+        }
+        totalUncompressedBytes = getFolderSize(logFolder)
+        currentUncompressedBytes = 0L
+        lastProgressReportTime = System.currentTimeMillis()
+        streamZipFolder(logFolder, "log", zipName)
+    }
+
+    private fun getFolderSize(file: File): Long {
+        if (!file.exists()) return 0
+        if (!file.isDirectory) return file.length()
+        return file.listFiles()?.sumOf { getFolderSize(it) } ?: 0L
+    }
+
+    private fun streamZipFolder(folder: File, zipPrefix: String, zipName: String) {
+        try {
+            sendSocketLine("FILE_START_CHUNKED:$zipName")
+            socketWriter?.flush()
+            
+            val chunkedOut = ChunkedOutputStream(socketWriter!!, tcpSocket!!.getOutputStream())
+            this.activeChunkedOut = chunkedOut
+            try {
+                ZipOutputStream(chunkedOut).use { zos ->
+                    zos.setLevel(java.util.zip.Deflater.BEST_SPEED)
+                    addFolderToZip(folder, zipPrefix, zos)
+                }
+            } finally {
+                this.activeChunkedOut = null
+                try { chunkedOut.close() } catch (_: Exception) {}
+            }
+            writeLog("Streaming zip $zipName completed")
+        } catch (e: Exception) {
+            writeLog("Streaming zip error: ${e.message}")
+        }
+    }
+    private var activeChunkedOut: ChunkedOutputStream? = null
+
+    class ChunkedOutputStream(private val writer: java.io.BufferedWriter, private val rawOut: OutputStream) : OutputStream() {
+        private val buffer = ByteArray(65536)
+        private var pos = 0
+        
+        fun sendProgress(current: Long, total: Long) {
+            flushChunk()
+            writer.write("PROGRESS:$current:$total\n")
+            writer.flush()
+        }
+        
+        override fun write(b: Int) {
+            buffer[pos++] = b.toByte()
+            if (pos == buffer.size) flushChunk()
+        }
+        
+        override fun write(b: ByteArray, off: Int, len: Int) {
+            var remaining = len
+            var currentOff = off
+            while (remaining > 0) {
+                val space = buffer.size - pos
+                val toCopy = minOf(remaining, space)
+                System.arraycopy(b, currentOff, buffer, pos, toCopy)
+                pos += toCopy
+                currentOff += toCopy
+                remaining -= toCopy
+                if (pos == buffer.size) flushChunk()
+            }
+        }
+        
+        private fun flushChunk() {
+            if (pos > 0) {
+                writer.write("CHUNK:$pos\n")
+                writer.flush()
+                rawOut.write(buffer, 0, pos)
+                rawOut.flush()
+                pos = 0
+            }
+        }
+        
+        override fun close() {
+            flushChunk()
+            writer.write("CHUNK:0\n")
+            writer.flush()
+        }
+    }
 
     /** Returns the watch firmware version string from Build.DISPLAY, safe for filenames. */
     private fun getWatchSoftwareVersion(): String {
@@ -573,54 +713,7 @@ class SyncService : Service() {
         }
     }
 
-    /**
-     * Scans /sdcard/Documents/COLA_FILE/ for directories whose names
-     * are 10-digit date-time strings (YYMMDDHHMM) and compresses each
-     * one into COLA_FILE_[version]_[date]_[time].zip.
-     * Already-compressed archives (COLA_FILE_*.zip) are skipped.
-     */
-    private fun compressColaFiles() {
-        val folder = File("/sdcard/Documents/COLA_FILE/")
-        if (!folder.exists()) { folder.mkdirs(); return }
-
-        val colaPattern = Regex("^\\d{10}$")
-        val targets = folder.listFiles { f ->
-            f.isDirectory && colaPattern.matches(f.name)
-        }?.sortedBy { it.name } ?: return
-
-        if (targets.isEmpty()) {
-            writeLog("COMPRESS: no unzipped COLA folders found.")
-            return
-        }
-
-        val newestFolder = targets.last()
-        val zipName = buildColaZipName(newestFolder.name)
-        val zipFile = File(folder, zipName)
-
-        if (zipFile.exists()) {
-            writeLog("COMPRESS: $zipName already exists, skipping.")
-            return
-        }
-
-        // Clean up old zip files before creating the new unified one
-        folder.listFiles { _, n -> n.startsWith("COLA_FILE_") && n.endsWith(".zip") }?.forEach { f ->
-            try { f.delete() } catch (_: Exception) {}
-        }
-
-        writeLog("COMPRESS: ${targets.size} folders → $zipName")
-        try {
-            ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
-                zos.setLevel(java.util.zip.Deflater.NO_COMPRESSION)
-                for (dir in targets) {
-                    addFolderToZip(dir, dir.name, zos)
-                }
-            }
-            writeLog("COMPRESS: done → $zipName")
-        } catch (e: Exception) {
-            writeLog("COMPRESS error: ${e.message}")
-            try { zipFile.delete() } catch (_: Exception) {}
-        }
-    }
+    // Original compressColaFiles logic removed.
 
     private fun addFolderToZip(folder: File, parentPath: String, zos: ZipOutputStream) {
         val children = folder.listFiles() ?: return
@@ -634,9 +727,28 @@ class SyncService : Service() {
     }
 
     private fun addFileToZip(file: File, entryName: String, zos: ZipOutputStream) {
-        zos.putNextEntry(ZipEntry(entryName))
-        FileInputStream(file).use { it.copyTo(zos, bufferSize = 65536) }
-        zos.closeEntry()
+        try {
+            zos.putNextEntry(ZipEntry(entryName))
+            FileInputStream(file).use { input ->
+                val buffer = ByteArray(65536)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } >= 0) {
+                    zos.write(buffer, 0, bytesRead)
+                    currentUncompressedBytes += bytesRead
+                    val now = System.currentTimeMillis()
+                    if (now - lastProgressReportTime > 500) {
+                        activeChunkedOut?.sendProgress(currentUncompressedBytes, totalUncompressedBytes)
+                        lastProgressReportTime = now
+                    }
+                }
+            }
+            zos.closeEntry()
+        } catch (e: java.net.SocketException) {
+            throw e
+        } catch (e: Exception) {
+            writeLog("Skip zip ${file.name}: ${e.message}")
+            try { zos.closeEntry() } catch (_: Exception) {}
+        }
     }
 
     private fun sendSocketFile(filename: String) {
@@ -672,9 +784,28 @@ class SyncService : Service() {
         val folder = File("/sdcard/Documents/COLA_FILE/")
         if (!folder.exists()) folder.mkdirs()
         val arr = JSONArray()
+        
         folder.listFiles { _, n -> n.endsWith(".zip", true) }?.forEach { f ->
             arr.put(JSONObject().apply { put("name", f.name); put("size", f.length()); put("last_modified", f.lastModified()) })
         }
+        
+        val colaPattern = Regex("^\\d{10}$")
+        val targets = folder.listFiles { f -> f.isDirectory && colaPattern.matches(f.name) }?.sortedBy { it.name }
+        if (targets != null && targets.isNotEmpty()) {
+            val virtualName = buildColaZipName(targets.last().name)
+            if (!File(folder, virtualName).exists()) {
+                arr.put(JSONObject().apply { put("name", virtualName); put("size", -1L); put("last_modified", System.currentTimeMillis()) })
+            }
+        }
+        
+        val logFolder = File("/sdcard/log/")
+        if (logFolder.exists() && logFolder.isDirectory) {
+            val virtualLogName = buildLogZipName()
+            if (!File(folder, virtualLogName).exists()) {
+                arr.put(JSONObject().apply { put("name", virtualLogName); put("size", -1L); put("last_modified", System.currentTimeMillis()) })
+            }
+        }
+        
         return arr.toString()
     }
 

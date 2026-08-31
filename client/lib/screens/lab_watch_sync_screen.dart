@@ -44,6 +44,12 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   int _lastSyncStage = -1;
   double _syncProgress = 0.0;
   int? _syncStartTimeMs;
+  
+  // Compression Progress states
+  double _compressProgress = 0.0;
+  int? _compressTransferredBytes;
+  int? _compressTotalBytes;
+  int? _compressStartTimeMs;
   int _syncTransferredBytes = 0;
   int _syncTotalBytes = 0;
   String? _targetColaFilename;
@@ -240,6 +246,10 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
             if (_autoSyncStage <= 1) {
               _autoSyncStage = 0;
             }
+            _compressProgress = 0.0;
+            _compressTransferredBytes = null;
+            _compressTotalBytes = null;
+            _compressStartTimeMs = null;
           });
         }
         break;
@@ -287,6 +297,20 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
       case "compressing":
         _addLog("워치에서 데이터 패키징 중...");
+        break;
+
+      case "compressingProgress":
+        final progressMap = Map<String, dynamic>.from(data);
+        final progress = progressMap["progress"] as double;
+        final transferred = progressMap["transferred"] as int?;
+        final total = progressMap["total"] as int?;
+        
+        setState(() {
+          _compressProgress = progress;
+          if (transferred != null) _compressTransferredBytes = transferred;
+          if (total != null) _compressTotalBytes = total;
+          _compressStartTimeMs ??= DateTime.now().millisecondsSinceEpoch;
+        });
         break;
 
       case "downloadProgress":
@@ -593,6 +617,10 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     if (_connectedEndpointId == null) return;
     setState(() {
       _autoSyncStage = 1;
+      _compressProgress = 0.0;
+      _compressTransferredBytes = null;
+      _compressTotalBytes = null;
+      _compressStartTimeMs = null;
     });
     _addLog("Requesting file list from Watch...");
     try {
@@ -1050,17 +1078,40 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   Widget _buildSyncStageRow(int step, String label, bool isDone, bool isActive, {double? progress, int? transferred, int? total, int? startTime, bool isStrikeThrough = false, String? appendText}) {
     String percentStr = "";
     String etaStr = "";
-    if (isActive && progress != null) {
-      percentStr = " ${(progress * 100).toStringAsFixed(1)}%";
-      if (transferred != null && total != null && startTime != null && progress < 1.0 && transferred > 0) {
-        final elapsedMs = DateTime.now().millisecondsSinceEpoch - startTime;
-        if (elapsedMs > 500) {
-          final speedBytesPerSec = (transferred / (elapsedMs / 1000)).round();
-          if (speedBytesPerSec > 0) {
-            final remainingBytes = total - transferred;
-            final remainingSec = (remainingBytes / speedBytesPerSec).ceil();
-            final speedMBps = (speedBytesPerSec / (1024 * 1024)).toStringAsFixed(2);
-            etaStr = "남은 시간: 약 ${remainingSec}초 ($speedMBps MB/s)";
+    
+    if (isActive) {
+      if (total == -1 && transferred != null) {
+        // Streaming mode (unknown total size)
+        if (progress != null && progress >= 0.0) {
+          percentStr = " ${(progress * 100).toStringAsFixed(1)}%";
+        }
+        if (startTime != null && transferred > 0) {
+          final elapsedMs = DateTime.now().millisecondsSinceEpoch - startTime;
+          if (elapsedMs > 500) {
+            final speedBytesPerSec = (transferred / (elapsedMs / 1000)).round();
+            if (speedBytesPerSec > 0) {
+              final speedMBps = (speedBytesPerSec / (1024 * 1024)).toStringAsFixed(2);
+              final transMB = (transferred / (1024 * 1024)).toStringAsFixed(1);
+              etaStr = "$transMB MB 수신됨 ($speedMBps MB/s)";
+            }
+          }
+        } else {
+          final transMB = (transferred / (1024 * 1024)).toStringAsFixed(1);
+          etaStr = "$transMB MB 수신됨...";
+        }
+      } else if (progress != null) {
+        // Normal mode (known total size)
+        percentStr = " ${(progress * 100).toStringAsFixed(1)}%";
+        if (transferred != null && total != null && startTime != null && progress < 1.0 && transferred > 0) {
+          final elapsedMs = DateTime.now().millisecondsSinceEpoch - startTime;
+          if (elapsedMs > 500) {
+            final speedBytesPerSec = (transferred / (elapsedMs / 1000)).round();
+            if (speedBytesPerSec > 0) {
+              final remainingBytes = total - transferred;
+              final remainingSec = (remainingBytes / speedBytesPerSec).ceil();
+              final speedMBps = (speedBytesPerSec / (1024 * 1024)).toStringAsFixed(2);
+              etaStr = "남은 시간: 약 ${remainingSec}초 ($speedMBps MB/s)";
+            }
           }
         }
       }
@@ -1115,9 +1166,16 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
                 if (isActive && progress != null) ...[
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
-                    value: progress,
+                    value: progress < 0 ? null : progress,
                     backgroundColor: Colors.white12,
                     valueColor: const AlwaysStoppedAnimation(Color(0xFF3366FF)),
+                  ),
+                ] else if (isActive && total == -1) ...[
+                  const SizedBox(height: 8),
+                  const LinearProgressIndicator(
+                    value: null, // Indeterminate spinning bar for streaming mode
+                    backgroundColor: Colors.white12,
+                    valueColor: AlwaysStoppedAnimation(Color(0xFF3366FF)),
                   ),
                 ] else if (isActive && step == 4) ...[
                   const SizedBox(height: 8),
