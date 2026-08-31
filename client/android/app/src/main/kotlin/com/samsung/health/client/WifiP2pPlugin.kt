@@ -283,11 +283,28 @@ class WifiP2pPlugin(private val context: Context) {
                         }
                         line == "COMPRESSING" ->
                             sendEvent("compressing", null)
+                        line.startsWith("COMPRESSING_PROGRESS:") -> {
+                            val parts = line.substring("COMPRESSING_PROGRESS:".length).split(":")
+                            if (parts.size >= 2) {
+                                val current = parts[0].toLongOrNull() ?: 0L
+                                val total = parts[1].toLongOrNull() ?: 0L
+                                val progress = if (total > 0) current.toDouble() / total else 0.0
+                                sendEvent("compressingProgress", mapOf(
+                                    "progress" to progress,
+                                    "transferred" to current,
+                                    "total" to total
+                                ))
+                            }
+                        }
                         line.startsWith("FILE_LIST:") ->
                             sendEvent("fileListReceived", line.substring("FILE_LIST:".length))
                         line.startsWith("FILE_START:") -> {
                             val p = line.split(":")
                             if (p.size >= 4) receiveFilePayload(inStream, p[1], p[2].toLong(), p[3])
+                        }
+                        line.startsWith("FILE_START_CHUNKED:") -> {
+                            val p = line.split(":")
+                            if (p.size >= 2) receiveChunkedFilePayload(inStream, p[1])
                         }
                         line.startsWith("ERROR:") ->
                             sendEvent("downloadFailure", mapOf("error" to line.substring("ERROR:".length)))
@@ -327,6 +344,54 @@ class WifiP2pPlugin(private val context: Context) {
                 sendEvent("downloadFailure", mapOf("filename" to filename, "error" to "MD5 mismatch"))
         } catch (e: Exception) {
             sendEvent("downloadFailure", mapOf("filename" to filename, "error" to (e.message ?: "unknown")))
+            tmp.delete()
+        }
+    }
+
+    private fun receiveChunkedFilePayload(inStream: InputStream, filename: String) {
+        val dest = File(context.cacheDir, "sh_sync").apply { mkdirs() }
+        val tmp  = File(dest, filename)
+        try {
+            BufferedOutputStream(FileOutputStream(tmp), BUFFER_SIZE).use { fos ->
+                val buf = ByteArray(65536)
+                var got = 0L
+                var currentStreamProgress = -1.0
+                while (true) {
+                    val headerLine = readLineFromStream(inStream) ?: throw java.io.EOFException("Premature stream close")
+                    if (headerLine.startsWith("CHUNK:")) {
+                        val chunkSize = headerLine.substring("CHUNK:".length).toInt()
+                        if (chunkSize == 0) break // End of file
+                        
+                        var chunkRead = 0
+                        while (chunkRead < chunkSize) {
+                            val r = inStream.read(buf, 0, minOf(buf.size, chunkSize - chunkRead))
+                            if (r == -1) throw java.io.EOFException("Premature stream close inside chunk")
+                            fos.write(buf, 0, r)
+                            chunkRead += r
+                            got += r
+                        }
+                        // Report progress with total = -1, but pass currentStreamProgress if available
+                        sendEvent("downloadProgress", mapOf("filename" to filename,
+                            "progress" to currentStreamProgress, "transferred" to got, "total" to -1))
+                    } else if (headerLine.startsWith("PROGRESS:")) {
+                        val parts = headerLine.split(":")
+                        if (parts.size >= 3) {
+                            val cur = parts[1].toLongOrNull() ?: 0L
+                            val tot = parts[2].toLongOrNull() ?: 0L
+                            currentStreamProgress = if (tot > 0) cur.toDouble() / tot else -1.0
+                            sendEvent("downloadProgress", mapOf("filename" to filename,
+                                "progress" to currentStreamProgress, "transferred" to got, "total" to -1))
+                        }
+                    } else {
+                        throw Exception("Unexpected chunk header: $headerLine")
+                    }
+                }
+                fos.flush()
+            }
+            sendEvent("downloadComplete", mapOf("filename" to filename, "path" to tmp.absolutePath))
+        } catch (e: Exception) {
+            sendEvent("downloadFailure", mapOf("filename" to filename, "error" to (e.message ?: "unknown")))
+            tmp.delete()
         }
     }
 

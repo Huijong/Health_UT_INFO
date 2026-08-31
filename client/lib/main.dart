@@ -23,6 +23,7 @@ Future<void> showLocalNotification(RemoteMessage message) async {
     importance: Importance.max,
     priority: Priority.high,
     showWhen: true,
+    icon: '@mipmap/launcher_icon',
   );
   const NotificationDetails platformChannelSpecifics =
       NotificationDetails(android: androidPlatformChannelSpecifics);
@@ -31,8 +32,10 @@ Future<void> showLocalNotification(RemoteMessage message) async {
   final title = message.notification?.title ?? message.data['title'] ?? '공지사항';
   final body = message.notification?.body ?? message.data['body'] ?? '새로운 공지사항이 등록되었습니다.';
 
+  final int notificationId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+  
   await flutterLocalNotificationsPlugin.show(
-    id: message.hashCode,
+    id: notificationId,
     title: title,
     body: body,
     notificationDetails: platformChannelSpecifics,
@@ -48,6 +51,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   // Admin 앱이 notification 필드 없이 data만 보냈을 때, 강제로 로컬 노티피케이션 표시
   if (message.notification == null) {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/launcher_icon');
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
+    await flutterLocalNotificationsPlugin.initialize(
+      settings: initializationSettings,
+    );
     await showLocalNotification(message);
   }
 }
@@ -74,13 +84,18 @@ void main() async {
     // 공용 알림 채널 'notices' 토픽 구독
     await messaging.subscribeToTopic('notices');
     debugPrint("Subscribed to 'notices' topic successfully.");
+
+    // Android 13+ 로컬 알림 권한 추가 요청
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
   } catch (e) {
     debugPrint("Firebase initialization failed: $e");
   }
 
   // flutter_local_notifications 초기화
   const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
+      AndroidInitializationSettings('@mipmap/launcher_icon');
   
   const InitializationSettings initializationSettings =
       InitializationSettings(android: initializationSettingsAndroid);
