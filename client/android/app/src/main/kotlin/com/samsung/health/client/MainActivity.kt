@@ -445,4 +445,9 @@ class MainActivity : FlutterActivity() {
             result.success("")
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        wifiP2pPlugin.stopServer()
+    }
 }

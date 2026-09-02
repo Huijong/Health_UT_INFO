@@ -72,12 +72,13 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
 
         actionButton = Button(this).apply {
             text = "연동 시작"
-            textSize = 13f
+            textSize = 15f
+            gravity = android.view.Gravity.CENTER
             setBackgroundColor(android.graphics.Color.parseColor("#2E5BFF"))
             setTextColor(android.graphics.Color.WHITE)
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                120
+                140
             ).apply {
                 gravity = android.view.Gravity.CENTER
                 leftMargin = 16

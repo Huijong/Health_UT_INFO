@@ -191,7 +191,7 @@ class WifiP2pPlugin(private val context: Context) {
         Thread {
             try {
                 serverSocket = ServerSocket(TCP_PORT).apply {
-                    // Set receive buffer size to 1MB
+                    reuseAddress = true
                     receiveBufferSize = BUFFER_SIZE
                 }
                 Log.d(TAG, "TCP Server listening on port $TCP_PORT with 1MB Buffer")
@@ -214,7 +214,7 @@ class WifiP2pPlugin(private val context: Context) {
     // STOP SERVER
     // ────────────────────────────────────────────────────────────────
 
-    private fun stopServer() {
+    fun stopServer() {
         isServerRunning = false
         
         // Stop Foreground Service
