@@ -206,6 +206,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
   @override
   void dispose() {
+    _wifiP2pChannel.invokeMethod("clearSyncCache");
     _radarController?.dispose();
     _spinController?.dispose();
     _wifiP2pSubscription?.cancel();
@@ -352,6 +353,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
       case "deleteWatchFilesOk":
         _addLog("워치 내부 잔여 파일 삭제 완료!");
+        _wifiP2pChannel.invokeMethod("clearSyncCache");
         setState(() => _autoSyncStage = 6);
         _updateNativeNotification(isComplete: true);
         if (mounted) {
@@ -719,21 +721,6 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   }
 
   Future<void> _recompressDownloadedFiles() async {
-    setState(() => _autoSyncStage = 4);
-    _updateNativeNotification();
-    final targetFolder = "/sdcard/Documents/COLA_FILE/";
-    
-    try {
-      if (_targetColaFilename != null && _targetColaFilename!.toLowerCase().endsWith('.zip')) {
-        await compute(_recompressZipIsolate, "$targetFolder${_targetColaFilename!}");
-      }
-      if (_targetLogFilename != null && _targetLogFilename!.toLowerCase().endsWith('.zip')) {
-        await compute(_recompressZipIsolate, "$targetFolder${_targetLogFilename!}");
-      }
-    } catch (e) {
-      _addLog("Recompress error (ignored): $e");
-    }
-    
     _addLog("All sync & compression complete!");
     
     final prefs = await SharedPreferences.getInstance();
@@ -745,49 +732,6 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       _updateNativeNotification(isComplete: true);
       if (mounted) {
         _showSuccessSnackBarAndPop('동기화가 완료되었습니다! (잔여 파일 삭제 안함 설정됨)');
-      }
-    }
-  }
-
-  static void _recompressZipIsolate(String zipPath) {
-    final tempDir = Directory("${zipPath}_unzipped");
-    try {
-      final file = File(zipPath);
-      if (!file.existsSync()) return;
-      
-      if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
-      tempDir.createSync();
-      
-      final bytes = file.readAsBytesSync();
-      final archive = ZipDecoder().decodeBytes(bytes);
-      for (final file in archive) {
-        final filename = file.name;
-        if (file.isFile) {
-          final data = file.content as List<int>;
-          File('${tempDir.path}/$filename')
-            ..createSync(recursive: true)
-            ..writeAsBytesSync(data);
-        } else {
-          Directory('${tempDir.path}/$filename').createSync(recursive: true);
-        }
-      }
-      
-      final encoder = ZipFileEncoder();
-      final tempZipPath = "$zipPath.tmp";
-      encoder.zipDirectory(tempDir, filename: tempZipPath);
-      
-      final tempZipFile = File(tempZipPath);
-      if (tempZipFile.existsSync()) {
-        file.deleteSync();
-        tempZipFile.renameSync(zipPath);
-      }
-    } catch (e) {
-      debugPrint("Isolate Recompress error: $e");
-    } finally {
-      if (tempDir.existsSync()) {
-        try {
-          tempDir.deleteSync(recursive: true);
-        } catch (_) {}
       }
     }
   }
