@@ -1,7 +1,9 @@
-﻿.gradle/
+.gradle/
 build/
 **/build/
 watch/.gradle/
 watch/app/build/
 *.apk
 *.aab
+firebase-adminsdk.json
+**/firebase-adminsdk.json
