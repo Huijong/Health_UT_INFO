@@ -220,21 +220,6 @@ class _CustomFilePickerPopupState extends State<_CustomFilePickerPopup> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
                     children: [
-                      if (widget.allowMultiple)
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3366FF),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          ),
-                          onPressed: _selectedFiles.isEmpty ? null : () {
-                            Navigator.pop(context, _selectedFiles.toList());
-                          },
-                          child: Text('선택 완료 (${_selectedFiles.length})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        ),
-                      const Spacer(),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white.withOpacity(0.15),
@@ -252,6 +237,21 @@ class _CustomFilePickerPopupState extends State<_CustomFilePickerPopup> {
                         icon: const Icon(Icons.search, size: 16),
                         label: const Text('다른 폴더에서 찾기 (자유 선택)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
+                      const Spacer(),
+                      if (widget.allowMultiple)
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3366FF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          ),
+                          onPressed: _selectedFiles.isEmpty ? null : () {
+                            Navigator.pop(context, _selectedFiles.toList());
+                          },
+                          child: Text('선택 완료 (${_selectedFiles.length})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
                     ],
                   ),
                 ),

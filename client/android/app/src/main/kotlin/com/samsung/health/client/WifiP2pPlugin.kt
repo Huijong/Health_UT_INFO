@@ -80,6 +80,11 @@ class WifiP2pPlugin(private val context: Context) {
                     else result.error("BAD_ARGS", "filename required", null)
                 }
                 "deleteWatchFiles"    -> { sendSocketLine("DELETE_WATCH_FILES"); result.success(true) }
+                "clearSyncCache"      -> {
+                    val dest = File(context.cacheDir, "sh_sync")
+                    if (dest.exists()) dest.deleteRecursively()
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }

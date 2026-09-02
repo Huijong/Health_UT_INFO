@@ -206,6 +206,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
   @override
   void dispose() {
+    _wifiP2pChannel.invokeMethod("clearSyncCache");
     _radarController?.dispose();
     _spinController?.dispose();
     _wifiP2pSubscription?.cancel();
@@ -352,6 +353,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
       case "deleteWatchFilesOk":
         _addLog("워치 내부 잔여 파일 삭제 완료!");
+        _wifiP2pChannel.invokeMethod("clearSyncCache");
         setState(() => _autoSyncStage = 6);
         _updateNativeNotification(isComplete: true);
         if (mounted) {

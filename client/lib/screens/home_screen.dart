@@ -205,7 +205,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   Future<void> _handleWatchSyncClick() async {
     final prefs = await SharedPreferences.getInstance();
-    final bool showTbdPopup = prefs.getBool('show_tbd_popup') ?? false;
     final bool hideGuide = prefs.getBool('hide_log_sync_guide') ?? false;
 
     void proceedToNext() {
@@ -299,53 +298,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       );
     }
 
-    if (showTbdPopup) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1E2640),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.orangeAccent),
-              SizedBox(width: 8),
-              Text('준비 중 (TBD)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: Text.rich(
-            TextSpan(
-              style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
-              children: [
-                const TextSpan(text: '해당 기능은 COLA/Log 파일을 원터치로 가져올 수 있도록 향후 업데이트될 예정입니다.\n\n현재 SDK 문제로 인해 워치 앱의 정식 스토어(Google Play Store, Galaxy Store) 등록이 제한된 상태입니다.\n\n사용자분들께서 쉽게 앱을 설치하실 수 있도록 우회 방법 및 대안을 적극적으로 찾고 있습니다. 조금만 기다려 주세요!\n\n'),
-                TextSpan(
-                  text: '💡 기능 릴리즈 전, 먼저 앱을 사용해보고 싶으신 분은 [유희종 프로]님에게 오시면 워치에 직접 설치해 드립니다!',
-                  style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 14.5),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('닫기', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3366FF),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () {
-                Navigator.pop(ctx);
-                proceedToNext();
-              },
-              child: const Text('사용해 보기', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
 
     // Check if watch app installed
     final bool isInstalled = await _appChannel.invokeMethod('checkWatchAppInstalled') ?? false;
@@ -2595,21 +2547,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         directoryPath: '/sdcard/Documents/COLA_FILE',
         prefixFilters: ['COLA_FILE', 'log_'],
         priorityPrefix: 'COLA_FILE',
+        allowMultiple: true,
         onFreeSelect: () => FileService.pickCola(),
       );
       if (f != null && mounted) {
-        final pathStr = f is File ? f.path : f.originalPath;
-        final fileName = pathStr.split('/').last.split('\\').last;
-        if (!fileName.toLowerCase().startsWith('cola')) {
-          _showFileError('Cola.zip', '선택한 파일이 COLA_FILE로 시작하는 zip 파일이 아닙니다.');
-          return;
-        }
-                if (f is File) {
-          final stat = f.statSync();
-          final name = f.path.split('/').last.split('\\').last;
-          setState(() => _colaFiles.add(AttachedFile(originalPath: f.path, name: name, sizeBytes: stat.size, type: AttachType.cola)));
-        } else {
-          setState(() => _colaFiles.add(f));
+        final List<dynamic> items = f is List ? f : [f];
+        for (final item in items) {
+          final pathStr = item is File ? item.path : (item as AttachedFile).originalPath;
+          final fileName = pathStr.split('/').last.split('\\').last;
+          if (!fileName.toLowerCase().startsWith('cola')) {
+            _showFileError('Cola.zip', '선택한 파일($fileName)이 COLA_FILE로 시작하는 zip 파일이 아닙니다.');
+            continue;
+          }
+          if (item is File) {
+            final stat = item.statSync();
+            setState(() => _colaFiles.add(AttachedFile(originalPath: item.path, name: fileName, sizeBytes: stat.size, type: AttachType.cola)));
+          } else {
+            setState(() => _colaFiles.add(item));
+          }
         }
       }
     } catch (e) {
