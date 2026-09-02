@@ -1445,7 +1445,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   Future<void> _showFameResultDialog(Map<String, dynamic> meta, List<dynamic> top3, String prevMonth, String currentMonth) async {
     final myRank = meta['my_rank'];
-    final myPoints = meta['my_count'] ?? 0;
+    final rawPoints = meta['my_count'] ?? 0;
+    final myPoints = rawPoints is num 
+        ? (rawPoints == rawPoints.toInt() ? rawPoints.toInt().toString() : rawPoints.toStringAsFixed(2)) 
+        : rawPoints.toString();
     
     final bool hasParticipated = myRank != null;
     

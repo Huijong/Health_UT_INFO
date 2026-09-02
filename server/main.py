@@ -703,14 +703,14 @@ async def create_notice(notice: NoticeCreate):
                 topic = "notices"
 
             message = messaging.Message(
-                notification=messaging.Notification(
-                    title=notice.title,
-                    body=notice.content[:100] + ("..." if len(notice.content) > 100 else ""),
+                android=messaging.AndroidConfig(
+                    priority="high"
                 ),
                 topic=topic,
                 data={
                     "notice_id": notice_id,
                     "title": notice.title,
+                    "body": notice.content[:100] + ("..." if len(notice.content) > 100 else "")
                 }
             )
             response = messaging.send(message)

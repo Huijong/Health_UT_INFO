@@ -64,6 +64,17 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+            
+        <!-- FCM 기본 알림 채널 설정 -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="high_importance_channel" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/launcher_icon" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@android:color/transparent" />
         
         <!-- Background Sync Foreground Service -->
         <service

@@ -23,7 +23,6 @@ Future<void> showLocalNotification(RemoteMessage message) async {
     importance: Importance.max,
     priority: Priority.high,
     showWhen: true,
-    icon: '@mipmap/launcher_icon',
   );
   const NotificationDetails platformChannelSpecifics =
       NotificationDetails(android: androidPlatformChannelSpecifics);
@@ -46,6 +45,7 @@ Future<void> showLocalNotification(RemoteMessage message) async {
 // 백그라운드 메시지 수신 시 처리용 핸들러 (반드시 top-level 함수여야 함)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   debugPrint("Background message received: ${message.messageId}");
 
@@ -58,6 +58,17 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await flutterLocalNotificationsPlugin.initialize(
       settings: initializationSettings,
     );
+
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'high_importance_channel',
+      'High Importance Notifications',
+      description: 'This channel is used for important notifications.',
+      importance: Importance.max,
+    );
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+
     await showLocalNotification(message);
   }
 }
