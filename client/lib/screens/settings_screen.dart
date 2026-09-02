@@ -444,6 +444,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         isHighlighted: _blinkHighlightActive,
                         onTap: _handleHealthPortUpdate,
                       ),
+                      const SizedBox(height: 20),
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          _buildMenuCard(
+                            title: '워치 앱(HealthPort Sync) 설치',
+                            subtitle: '워치와 연동하여 자동으로 로그를 동기화해 보세요.',
+                            icon: Icons.watch_outlined,
+                            onTap: _installWatchApp,
+                            titleBadge: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _isWatchAppInstalled ? const Color(0xFF3366FF).withOpacity(0.15) : Colors.redAccent.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _isWatchAppInstalled ? '설치됨' : '설치 필요',
+                                style: TextStyle(
+                                  color: _isWatchAppInstalled ? const Color(0xFF3366FF) : Colors.redAccent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: -12,
+                            right: 20,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF8B5CF6),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))],
+                              ),
+                              child: const Text('Watch 앱 🚀', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 24),
                       _buildSectionHeader('유용한 기능'),
                       const SizedBox(height: 8),
@@ -789,6 +829,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required VoidCallback onTap,
     bool showBadge = false,
     bool isHighlighted = false,
+    Widget? titleBadge,
   }) {
     return _GlassCard(
       borderColor: isHighlighted
@@ -821,10 +862,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          title,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                        if (titleBadge != null) ...[
+                          const SizedBox(width: 8),
+                          titleBadge,
+                        ],
                         if (showBadge) ...[
                           const SizedBox(width: 8),
                           Container(
@@ -2012,27 +2060,6 @@ class LabSubScreen extends StatelessWidget {
                 child: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
-                    _buildMenuCard(
-                      title: '워치 앱(HealthPort Sync) 설치',
-                      subtitle: '워치와 연동하여 자동으로 로그를 동기화해 보세요.',
-                      icon: Icons.watch_outlined,
-                      onTap: onInstallWatchApp,
-                      titleBadge: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isWatchAppInstalled ? const Color(0xFF3366FF).withOpacity(0.15) : Colors.redAccent.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          isWatchAppInstalled ? '설치됨' : '설치 필요',
-                          style: TextStyle(
-                            color: isWatchAppInstalled ? const Color(0xFF3366FF) : Colors.redAccent,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
                     _buildMenuCard(
                       title: '실험실 (워치 연동)',
                       subtitle: '워치에서 운동 데이터를 고속 무선 LAN(P2P)으로 전송받습니다.',
