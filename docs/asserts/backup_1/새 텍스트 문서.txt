@@ -1,0 +1,98 @@
+[최초 1회만 진행 기이드]
+Step 1 
+이미지 : guide_1.jpg 
+내용 : 「 2. 워치 COLA / Log 파일 동기화 」 선택
+
+Step 2
+이미지 : guide_1_1.jpg
+내용 : 「 워치로 설치 링크 보내기 」 선택
+
+Step 3
+이미지 : guide_1_2.png
+내용 : 「 설치 」 선택
+
+Step 4
+이미지 : guide_1_3.png
+내용 : 「 HealthPory Sync 」 선택
+
+Step 5
+이미지 : guide_1_4.png
+내용 : 「 연동 시작 」 선택
+
+Step 6
+이미지 : guide_1_5.png
+내용 : 「 앱을 사용 중일때 」 선택
+
+Step 7
+이미지 : guide_1_6.png
+내용 : 「 허용 」 선택
+
+Step 8
+이미지 : guide_1_7.png
+내용 : 「 확인 」 선택
+
+Step 9
+이미지 : guide_1_8.png
+내용 : 「 모든 파일 액세스 」 선택
+
+Step 10
+이미지 : guide_1_9.png
+내용 : 「 V 」 선택
+
+Step 11
+이미지 : guide_2.jpg
+내용 : 「 핫스팟  설정 열기 」 선택
+
+Step 12
+이미지 : guide_3.jpg
+내용 : 「 확인 」 선택
+
+Step 13
+이미지 : guide_4.jpg
+내용 : 「 ON 」 선택
+
+Step 14
+이미지 : guide_5.jpg
+내용 : 네트워크 이름 / 비밀번호 복사 및 밴드 변경
+
+Step 15
+이미지 : guide_5_1.jpg
+내용 : 네트워크 이름 / 비밀번호 입력
+
+Step 16
+이미지 : guide_5_2.jpg
+내용 : 「 워치와 연결 시작 」 선택
+
+Step 17
+이미지 : guide_8.png
+내용 : 연동 종료 상태로 자동 변경 됨
+
+Step 18
+이미지 : guide_8_1.png
+내용 : 「 확인 」 선택
+
+Step 19
+이미지 : guide_9.jpg
+내용 : 워치 동기 화면 진입
+
+Step 20
+이미지 : guide_9_1.jpg
+내용 : 워치 > 폰으로 파일 다운로드 시작
+
+Step 21
+이미지 : guide_10.jpg
+내용 : COLA / Log 파일이 자동으로 첨부 됨
+
+[평소 진행 가이드]
+Step 1 
+이미지 : guide_1.jpg 
+내용 : 「 2. 워치 COLA / Log 파일 동기화 」 선택
+
+Step 2
+이미지 : guide_5_2.jpg
+내용 : 「 연결 시작 」 선택
+
+
+Step 3
+이미지 : guide_15.jpg
+내용 : 「 워치와 연결 시작 」 버튼이 활성화
