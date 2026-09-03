@@ -78,6 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late String _customStrap;
   bool _hasUpdate = false;
   bool _autoDeleteWatchFiles = true;
+  bool _showWatchInstallPopup = true;
 
   bool _blinkHighlightActive = false;
   bool _blinkState = false;
@@ -109,6 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         setState(() {
           _autoDeleteWatchFiles = p.getBool('auto_delete_watch_files') ?? true;
+          _showWatchInstallPopup = p.getBool('show_watch_install_popup') ?? true;
         });
       }
     });
@@ -497,6 +499,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           await p.setBool('auto_delete_watch_files', val);
                           setState(() {
                             _autoDeleteWatchFiles = val;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSwitchCard(
+                        title: '워치 앱 설치 확인 팝업 표시',
+                        subtitle: 'COLA / Log 파일 동기화 버튼을 누를 때 워치 앱 설치 안내 팝업을 표시합니다.',
+                        icon: Icons.info_outline_rounded,
+                        value: _showWatchInstallPopup,
+                        onChanged: (val) async {
+                          final p = await SharedPreferences.getInstance();
+                          await p.setBool('show_watch_install_popup', val);
+                          setState(() {
+                            _showWatchInstallPopup = val;
                           });
                         },
                       ),

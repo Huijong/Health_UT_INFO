@@ -21,6 +21,7 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import java.io.File
 
+
 class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
 
     private lateinit var statusText: TextView

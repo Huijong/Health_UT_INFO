@@ -298,10 +298,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       );
     }
 
+    // Check if popup should be shown
+    final localPrefs = await SharedPreferences.getInstance();
+    final bool showPopup = localPrefs.getBool('show_watch_install_popup') ?? true;
 
     // Check if watch app installed
     final bool isInstalled = await _appChannel.invokeMethod('checkWatchAppInstalled') ?? false;
-    if (isInstalled) {
+    if (isInstalled || !showPopup) {
       proceedToNext();
       return;
     }

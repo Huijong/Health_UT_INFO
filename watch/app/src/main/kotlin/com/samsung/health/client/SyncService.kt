@@ -36,7 +36,7 @@ class SyncService : Service() {
         private const val TAG = "HP_SyncService"
         private const val CHANNEL_ID = "WatchSyncServiceChannel"
         private const val TCP_PORT = 8888
-        private const val UDP_PORT = 8889
+        private const val UDP_PORT = 8888
         private const val BUFFER_SIZE = 1024 * 1024
 
         @Volatile
@@ -77,9 +77,9 @@ class SyncService : Service() {
     // Auto Wifi Join System Callback
     private var autoJoinCallback: ConnectivityManager.NetworkCallback? = null
 
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
     // LIFECYCLE
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
 
     override fun onCreate() {
         super.onCreate()
@@ -138,9 +138,9 @@ class SyncService : Service() {
         super.onDestroy()
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
     // WIFI NETWORK SPECIFIER (AUTO JOIN GALAXY WATCH WI-FI)
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
 
     private fun triggerWifiNetworkSpecifier(ssid: String, pwd: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
@@ -173,7 +173,6 @@ class SyncService : Service() {
                     super.onAvailable(network)
                     writeLog("Successfully joined healthport hotspot network!")
                     activeWifiNetwork = network
-                    connectivityManager?.bindProcessToNetwork(network)
                     
                     // Restart UDP search immediately since we are now on the hotspot
                     mainHandler.post {
@@ -211,9 +210,9 @@ class SyncService : Service() {
         } catch (_: Exception) {}
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
     // BIND PHYSICAL WI-FI NETWORK (BYPASS BLUETOOTH PROXY)
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
 
     private fun requestPhysicalWifiNetwork() {
         try {
@@ -225,10 +224,9 @@ class SyncService : Service() {
             networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     super.onAvailable(network)
-                    writeLog("Physical Wi-Fi network available! Binding active socket link...")
+                    writeLog("Physical Wi-Fi network available!")
                     activeWifiNetwork = network
-                    connectivityManager?.bindProcessToNetwork(network)
-                    // 기존에 엉뚱한 망(LTE 등)으로 연결된 가짜 소켓이 있다면 강제 종료하여 새 Wi-Fi 망으로 재접속 유도
+                    // Force reconnect through Wi-Fi path
                     stopTcpClient()
                 }
 
@@ -237,7 +235,6 @@ class SyncService : Service() {
                     writeLog("Physical Wi-Fi network lost.")
                     if (activeWifiNetwork == network) {
                         activeWifiNetwork = null
-                        connectivityManager?.bindProcessToNetwork(null)
                     }
                 }
             }
@@ -255,15 +252,14 @@ class SyncService : Service() {
             networkCallback?.let {
                 connectivityManager?.unregisterNetworkCallback(it)
             }
-            connectivityManager?.bindProcessToNetwork(null)
             activeWifiNetwork = null
             writeLog("Wi-Fi network binding released.")
         } catch (_: Exception) {}
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
     // LOCKS
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
 
     private fun acquireLocks() {
         try {
@@ -286,15 +282,15 @@ class SyncService : Service() {
         } catch (e: Exception) { Log.e(TAG, "Release lock error: ${e.message}") }
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
     // WI-FI HARDWARE
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
 
     private fun ensureWifiEnabled() {
         try {
             val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             if (!wm.isWifiEnabled) {
-                writeLog("Wi-Fi is OFF → turning ON...")
+                writeLog("Wi-Fi is OFF ??turning ON...")
                 @Suppress("DEPRECATION")
                 wm.isWifiEnabled = true
             } else {
@@ -303,9 +299,9 @@ class SyncService : Service() {
         } catch (e: Exception) { writeLog("Wi-Fi check error: ${e.message}") }
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
     // UDP BEACON LISTENER
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
 
     private fun startUdpBeaconListener() {
         if (udpStarted || isSocketRunning) return
@@ -332,7 +328,7 @@ class SyncService : Service() {
                             if (parts.size >= 3) {
                                 val ip = parts[1]
                                 val port = parts[2].toIntOrNull() ?: TCP_PORT
-                                writeLog("Discovered Server at $ip:$port → Connecting TCP...")
+                                writeLog("Discovered Server at $ip:$port ??Connecting TCP...")
                                 startTcpClient(ip, port)
                                 break
                             }
@@ -350,40 +346,28 @@ class SyncService : Service() {
         }.apply { isDaemon = true; start() }
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
     // DIRECT TCP CONNECT FALLBACK (FOR HOTSPOT & BT TETHERING)
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
 
     private fun startDirectConnectFallback() {
         if (directConnectThread?.isAlive == true) return
         directConnectThread = Thread {
             writeLog("Starting Direct Connection Fallback thread...")
-            val fallbackIps = listOf("192.168.43.1", "192.168.44.1", "192.168.45.1", "192.168.1.1", "192.168.0.1")
             
             while (isServiceActive) {
                 if (!isSocketRunning) {
-                    val fallbackIps = mutableListOf<String>()
-                    getWifiGatewayIp()?.let {
-                        fallbackIps.add(it)
-                    }
-                    fallbackIps.addAll(listOf("192.168.43.1", "192.168.44.1", "192.168.45.1", "192.168.1.1", "192.168.0.1"))
-                    val uniqueIps = fallbackIps.distinct()
-                    
-                    for (ip in uniqueIps) {
-                        if (isSocketRunning) break
+                    val gatewayIp = getWifiGatewayIp()
+                    if (gatewayIp != null) {
                         try {
                             val socket = Socket()
                             socket.receiveBufferSize = BUFFER_SIZE
                             socket.sendBufferSize = BUFFER_SIZE
                             
-                            activeWifiNetwork?.let {
-                                it.bindSocket(socket)
-                            }
+                            writeLog("Attempting direct TCP connection to gateway: $gatewayIp:$TCP_PORT...")
+                            socket.connect(InetSocketAddress(gatewayIp, TCP_PORT), 5000)
                             
-                            writeLog("Attempting direct TCP connection to gateway: $ip:$TCP_PORT...")
-                            socket.connect(InetSocketAddress(ip, TCP_PORT), 3000)
-                            
-                            writeLog("Direct connection success to $ip! Initiating synchronization client...")
+                            writeLog("Direct connection success to $gatewayIp! Initiating synchronization client...")
                             tcpSocket = socket
                             isSocketRunning = true
                             
@@ -397,13 +381,15 @@ class SyncService : Service() {
                                 handleSocketCommand(line, socket.getInputStream())
                             }
                         } catch (e: Exception) {
-                            // Silently ignore
+                            writeLog("Direct connect to $gatewayIp failed: ${e.message}")
                         } finally {
                             if (isSocketRunning) {
                                 writeLog("Direct client session closed.")
                                 stopTcpClient()
                             }
                         }
+                    } else {
+                        writeLog("No DHCP gateway IP detected, waiting...")
                     }
                 }
                 Thread.sleep(3000)
@@ -411,9 +397,9 @@ class SyncService : Service() {
         }.apply { isDaemon = true; start() }
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
     // TCP CLIENT (UDP BEACON INITIATED)
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
 
     private fun startTcpClient(ip: String, port: Int) {
         if (isSocketRunning) return
@@ -425,9 +411,7 @@ class SyncService : Service() {
                 socket.receiveBufferSize = BUFFER_SIZE
                 socket.sendBufferSize = BUFFER_SIZE
 
-                activeWifiNetwork?.let {
-                    it.bindSocket(socket)
-                }
+                // bindProcessToNetwork already handles routing at process level
 
                 socket.connect(InetSocketAddress(ip, port), 15000)
                 tcpSocket = socket
@@ -447,7 +431,7 @@ class SyncService : Service() {
             } finally {
                 writeLog("TCP closed. Resetting socket state for retry...")
                 stopTcpClient()
-                // Do NOT call stopSelf() here — let directConnectFallback retry automatically.
+                // Do NOT call stopSelf() here ??let directConnectFallback retry automatically.
             }
         }.apply { isDaemon = true; start() }
     }
@@ -505,9 +489,9 @@ class SyncService : Service() {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
     // COLA FILE COMPRESSION
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
 
     private var totalUncompressedBytes = 0L
     private var currentUncompressedBytes = 0L
@@ -700,13 +684,13 @@ class SyncService : Service() {
             try { f.delete() } catch (_: Exception) {}
         }
 
-        writeLog("COMPRESS: log folder → $zipName")
+        writeLog("COMPRESS: log folder ??$zipName")
         try {
             ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
                 zos.setLevel(java.util.zip.Deflater.NO_COMPRESSION)
                 addFolderToZip(logFolder, "log", zos)
             }
-            writeLog("COMPRESS: done → $zipName")
+            writeLog("COMPRESS: done ??$zipName")
         } catch (e: Exception) {
             writeLog("COMPRESS log error: ${e.message}")
             try { zipFile.delete() } catch (_: Exception) {}
@@ -761,7 +745,7 @@ class SyncService : Service() {
             sendSocketLine("FILE_START:$filename:$size:$md5")
             socketWriter?.flush()
             
-            // 패킷 병합 방지: 폰의 BufferedReader가 파일 데이터까지 미리 읽어버리는 현상을 막기 위해 패킷 경계선(Delay) 형성
+            // ?⑦궥 蹂묓빀 諛⑹?: ?곗쓽 BufferedReader媛 ?뚯씪 ?곗씠?곌퉴吏 誘몃━ ?쎌뼱踰꾨━???꾩긽??留됯린 ?꾪빐 ?⑦궥 寃쎄퀎??Delay) ?뺤꽦
             Thread.sleep(200)
             
             val out = BufferedOutputStream(tcpSocket?.getOutputStream() ?: return, BUFFER_SIZE)
@@ -809,9 +793,9 @@ class SyncService : Service() {
         return arr.toString()
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
     // UTILITIES
-    // ────────────────────────────────────────────────────────────────
+    // ????????????????????????????????????????????????????????????????
 
     private fun getWifiGatewayIp(): String? {
         return try {
@@ -868,7 +852,7 @@ class SyncService : Service() {
     private fun createNotification(): Notification =
         NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("HealthPort Sync")
-            .setContentText("기기 연동 대기 중...")
+            .setContentText("湲곌린 ?곕룞 ?湲?以?..")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .build()
 }
