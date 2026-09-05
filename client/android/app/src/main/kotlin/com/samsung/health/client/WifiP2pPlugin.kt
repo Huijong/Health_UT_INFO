@@ -20,6 +20,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
 import java.util.Locale
+import java.net.InetSocketAddress
 
 class WifiP2pPlugin(private val context: Context) {
 
@@ -27,8 +28,8 @@ class WifiP2pPlugin(private val context: Context) {
         private const val TAG = "HP_WifiPlugin"
         private const val METHOD_CHANNEL = "com.samsung.health.client/wifi_p2p"
         private const val EVENT_CHANNEL  = "com.samsung.health.client/wifi_p2p_events"
-        private const val TCP_PORT       = 8888
-        private const val UDP_PORT       = 8888
+        private const val TCP_PORT       = 34567
+        private const val UDP_PORT       = 34567
 
         const val FIXED_SSID = "healthport"
         const val PRIMARY_PASS = "00000000"
@@ -119,7 +120,7 @@ class WifiP2pPlugin(private val context: Context) {
         }
 
         // 1. Start TCP ServerSocket
-        startTcpServerThread()
+        startTcpServerThread(ip)
 
         // 2. Broadcast UDP Beacon on targeted subnet
         startMultiSubnetUdpBeacon(ip, mode)
@@ -141,7 +142,9 @@ class WifiP2pPlugin(private val context: Context) {
         if (udpBeaconThread?.isAlive == true) return
         udpBeaconThread = Thread {
             try {
-                val socket = DatagramSocket()
+                val socket = DatagramSocket(null)
+                socket.reuseAddress = true
+                socket.bind(InetSocketAddress(primaryIp, 0))
                 socket.broadcast = true
 
                 while (isServerRunning) {
@@ -200,14 +203,15 @@ class WifiP2pPlugin(private val context: Context) {
     // TCP SERVER
     // ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 
-    private fun startTcpServerThread() {
+    private fun startTcpServerThread(activeIp: String) {
         Thread {
             try {
-                serverSocket = ServerSocket(TCP_PORT).apply {
+                serverSocket = ServerSocket().apply {
                     reuseAddress = true
                     receiveBufferSize = BUFFER_SIZE
+                    bind(InetSocketAddress(TCP_PORT))
                 }
-                Log.i(TAG, "TCP Server listening on port $TCP_PORT with 1MB Buffer")
+                Log.i(TAG, "TCP Server listening on $activeIp:$TCP_PORT with 1MB Buffer")
                 while (isServerRunning) {
                     val socket = serverSocket?.accept() ?: break
                     Log.i(TAG, "Watch connected from ${socket.inetAddress.hostAddress}")
@@ -265,7 +269,14 @@ class WifiP2pPlugin(private val context: Context) {
 
     private fun sendSocketLine(text: String) {
         Thread {
-            try { socketWriter?.run { write(text + "\n"); flush() } }
+            try {
+                if (socketWriter != null) {
+                    socketWriter?.run { write(text + "\n"); flush() }
+                    Log.i(TAG, "[SOCKET] Sent: $text")
+                } else {
+                    Log.e(TAG, "[SOCKET] socketWriter is NULL - cannot send: $text")
+                }
+            }
             catch (e: Exception) { Log.e(TAG, "sendSocketLine: ${e.message}") }
         }.start()
     }
@@ -294,10 +305,16 @@ class WifiP2pPlugin(private val context: Context) {
                     Log.i(TAG, "Socket: $line")
                     when {
                         line == "HELLO_FROM_WATCH" -> {
-                            sendEvent("connectionStateChanged", mapOf(
-                                "connected" to true,
-                                "deviceName" to (socket.inetAddress.hostAddress ?: "Watch")
-                            ))
+                            Log.i(TAG, "[HANDSHAKE] HELLO_FROM_WATCH received. eventSink=${if (eventSink != null) "SET" else "NULL"}")
+                            if (eventSink != null) {
+                                sendEvent("connectionStateChanged", mapOf(
+                                    "connected" to true,
+                                    "deviceName" to (socket.inetAddress.hostAddress ?: "Watch")
+                                ))
+                                Log.i(TAG, "[HANDSHAKE] connectionStateChanged event fired.")
+                            } else {
+                                Log.e(TAG, "[HANDSHAKE] eventSink is NULL - event DROPPED. Flutter is not listening!")
+                            }
                         }
                         line == "COMPRESSING" ->
                             sendEvent("compressing", null)
@@ -435,6 +452,10 @@ class WifiP2pPlugin(private val context: Context) {
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()
             val allIps = mutableListOf<String>()
+            var bestIp: String? = null
+            var fallbackIp: String? = null
+            
+            val sb = java.lang.StringBuilder("Network Interfaces: ")
             
             while (interfaces.hasMoreElements()) {
                 val networkInterface = interfaces.nextElement()
@@ -446,21 +467,30 @@ class WifiP2pPlugin(private val context: Context) {
                     if (!inetAddress.isLoopbackAddress && inetAddress.hostAddress.indexOf(':') < 0) {
                         val host = inetAddress.hostAddress ?: continue
                         allIps.add(host)
+                        sb.append("[$name=$host] ")
                         
-                        // 1. Prefer known static hotspot IPs
-                        if (host.startsWith("192.168.44.") || host.startsWith("192.168.45.") || host.startsWith("192.168.43.")) {
-                            return host
+                        // Ignore clat/v4 interfaces which often get 192.0.0.x
+                        if (host.startsWith("192.0.0.")) {
+                            continue
                         }
-                        // 2. Prefer Wi-Fi or Hotspot interfaces (Android 14+ randomizes IPs on wlan0/ap0/swlan0)
-                        if (name.contains("wlan") || name.contains("ap") || name.contains("swlan") || name.contains("hotspot")) {
-                            return host
+                        
+                        if (name.contains("wlan1") || name.contains("swlan") || name.contains("ap") || name.contains("bt-pan") || name.contains("rndis")) {
+                            bestIp = host
+                        } else if (name.contains("wlan") && bestIp == null) {
+                            fallbackIp = host
+                        } else if (host.startsWith("192.168.") && bestIp == null && fallbackIp == null) {
+                            fallbackIp = host
                         }
                     }
                 }
             }
             
-            // 3. Fallback to the first non-cellular looking IP if possible, or just the first one
-            val nonCellular = allIps.firstOrNull { !it.startsWith("10.") || it.startsWith("10.10") || it.startsWith("10.3") }
+            Log.d(TAG, sb.toString())
+            
+            if (bestIp != null) return bestIp
+            if (fallbackIp != null) return fallbackIp
+            
+            val nonCellular = allIps.firstOrNull { !it.startsWith("192.0.0.") && (!it.startsWith("10.") || it.startsWith("10.10") || it.startsWith("10.3")) }
             return nonCellular ?: allIps.firstOrNull() ?: "192.168.43.1"
             
         } catch (e: Exception) {

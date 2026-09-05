@@ -35,8 +35,8 @@ class SyncService : Service() {
     companion object {
         private const val TAG = "HP_SyncService"
         private const val CHANNEL_ID = "WatchSyncServiceChannel"
-        private const val TCP_PORT = 8888
-        private const val UDP_PORT = 8888
+        private const val TCP_PORT = 34567
+        private const val UDP_PORT = 34567
         private const val BUFFER_SIZE = 1024 * 1024
 
         @Volatile
@@ -53,6 +53,8 @@ class SyncService : Service() {
     private var socketWriter: BufferedWriter? = null
     private var socketReader: BufferedReader? = null
     private var isSocketRunning = false
+    @Volatile private var socketWasBound = false
+    @Volatile private var hotspotGatewayIp: String? = null  // Was socket bound to WiFi network?
 
     // Service state
     private var isServiceActive = false
@@ -64,7 +66,8 @@ class SyncService : Service() {
 
     // UDP Listener
     private var udpListenerThread: Thread? = null
-    private var udpStarted = false
+    @Volatile private var udpStarted = false
+    private var udpSocket: DatagramSocket? = null
 
     // Direct Connect Thread for Hotspot
     private var directConnectThread: Thread? = null
@@ -73,13 +76,14 @@ class SyncService : Service() {
     private var activeWifiNetwork: Network? = null
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private val allDetectedGateways = java.util.concurrent.CopyOnWriteArraySet<String>()
 
     // Auto Wifi Join System Callback
     private var autoJoinCallback: ConnectivityManager.NetworkCallback? = null
 
-    // ????????????????????????????????????????????????????????????????
+    // ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
     // LIFECYCLE
-    // ????????????????????????????????????????????????????????????????
+    // ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
     override fun onCreate() {
         super.onCreate()
@@ -164,6 +168,7 @@ class SyncService : Service() {
             // 2. Build Network Request
             val request = NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .setNetworkSpecifier(specifier)
                 .build()
 
@@ -219,15 +224,42 @@ class SyncService : Service() {
             writeLog("Requesting physical Wi-Fi network link (offline ok) from OS...")
             val request = NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .build()
 
             networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     super.onAvailable(network)
-                    writeLog("Physical Wi-Fi network available!")
+                    writeLog("Physical Wi-Fi network available! Setting activeWifiNetwork.")
                     activeWifiNetwork = network
-                    // Force reconnect through Wi-Fi path
-                    stopTcpClient()
+                    
+                    try {
+                        connectivityManager?.bindProcessToNetwork(network)
+                        writeLog("Process bound to Wi-Fi network for robust routing.")
+                    } catch (e: Exception) {
+                        writeLog("Failed to bind process to network: ${e.message}")
+                    }
+                    
+                    // Restart UDP Beacon Listener to bind it cleanly to the new Wi-Fi interface!
+                    stopUdpBeaconListener()
+                    startUdpBeaconListener()
+                    
+                    if (isSocketRunning && !socketWasBound) {
+                        writeLog("Wi-Fi is now available, but current connection is via Bluetooth. Reconnecting over Wi-Fi...")
+                        stopTcpClient()
+                    }
+                }
+                
+                override fun onLinkPropertiesChanged(network: Network, linkProperties: android.net.LinkProperties) {
+                    super.onLinkPropertiesChanged(network, linkProperties)
+                    for (route in linkProperties.routes) {
+                        val ip = route.gateway?.hostAddress
+                        if (ip != null && ip != "0.0.0.0" && ip != "::") {
+                            hotspotGatewayIp = ip
+                            allDetectedGateways.add(ip)
+                            writeLog("Wi-Fi LinkProperties Gateway IP detected: $ip")
+                        }
+                    }
                 }
 
                 override fun onLost(network: Network) {
@@ -235,6 +267,9 @@ class SyncService : Service() {
                     writeLog("Physical Wi-Fi network lost.")
                     if (activeWifiNetwork == network) {
                         activeWifiNetwork = null
+                        try {
+                            connectivityManager?.bindProcessToNetwork(null)
+                        } catch (e: Exception) {}
                     }
                 }
             }
@@ -304,44 +339,76 @@ class SyncService : Service() {
     // ????????????????????????????????????????????????????????????????
 
     private fun startUdpBeaconListener() {
-        if (udpStarted || isSocketRunning) return
+        if (udpStarted) return
         udpStarted = true
 
         udpListenerThread = Thread {
             writeLog("Starting UDP Beacon Listener on port $UDP_PORT...")
-            var ds: DatagramSocket? = null
+            var localSocket: DatagramSocket? = null
             try {
-                ds = DatagramSocket(null)
-                ds.reuseAddress = true
-                ds.soTimeout = 15000
-                ds.bind(InetSocketAddress(UDP_PORT))
+                localSocket = DatagramSocket(null)
+                localSocket.reuseAddress = true
+                udpSocket = localSocket
+                
+                // Process is already bound to Wi-Fi network, so we don't need bindSocket here
+                
+                udpSocket?.soTimeout = 2000
+                udpSocket?.bind(InetSocketAddress(UDP_PORT))
 
                 val buf = ByteArray(1024)
-                while (isServiceActive && !isSocketRunning) {
+                while (isServiceActive) {
                     try {
                         val pkt = DatagramPacket(buf, buf.size)
-                        ds.receive(pkt)
+                        udpSocket?.receive(pkt)
                         val msg = String(pkt.data, 0, pkt.length, Charsets.UTF_8)
-                        writeLog("UDP Beacon received: $msg")
+                        val senderIp = pkt.address?.hostAddress
+                        writeLog("UDP Beacon received: $msg (Sender IP: $senderIp)")
                         if (msg.startsWith("HEALTHPORT_SERVER:")) {
                             val parts = msg.split(":")
                             if (parts.size >= 3) {
                                 val ip = parts[1]
                                 val port = parts[2].toIntOrNull() ?: TCP_PORT
-                                writeLog("Discovered Server at $ip:$port ??Connecting TCP...")
-                                startTcpClient(ip, port)
-                                break
+                                
+                                val ipsToTry = mutableListOf<String>()
+                                if (senderIp != null && senderIp.isNotEmpty() && senderIp != "0.0.0.0") ipsToTry.add(senderIp)
+                                if (ip.isNotEmpty() && ip != "0.0.0.0" && !ipsToTry.contains(ip)) ipsToTry.add(ip)
+                                
+                                writeLog("Discovered Server. Will try IPs: $ipsToTry :$port")
+                                
+                                if (isSocketRunning && tcpSocket != null && tcpSocket?.isConnected == true) {
+                                    val currentIp = tcpSocket?.inetAddress?.hostAddress
+                                    if (currentIp in ipsToTry || currentIp == hotspotGatewayIp) {
+                                        // Ignore beacon since we are already connected to a valid server
+                                        // writeLog("Ignoring beacon: Already connected to $currentIp") // Optional, but skip to avoid log spam
+                                        continue
+                                    }
+                                }
+                                
+                                if (isSocketRunning) {
+                                    writeLog("Stopping current socket to connect to beacon...")
+                                    stopTcpClient()
+                                }
+                                
+                                // Since startTcpClient currently only takes a single IP, we'll try to connect 
+                                // in a thread that tries each IP sequentially
+                                startTcpClientWithFailover(ipsToTry, port)
                             }
                         }
                     } catch (e: java.net.SocketTimeoutException) {
-                        writeLog("UDP timeout - listening for beacon...")
+                        // Ignore timeout, keep listening
+                    } catch (e: java.net.SocketException) {
+                        writeLog("UDP Socket closed, exiting listener...")
+                        break
                     }
                 }
             } catch (e: Exception) {
                 writeLog("UDP Beacon listener error: ${e.message}")
             } finally {
-                try { ds?.close() } catch (_: Exception) {}
-                udpStarted = false
+                try { localSocket?.close() } catch (_: Exception) {}
+                if (udpSocket == localSocket) {
+                    udpStarted = false
+                    udpSocket = null
+                }
             }
         }.apply { isDaemon = true; start() }
     }
@@ -357,39 +424,156 @@ class SyncService : Service() {
             
             while (isServiceActive) {
                 if (!isSocketRunning) {
-                    val gatewayIp = getWifiGatewayIp()
-                    if (gatewayIp != null) {
+                    val fallbackIps = mutableListOf<String>()
+                    fallbackIps.addAll(allDetectedGateways)
+                    fallbackIps.addAll(getWifiGatewayIps())
+                    fallbackIps.addAll(getSubnetRouterIps())
+                    fallbackIps.addAll(listOf("192.168.49.1", "192.168.43.1", "192.168.44.1", "192.168.45.1", "192.168.1.1", "192.168.0.1", "10.0.0.1", "172.16.0.1"))
+                    val uniqueIps = fallbackIps.distinct()
+                    
+                    for (ip in uniqueIps) {
+                        if (isSocketRunning) break
+                        var socket: Socket? = null
+                        var wasSuccessfullyConnected = false
                         try {
-                            val socket = Socket()
+                            socket = Socket()
                             socket.receiveBufferSize = BUFFER_SIZE
                             socket.sendBufferSize = BUFFER_SIZE
                             
-                            writeLog("Attempting direct TCP connection to gateway: $gatewayIp:$TCP_PORT...")
-                            socket.connect(InetSocketAddress(gatewayIp, TCP_PORT), 5000)
+                            // Process is bound to Wi-Fi network, so routing is handled automatically.
+                            socketWasBound = (activeWifiNetwork != null)
                             
-                            writeLog("Direct connection success to $gatewayIp! Initiating synchronization client...")
+                            writeLog("Attempting direct TCP connection to gateway: $ip:$TCP_PORT...")
+                            socket.connect(InetSocketAddress(ip, TCP_PORT), 2000)
+                            
+                            // Prevent overwriting if UDP beacon thread already successfully connected while we were blocking
+                            if (isSocketRunning && tcpSocket != null) {
+                                socket.close()
+                                break
+                            }
+                            
+                            writeLog("Direct connection success to $ip! Initiating synchronization client...")
                             tcpSocket = socket
                             isSocketRunning = true
                             
-                            socketWriter = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
-                            socketReader = BufferedReader(InputStreamReader(BufferedInputStream(socket.getInputStream(), BUFFER_SIZE), Charsets.UTF_8))
+                            val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
+                            socketWriter = writer
+                            writer.write("HELLO_FROM_WATCH\n")
+                            writer.flush()
                             
-                            sendSocketLine("HELLO_FROM_WATCH")
-                            
-                            while (isSocketRunning) {
-                                val line = socketReader?.readLine() ?: break
-                                handleSocketCommand(line, socket.getInputStream())
+                            if (isServiceActive) {
+                                val reader = java.io.BufferedReader(java.io.InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
+                                socketReader = reader
+                                handleSocketCommand("START_SYNC", socket.getInputStream())
+                                wasSuccessfullyConnected = true
+                                
+                                // Loop to read commands just like the normal TCP client
+                                while (isSocketRunning) {
+                                    val line = reader.readLine() ?: break
+                                    handleSocketCommand(line, socket.getInputStream()) 
+                                }
                             }
                         } catch (e: Exception) {
-                            writeLog("Direct connect to $gatewayIp failed: ${e.message}")
+                            // Silently ignore
                         } finally {
-                            if (isSocketRunning) {
+                            if (isSocketRunning && tcpSocket != null && tcpSocket == socket) {
                                 writeLog("Direct client session closed.")
                                 stopTcpClient()
                             }
                         }
-                    } else {
-                        writeLog("No DHCP gateway IP detected, waiting...")
+                        if (wasSuccessfullyConnected) {
+                            writeLog("Previous session ended, restarting fallback loop to fetch new gateway IPs...")
+                            break
+                        }
+                    }
+                    
+                    if (!isSocketRunning) {
+                        writeLog("Sequential scan failed. Launching parallel full subnet scan (192.168.x.1 and Local Subnet)...")
+                        val executor = java.util.concurrent.Executors.newFixedThreadPool(64)
+                        
+                        val scanList = mutableListOf<String>()
+                        for (i in 0..255) {
+                            scanList.add("192.168.$i.1")
+                        }
+                        
+                        try {
+                            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                            val dhcp = wm.dhcpInfo
+                            val ip = dhcp.ipAddress
+                            if (ip != 0) {
+                                val ipAddr = String.format(java.util.Locale.US, "%d.%d.%d.",
+                                    ip and 0xff, ip shr 8 and 0xff, ip shr 16 and 0xff)
+                                for (j in 1..254) {
+                                    scanList.add(ipAddr + j)
+                                }
+                            }
+                        } catch (e: Exception) {}
+                        
+                        val latch = java.util.concurrent.CountDownLatch(scanList.size)
+                        
+                        for (ip in scanList) {
+                            executor.execute {
+                                if (isSocketRunning) {
+                                    latch.countDown()
+                                    return@execute
+                                }
+                                var socket: Socket? = null
+                                var wasSuccessfullyConnected = false
+                                try {
+                                    socket = Socket()
+                                    socket.receiveBufferSize = BUFFER_SIZE
+                                    socket.sendBufferSize = BUFFER_SIZE
+                                    socketWasBound = (activeWifiNetwork != null)
+                                    
+                                    socket.connect(InetSocketAddress(ip, TCP_PORT), 800)
+                                    
+                                    synchronized(this) {
+                                        if (!isSocketRunning) {
+                                            writeLog("PARALLEL SCAN SUCCESS to $ip! Initiating synchronization client...")
+                                            tcpSocket = socket
+                                            isSocketRunning = true
+                                            val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
+                                            socketWriter = writer
+                                            writer.write("HELLO_FROM_WATCH\n")
+                                            writer.flush()
+                                        } else {
+                                            socket.close()
+                                        }
+                                    }
+                                    
+                                    if (isSocketRunning && tcpSocket == socket && isServiceActive) {
+                                        val reader = java.io.BufferedReader(java.io.InputStreamReader(socket!!.getInputStream(), Charsets.UTF_8))
+                                        socketReader = reader
+                                        handleSocketCommand("START_SYNC", socket!!.getInputStream())
+                                        wasSuccessfullyConnected = true
+                                        
+                                        while (isSocketRunning && tcpSocket == socket) {
+                                            val line = reader.readLine() ?: break
+                                            handleSocketCommand(line, socket!!.getInputStream()) 
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                } finally {
+                                    if (isSocketRunning && tcpSocket != null && tcpSocket == socket) {
+                                        writeLog("Direct client session closed (parallel).")
+                                        stopTcpClient()
+                                    }
+                                    latch.countDown()
+                                }
+                            }
+                        }
+                        
+                        try {
+                            latch.await(3000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                        } catch (e: Exception) {}
+                        executor.shutdownNow()
+                        
+                        if (isSocketRunning) {
+                            // Block this loop until socket dies
+                            while (isSocketRunning) {
+                                Thread.sleep(1000)
+                            }
+                        }
                     }
                 }
                 Thread.sleep(3000)
@@ -397,9 +581,64 @@ class SyncService : Service() {
         }.apply { isDaemon = true; start() }
     }
 
-    // ????????????????????????????????????????????????????????????????
-    // TCP CLIENT (UDP BEACON INITIATED)
-    // ????????????????????????????????????????????????????????????????
+    private fun stopUdpBeaconListener() {
+        udpStarted = false
+        try { udpSocket?.close() } catch (_: Exception) {}
+        udpSocket = null
+        try { udpListenerThread?.interrupt() } catch (_: Exception) {}
+        udpListenerThread = null
+    }
+
+    // ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+    // TCP CLIENT (UDP BEACON INITIATED) 
+    // ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+
+    private fun startTcpClientWithFailover(ips: List<String>, port: Int) {
+        if (isSocketRunning) return
+        isSocketRunning = true
+        Thread {
+            for (ip in ips) {
+                try {
+                    writeLog("TCP connecting to failover $ip:$port...")
+                    val socket = Socket()
+                    activeWifiNetwork?.let {
+                        writeLog("Binding socket to active Wi-Fi network before connecting...")
+                        it.bindSocket(socket)
+                        socketWasBound = true
+                    } ?: run {
+                        socketWasBound = false
+                    }
+                    socket.connect(InetSocketAddress(ip, port), 10000)
+                    
+                    socket.tcpNoDelay = true
+                    socket.soTimeout = 0
+                    tcpSocket = socket
+                    
+                    socketWriter = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
+                    socketReader = BufferedReader(InputStreamReader(BufferedInputStream(socket.getInputStream(), BUFFER_SIZE), Charsets.UTF_8))
+                    
+                    writeLog("TCP Connected to $ip:$port")
+                    
+                    sendSocketLine("HELLO_FROM_WATCH")
+
+                    while (isSocketRunning) {
+                        val line = socketReader?.readLine() ?: break
+                        handleSocketCommand(line, socket.getInputStream())
+                    }
+                    
+                    stopTcpClient()
+                    return@Thread // Successfully connected and handled, break the loop
+                } catch (e: Exception) {
+                    writeLog("Failed to connect to $ip:$port - ${e.message}")
+                    try { tcpSocket?.close() } catch (_: Exception) {}
+                    tcpSocket = null
+                    socketWriter = null
+                }
+            }
+            writeLog("Failed to connect to all IPs: $ips")
+            isSocketRunning = false
+        }.apply { isDaemon = true; start() }
+    }
 
     private fun startTcpClient(ip: String, port: Int) {
         if (isSocketRunning) return
@@ -411,7 +650,9 @@ class SyncService : Service() {
                 socket.receiveBufferSize = BUFFER_SIZE
                 socket.sendBufferSize = BUFFER_SIZE
 
-                // bindProcessToNetwork already handles routing at process level
+                activeWifiNetwork?.let {
+                    it.bindSocket(socket)
+                }
 
                 socket.connect(InetSocketAddress(ip, port), 15000)
                 tcpSocket = socket
@@ -438,9 +679,10 @@ class SyncService : Service() {
 
     private fun stopTcpClient() {
         isSocketRunning = false
+        socketWasBound = false
+        try { tcpSocket?.close() } catch (_: Exception) {}
         try { socketWriter?.close() } catch (_: Exception) {}
         try { socketReader?.close() } catch (_: Exception) {}
-        try { tcpSocket?.close() } catch (_: Exception) {}
         socketWriter = null; socketReader = null; tcpSocket = null
     }
 
@@ -797,29 +1039,56 @@ class SyncService : Service() {
     // UTILITIES
     // ????????????????????????????????????????????????????????????????
 
-    private fun getWifiGatewayIp(): String? {
-        return try {
+    private fun getWifiGatewayIps(): List<String> {
+        val ips = mutableListOf<String>()
+        try {
             val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             val dhcp = wm.dhcpInfo
+            
             val gateway = dhcp.gateway
             if (gateway != 0) {
-                val ip = String.format(
-                    java.util.Locale.US,
-                    "%d.%d.%d.%d",
-                    gateway and 0xff,
-                    gateway shr 8 and 0xff,
-                    gateway shr 16 and 0xff,
-                    gateway shr 24 and 0xff
-                )
+                val ip = String.format(java.util.Locale.US, "%d.%d.%d.%d",
+                    gateway and 0xff, gateway shr 8 and 0xff, gateway shr 16 and 0xff, gateway shr 24 and 0xff)
                 writeLog("DHCP detected Gateway IP: $ip")
-                ip
-            } else {
-                null
+                ips.add(ip)
+            }
+            
+            val server = dhcp.serverAddress
+            if (server != 0 && server != gateway) {
+                val ip = String.format(java.util.Locale.US, "%d.%d.%d.%d",
+                    server and 0xff, server shr 8 and 0xff, server shr 16 and 0xff, server shr 24 and 0xff)
+                writeLog("DHCP detected Server IP: $ip")
+                ips.add(ip)
+            }
+            
+            val dns1 = dhcp.dns1
+            if (dns1 != 0 && dns1 != gateway && dns1 != server) {
+                val ip = String.format(java.util.Locale.US, "%d.%d.%d.%d",
+                    dns1 and 0xff, dns1 shr 8 and 0xff, dns1 shr 16 and 0xff, dns1 shr 24 and 0xff)
+                writeLog("DHCP detected DNS IP: $ip")
+                ips.add(ip)
             }
         } catch (e: Exception) {
-            writeLog("Failed to read DHCP gateway: ${e.message}")
-            null
+            writeLog("Failed to read DHCP IPs: ${e.message}")
         }
+        return ips
+    }
+
+    private fun getSubnetRouterIps(): List<String> {
+        val ips = mutableListOf<String>()
+        try {
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val dhcp = wm.dhcpInfo
+            val ip = dhcp.ipAddress
+            if (ip != 0) {
+                val ipAddr = String.format(java.util.Locale.US, "%d.%d.%d.",
+                    ip and 0xff, ip shr 8 and 0xff, ip shr 16 and 0xff)
+                ips.add(ipAddr + "1")
+                ips.add(ipAddr + "254")
+                writeLog("Derived subnet router IPs: ${ipAddr}1, ${ipAddr}254")
+            }
+        } catch (e: Exception) {}
+        return ips
     }
 
     private fun getMd5(file: File): String {
