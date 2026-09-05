@@ -1,0 +1,1 @@
+adb -s R3CX905XRMT logcat -s HP_WifiPlugin
