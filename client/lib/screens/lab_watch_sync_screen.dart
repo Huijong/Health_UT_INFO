@@ -256,9 +256,29 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         break;
 
       case "hotspotStarted":
-        final ssid = data["ssid"] as String? ?? "healthport";
-        final pw   = data["password"] as String? ?? "00000000";
+        String? pluginSsid = data["ssid"] as String?;
+        String? pluginPw = data["password"] as String?;
+        
+        final ssid = (pluginSsid != null && pluginSsid.isNotEmpty && pluginSsid != "healthport" && pluginSsid != "Unknown") 
+            ? pluginSsid 
+            : (widget.hotspotSsid ?? "healthport");
+            
+        final pw = (pluginPw != null && pluginPw.isNotEmpty && pluginPw != "00000000") 
+            ? pluginPw 
+            : (widget.hotspotPwd ?? "12345678");
+
         _addLog("Direct Hotspot Started: SSID=$ssid, PW=$pw");
+        
+        // 워치에 사용자가 입력한(또는 자동 생성된) SSID/비번 전달
+        if (_connectedEndpointId == null && mounted) {
+          _addLog("Sending Wake Up Request to watch...");
+          _appChannel.invokeMethod("requestWatchWifiJoin", {
+            "ssid": ssid,
+            "pwd": pw,
+          }).catchError((e) {
+            _addLog("Failed to send Wi-Fi join request: $e");
+          });
+        }
         break;
 
       case "fileListReceived":
@@ -581,22 +601,10 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     try {
       await _wifiP2pChannel.invokeMethod("startServer", {"mode": _syncMode});
       
-      // Request watch to join the custom hotspot
+      // Request watch to join the custom hotspot (now handled dynamically in hotspotStarted event)
       if (widget.hotspotSsid != null && widget.hotspotPwd != null) {
         _addLog("Waiting for WearOS Data Layer to initialize...");
         await Future.delayed(const Duration(milliseconds: 1500));
-        
-        // 2번째 자동 동기화 시 이미 워치가 백그라운드에서 연결을 완료했을 수 있으므로,
-        // 연결이 완료된 상태라면 와이파이 조인 요청을 보내지 않음 (워치의 네트워크 재설정 및 통신 끊김 방지)
-        if (_connectedEndpointId == null && mounted) {
-          _addLog("Sending Wi-Fi Join Request to watch for SSID: ${widget.hotspotSsid}...");
-          await _appChannel.invokeMethod("requestWatchWifiJoin", {
-            "ssid": widget.hotspotSsid,
-            "pwd": widget.hotspotPwd,
-          });
-        } else {
-          _addLog("Watch already connected. Skipping Wi-Fi Join Request.");
-        }
       }
       
       if (_syncMode == 'BT') {

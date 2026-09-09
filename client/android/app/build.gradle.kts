@@ -44,6 +44,7 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
@@ -53,6 +54,7 @@ flutter {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-nearby:18.7.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
     implementation("androidx.wear:wear-remote-interactions:1.0.0")

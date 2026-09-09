@@ -6,940 +6,227 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
-import android.net.wifi.WifiManager
-import android.net.wifi.WifiNetworkSpecifier
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.google.android.gms.nearby.Nearby
+import com.google.android.gms.nearby.connection.ConnectionInfo
+import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback
+import com.google.android.gms.nearby.connection.ConnectionResolution
+import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo
+import com.google.android.gms.nearby.connection.DiscoveryOptions
+import com.google.android.gms.nearby.connection.EndpointDiscoveryCallback
+import com.google.android.gms.nearby.connection.Payload
+import com.google.android.gms.nearby.connection.PayloadCallback
+import com.google.android.gms.nearby.connection.PayloadTransferUpdate
+import com.google.android.gms.nearby.connection.Strategy
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.*
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetSocketAddress
-import java.net.Socket
-import java.security.MessageDigest
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.nio.charset.StandardCharsets
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import java.util.concurrent.Executors
 
 class SyncService : Service() {
-
     companion object {
         private const val TAG = "HP_SyncService"
         private const val CHANNEL_ID = "WatchSyncServiceChannel"
-        private const val TCP_PORT = 34567
-        private const val UDP_PORT = 34567
-        private const val BUFFER_SIZE = 1024 * 1024
-
-        @Volatile
-        var isRunning = false
+        private const val SERVICE_ID = "com.samsung.health.sync"
+        @Volatile var isRunning = false
     }
 
-    private var wakeLock: PowerManager.WakeLock? = null
-    private var wifiLock: WifiManager.WifiLock? = null
-
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    // TCP Socket
-    private var tcpSocket: Socket? = null
-    private var socketWriter: BufferedWriter? = null
-    private var socketReader: BufferedReader? = null
-    private var isSocketRunning = false
-    @Volatile private var socketWasBound = false
-    @Volatile private var hotspotGatewayIp: String? = null  // Was socket bound to WiFi network?
-
-    // Service state
     private var isServiceActive = false
-
-    // Compression progress state
-    private var totalCompressionBytes: Long = 0L
-    private var currentCompressedBytes: Long = 0L
-    private var lastCompressionReportTime: Long = 0L
-
-    // UDP Listener
-    private var udpListenerThread: Thread? = null
-    @Volatile private var udpStarted = false
-    private var udpSocket: DatagramSocket? = null
-
-    // Direct Connect Thread for Hotspot
-    private var directConnectThread: Thread? = null
-
-    // Active Wi-Fi Network for binding
-    private var activeWifiNetwork: Network? = null
-    private var connectivityManager: ConnectivityManager? = null
-    private var networkCallback: ConnectivityManager.NetworkCallback? = null
-    private val allDetectedGateways = java.util.concurrent.CopyOnWriteArraySet<String>()
-
-    // Auto Wifi Join System Callback
-    private var autoJoinCallback: ConnectivityManager.NetworkCallback? = null
-
-    // ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
-    // LIFECYCLE
-    // ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+    private var wakeLock: PowerManager.WakeLock? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var connectedEndpointId: String? = null
 
     override fun onCreate() {
         super.onCreate()
+        isServiceActive = true
         isRunning = true
         createNotificationChannel()
-        acquireLocks()
-
-        connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(1, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-            } else {
-                startForeground(1, createNotification())
-            }
-            writeLog("Foreground service started successfully.")
-        } catch (e: Exception) {
-            writeLog("Foreground start error: ${e.message}")
-            try { startForeground(1, createNotification()) } catch (_: Exception) {}
-        }
-
-        isServiceActive = true
-        ensureWifiEnabled()
-
-        // Request Physical Wi-Fi Network directly (without internet requirement for offline hotspot compatibility)
-        requestPhysicalWifiNetwork()
-
-        // Start UDP listener immediately
-        startUdpBeaconListener()
-
-        // Start Direct Connect fallback
-        startDirectConnectFallback()
+        startForeground(1, buildNotification("Ready", "Waiting for command"))
+        acquireWakeLock()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent != null && intent.action == "ACTION_TRIGGER_WIFI_JOIN") {
-            writeLog("Received Intent command: ACTION_TRIGGER_WIFI_JOIN. Scheduling Wi-Fi join in 1.5s...")
-            mainHandler.postDelayed({
-                triggerWifiNetworkSpecifier(intent.getStringExtra("ssid") ?: "healthport", intent.getStringExtra("pwd") ?: "12345678")
-            }, 1500)
+        if (intent?.action == "ACTION_TRIGGER_WIFI_JOIN") {
+            writeLog("Received Intent command. Starting Nearby Discovery...")
+            startDiscovery()
         }
-        return START_STICKY
+        return START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+        isServiceActive = false
+        isRunning = false
+        stopDiscovery()
+        connectedEndpointId?.let { Nearby.getConnectionsClient(this).disconnectFromEndpoint(it) }
+        releaseWakeLock()
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onDestroy() {
-        writeLog("Destroying SyncService. Releasing resources...")
-        isRunning = false
-        isServiceActive = false
-        mainHandler.removeCallbacksAndMessages(null)
-        stopTcpClient()
-        releaseWifiNetworkRequest()
-        releaseAutoJoinRequest()
-        releaseLocks()
-        super.onDestroy()
+    // -----------------------------------------------------------------------------------------
+    // NEARBY CONNECTIONS LOGIC
+    // -----------------------------------------------------------------------------------------
+    private fun startDiscovery() {
+        val options = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_POINT_TO_POINT).build()
+        Nearby.getConnectionsClient(this)
+            .startDiscovery(SERVICE_ID, endpointDiscoveryCallback, options)
+            .addOnSuccessListener { writeLog("Discovery started") }
+            .addOnFailureListener { e -> writeLog("Discovery failed: ${e.message}") }
     }
 
-    // ????????????????????????????????????????????????????????????????
-    // WIFI NETWORK SPECIFIER (AUTO JOIN GALAXY WATCH WI-FI)
-    // ????????????????????????????????????????????????????????????????
+    private fun stopDiscovery() {
+        Nearby.getConnectionsClient(this).stopDiscovery()
+    }
 
-    private fun triggerWifiNetworkSpecifier(ssid: String, pwd: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            writeLog("WifiNetworkSpecifier is not supported on Android version < 10")
-            return
+    private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
+        override fun onEndpointFound(epId: String, info: DiscoveredEndpointInfo) {
+            writeLog("Found endpoint: ${info.endpointName} ($epId). Requesting connection...")
+            Nearby.getConnectionsClient(this@SyncService)
+                .requestConnection("Watch", epId, connLifecycleCallback)
+                .addOnFailureListener { e -> writeLog("Request connection failed: ${e.message}") }
         }
-
-        try {
-            writeLog("Triggering WifiNetworkSpecifier for SSID '$ssid'...")
-            ensureWifiEnabled()
-
-            // Release any existing autojoin callback to prevent memory leak
-            releaseAutoJoinRequest()
-
-            // 1. Build Network Specifier targeting hotspot credentials
-            val specifier = WifiNetworkSpecifier.Builder()
-                .setSsid(ssid)
-                .setWpa2Passphrase(pwd)
-                .build()
-
-            // 2. Build Network Request
-            val request = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .setNetworkSpecifier(specifier)
-                .build()
-
-            // 3. Register callback. Android OS will now display a Wear OS popup asking user to approve join
-            autoJoinCallback = object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    super.onAvailable(network)
-                    writeLog("Successfully joined healthport hotspot network!")
-                    activeWifiNetwork = network
-                    
-                    // Restart UDP search immediately since we are now on the hotspot
-                    mainHandler.post {
-                        startUdpBeaconListener()
-                    }
-                }
-
-                override fun onUnavailable() {
-                    super.onUnavailable()
-                    writeLog("User denied joining healthport hotspot or network was not found.")
-                }
-
-                override fun onLost(network: Network) {
-                    super.onLost(network)
-                    writeLog("Connection to healthport lost.")
-                }
-            }
-
-            autoJoinCallback?.let {
-                connectivityManager?.requestNetwork(request, it)
-                writeLog("OS confirmation dialog has been triggered. Please look at the Watch Screen.")
-            }
-
-        } catch (e: Exception) {
-            writeLog("Failed to execute WifiNetworkSpecifier: ${e.message}")
+        override fun onEndpointLost(epId: String) {
+            writeLog("Lost endpoint: $epId")
         }
     }
 
-    private fun releaseAutoJoinRequest() {
-        try {
-            autoJoinCallback?.let {
-                connectivityManager?.unregisterNetworkCallback(it)
-            }
-            autoJoinCallback = null
-        } catch (_: Exception) {}
-    }
-
-    // ????????????????????????????????????????????????????????????????
-    // BIND PHYSICAL WI-FI NETWORK (BYPASS BLUETOOTH PROXY)
-    // ????????????????????????????????????????????????????????????????
-
-    private fun requestPhysicalWifiNetwork() {
-        try {
-            writeLog("Requesting physical Wi-Fi network link (offline ok) from OS...")
-            val request = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-
-            networkCallback = object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    super.onAvailable(network)
-                    writeLog("Physical Wi-Fi network available! Setting activeWifiNetwork.")
-                    activeWifiNetwork = network
-                    
-                    try {
-                        connectivityManager?.bindProcessToNetwork(network)
-                        writeLog("Process bound to Wi-Fi network for robust routing.")
-                    } catch (e: Exception) {
-                        writeLog("Failed to bind process to network: ${e.message}")
-                    }
-                    
-                    // Restart UDP Beacon Listener to bind it cleanly to the new Wi-Fi interface!
-                    stopUdpBeaconListener()
-                    startUdpBeaconListener()
-                    
-                    if (isSocketRunning && !socketWasBound) {
-                        writeLog("Wi-Fi is now available, but current connection is via Bluetooth. Reconnecting over Wi-Fi...")
-                        stopTcpClient()
-                    }
-                }
-                
-                override fun onLinkPropertiesChanged(network: Network, linkProperties: android.net.LinkProperties) {
-                    super.onLinkPropertiesChanged(network, linkProperties)
-                    for (route in linkProperties.routes) {
-                        val ip = route.gateway?.hostAddress
-                        if (ip != null && ip != "0.0.0.0" && ip != "::") {
-                            hotspotGatewayIp = ip
-                            allDetectedGateways.add(ip)
-                            writeLog("Wi-Fi LinkProperties Gateway IP detected: $ip")
-                        }
-                    }
-                }
-
-                override fun onLost(network: Network) {
-                    super.onLost(network)
-                    writeLog("Physical Wi-Fi network lost.")
-                    if (activeWifiNetwork == network) {
-                        activeWifiNetwork = null
-                        try {
-                            connectivityManager?.bindProcessToNetwork(null)
-                        } catch (e: Exception) {}
-                    }
-                }
-            }
-
-            networkCallback?.let {
-                connectivityManager?.requestNetwork(request, it)
-            }
-        } catch (e: Exception) {
-            writeLog("Failed to request Wi-Fi network: ${e.message}")
+    private val connLifecycleCallback = object : ConnectionLifecycleCallback() {
+        override fun onConnectionInitiated(epId: String, info: ConnectionInfo) {
+            writeLog("Connection initiated by ${info.endpointName}. Accepting...")
+            Nearby.getConnectionsClient(this@SyncService).acceptConnection(epId, payloadCallback)
         }
-    }
-
-    private fun releaseWifiNetworkRequest() {
-        try {
-            networkCallback?.let {
-                connectivityManager?.unregisterNetworkCallback(it)
-            }
-            activeWifiNetwork = null
-            writeLog("Wi-Fi network binding released.")
-        } catch (_: Exception) {}
-    }
-
-    // ????????????????????????????????????????????????????????????????
-    // LOCKS
-    // ????????????????????????????????????????????????????????????????
-
-    private fun acquireLocks() {
-        try {
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HealthPort:SyncWakeLock")
-                .apply { acquire(10 * 60 * 1000L) }
-            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            @Suppress("DEPRECATION")
-            wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "HealthPort:SyncWifiLock")
-                .apply { acquire() }
-            writeLog("WakeLock and WifiLock acquired.")
-        } catch (e: Exception) { Log.e(TAG, "Lock error: ${e.message}") }
-    }
-
-    private fun releaseLocks() {
-        try {
-            wakeLock?.let { if (it.isHeld) it.release() }
-            wifiLock?.let { if (it.isHeld) it.release() }
-            writeLog("Locks released.")
-        } catch (e: Exception) { Log.e(TAG, "Release lock error: ${e.message}") }
-    }
-
-    // ????????????????????????????????????????????????????????????????
-    // WI-FI HARDWARE
-    // ????????????????????????????????????????????????????????????????
-
-    private fun ensureWifiEnabled() {
-        try {
-            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            if (!wm.isWifiEnabled) {
-                writeLog("Wi-Fi is OFF ??turning ON...")
-                @Suppress("DEPRECATION")
-                wm.isWifiEnabled = true
+        override fun onConnectionResult(epId: String, res: ConnectionResolution) {
+            if (res.status.isSuccess) {
+                writeLog("Connected to $epId")
+                connectedEndpointId = epId
+                stopDiscovery()
+                sendCommand("HELLO_FROM_WATCH")
             } else {
-                writeLog("Wi-Fi hardware is already ON.")
+                writeLog("Connection failed: ${res.status.statusCode}")
             }
-        } catch (e: Exception) { writeLog("Wi-Fi check error: ${e.message}") }
+        }
+        override fun onDisconnected(epId: String) {
+            writeLog("Disconnected from $epId")
+            if (connectedEndpointId == epId) connectedEndpointId = null
+        }
     }
 
-    // ????????????????????????????????????????????????????????????????
-    // UDP BEACON LISTENER
-    // ????????????????????????????????????????????????????????????????
+    private fun sendCommand(cmd: String) {
+        val ep = connectedEndpointId ?: return
+        writeLog("Sending command: $cmd")
+        Nearby.getConnectionsClient(this).sendPayload(ep, Payload.fromBytes(cmd.toByteArray(StandardCharsets.UTF_8)))
+    }
 
-    private fun startUdpBeaconListener() {
-        if (udpStarted) return
-        udpStarted = true
-
-        udpListenerThread = Thread {
-            writeLog("Starting UDP Beacon Listener on port $UDP_PORT...")
-            var localSocket: DatagramSocket? = null
-            try {
-                localSocket = DatagramSocket(null)
-                localSocket.reuseAddress = true
-                udpSocket = localSocket
-                
-                // Process is already bound to Wi-Fi network, so we don't need bindSocket here
-                
-                udpSocket?.soTimeout = 2000
-                udpSocket?.bind(InetSocketAddress(UDP_PORT))
-
-                val buf = ByteArray(1024)
-                while (isServiceActive) {
-                    try {
-                        val pkt = DatagramPacket(buf, buf.size)
-                        udpSocket?.receive(pkt)
-                        val msg = String(pkt.data, 0, pkt.length, Charsets.UTF_8)
-                        val senderIp = pkt.address?.hostAddress
-                        writeLog("UDP Beacon received: $msg (Sender IP: $senderIp)")
-                        if (msg.startsWith("HEALTHPORT_SERVER:")) {
-                            val parts = msg.split(":")
-                            if (parts.size >= 3) {
-                                val ip = parts[1]
-                                val port = parts[2].toIntOrNull() ?: TCP_PORT
-                                
-                                val ipsToTry = mutableListOf<String>()
-                                if (senderIp != null && senderIp.isNotEmpty() && senderIp != "0.0.0.0") ipsToTry.add(senderIp)
-                                if (ip.isNotEmpty() && ip != "0.0.0.0" && !ipsToTry.contains(ip)) ipsToTry.add(ip)
-                                
-                                writeLog("Discovered Server. Will try IPs: $ipsToTry :$port")
-                                
-                                if (isSocketRunning && tcpSocket != null && tcpSocket?.isConnected == true) {
-                                    val currentIp = tcpSocket?.inetAddress?.hostAddress
-                                    if (currentIp in ipsToTry || currentIp == hotspotGatewayIp) {
-                                        // Ignore beacon since we are already connected to a valid server
-                                        // writeLog("Ignoring beacon: Already connected to $currentIp") // Optional, but skip to avoid log spam
-                                        continue
-                                    }
-                                }
-                                
-                                if (isSocketRunning) {
-                                    writeLog("Stopping current socket to connect to beacon...")
-                                    stopTcpClient()
-                                }
-                                
-                                // Since startTcpClient currently only takes a single IP, we'll try to connect 
-                                // in a thread that tries each IP sequentially
-                                startTcpClientWithFailover(ipsToTry, port)
-                            }
-                        }
-                    } catch (e: java.net.SocketTimeoutException) {
-                        // Ignore timeout, keep listening
-                    } catch (e: java.net.SocketException) {
-                        writeLog("UDP Socket closed, exiting listener...")
-                        break
-                    }
+    private val payloadCallback = object : PayloadCallback() {
+        override fun onPayloadReceived(epId: String, p: Payload) {
+            if (p.type == Payload.Type.BYTES) {
+                val cmd = String(p.asBytes()!!, StandardCharsets.UTF_8)
+                writeLog("Received cmd: $cmd")
+                handleCommand(cmd)
+            }
+        }
+        override fun onPayloadTransferUpdate(epId: String, upd: PayloadTransferUpdate) {
+            if (upd.status == PayloadTransferUpdate.Status.SUCCESS) {
+                if (currentTransferZip != null) {
+                    currentTransferZip?.delete()
+                    currentTransferZip = null
+                    writeLog("Transfer SUCCESS. Temp zip deleted.")
                 }
-            } catch (e: Exception) {
-                writeLog("UDP Beacon listener error: ${e.message}")
-            } finally {
-                try { localSocket?.close() } catch (_: Exception) {}
-                if (udpSocket == localSocket) {
-                    udpStarted = false
-                    udpSocket = null
+            } else if (upd.status == PayloadTransferUpdate.Status.FAILURE || upd.status == PayloadTransferUpdate.Status.CANCELED) {
+                if (currentTransferZip != null) {
+                    currentTransferZip?.delete()
+                    currentTransferZip = null
+                    writeLog("Transfer FAILED/CANCELED. Temp zip deleted.")
                 }
             }
-        }.apply { isDaemon = true; start() }
+        }
     }
 
-    // ????????????????????????????????????????????????????????????????
-    // DIRECT TCP CONNECT FALLBACK (FOR HOTSPOT & BT TETHERING)
-    // ????????????????????????????????????????????????????????????????
-
-    private fun startDirectConnectFallback() {
-        if (directConnectThread?.isAlive == true) return
-        directConnectThread = Thread {
-            writeLog("Starting Direct Connection Fallback thread...")
-            
-            while (isServiceActive) {
-                if (!isSocketRunning) {
-                    val fallbackIps = mutableListOf<String>()
-                    fallbackIps.addAll(allDetectedGateways)
-                    fallbackIps.addAll(getWifiGatewayIps())
-                    fallbackIps.addAll(getSubnetRouterIps())
-                    fallbackIps.addAll(listOf("192.168.49.1", "192.168.43.1", "192.168.44.1", "192.168.45.1", "192.168.1.1", "192.168.0.1", "10.0.0.1", "172.16.0.1"))
-                    val uniqueIps = fallbackIps.distinct()
-                    
-                    for (ip in uniqueIps) {
-                        if (isSocketRunning) break
-                        var socket: Socket? = null
-                        var wasSuccessfullyConnected = false
-                        try {
-                            socket = Socket()
-                            socket.receiveBufferSize = BUFFER_SIZE
-                            socket.sendBufferSize = BUFFER_SIZE
-                            
-                            // Process is bound to Wi-Fi network, so routing is handled automatically.
-                            socketWasBound = (activeWifiNetwork != null)
-                            
-                            writeLog("Attempting direct TCP connection to gateway: $ip:$TCP_PORT...")
-                            socket.connect(InetSocketAddress(ip, TCP_PORT), 2000)
-                            
-                            // Prevent overwriting if UDP beacon thread already successfully connected while we were blocking
-                            if (isSocketRunning && tcpSocket != null) {
-                                socket.close()
-                                break
-                            }
-                            
-                            writeLog("Direct connection success to $ip! Initiating synchronization client...")
-                            tcpSocket = socket
-                            isSocketRunning = true
-                            
-                            val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
-                            socketWriter = writer
-                            writer.write("HELLO_FROM_WATCH\n")
-                            writer.flush()
-                            
-                            if (isServiceActive) {
-                                val reader = java.io.BufferedReader(java.io.InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
-                                socketReader = reader
-                                handleSocketCommand("START_SYNC", socket.getInputStream())
-                                wasSuccessfullyConnected = true
-                                
-                                // Loop to read commands just like the normal TCP client
-                                while (isSocketRunning) {
-                                    val line = reader.readLine() ?: break
-                                    handleSocketCommand(line, socket.getInputStream()) 
-                                }
-                            }
-                        } catch (e: Exception) {
-                            // Silently ignore
-                        } finally {
-                            if (isSocketRunning && tcpSocket != null && tcpSocket == socket) {
-                                writeLog("Direct client session closed.")
-                                stopTcpClient()
-                            }
-                        }
-                        if (wasSuccessfullyConnected) {
-                            writeLog("Previous session ended, restarting fallback loop to fetch new gateway IPs...")
-                            break
-                        }
-                    }
-                    
-                    if (!isSocketRunning) {
-                        writeLog("Sequential scan failed. Launching parallel full subnet scan (192.168.x.1 and Local Subnet)...")
-                        val executor = java.util.concurrent.Executors.newFixedThreadPool(64)
-                        
-                        val scanList = mutableListOf<String>()
-                        for (i in 0..255) {
-                            scanList.add("192.168.$i.1")
-                        }
-                        
-                        try {
-                            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-                            val dhcp = wm.dhcpInfo
-                            val ip = dhcp.ipAddress
-                            if (ip != 0) {
-                                val ipAddr = String.format(java.util.Locale.US, "%d.%d.%d.",
-                                    ip and 0xff, ip shr 8 and 0xff, ip shr 16 and 0xff)
-                                for (j in 1..254) {
-                                    scanList.add(ipAddr + j)
-                                }
-                            }
-                        } catch (e: Exception) {}
-                        
-                        val latch = java.util.concurrent.CountDownLatch(scanList.size)
-                        
-                        for (ip in scanList) {
-                            executor.execute {
-                                if (isSocketRunning) {
-                                    latch.countDown()
-                                    return@execute
-                                }
-                                var socket: Socket? = null
-                                var wasSuccessfullyConnected = false
-                                try {
-                                    socket = Socket()
-                                    socket.receiveBufferSize = BUFFER_SIZE
-                                    socket.sendBufferSize = BUFFER_SIZE
-                                    socketWasBound = (activeWifiNetwork != null)
-                                    
-                                    socket.connect(InetSocketAddress(ip, TCP_PORT), 800)
-                                    
-                                    synchronized(this) {
-                                        if (!isSocketRunning) {
-                                            writeLog("PARALLEL SCAN SUCCESS to $ip! Initiating synchronization client...")
-                                            tcpSocket = socket
-                                            isSocketRunning = true
-                                            val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
-                                            socketWriter = writer
-                                            writer.write("HELLO_FROM_WATCH\n")
-                                            writer.flush()
-                                        } else {
-                                            socket.close()
-                                        }
-                                    }
-                                    
-                                    if (isSocketRunning && tcpSocket == socket && isServiceActive) {
-                                        val reader = java.io.BufferedReader(java.io.InputStreamReader(socket!!.getInputStream(), Charsets.UTF_8))
-                                        socketReader = reader
-                                        handleSocketCommand("START_SYNC", socket!!.getInputStream())
-                                        wasSuccessfullyConnected = true
-                                        
-                                        while (isSocketRunning && tcpSocket == socket) {
-                                            val line = reader.readLine() ?: break
-                                            handleSocketCommand(line, socket!!.getInputStream()) 
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                } finally {
-                                    if (isSocketRunning && tcpSocket != null && tcpSocket == socket) {
-                                        writeLog("Direct client session closed (parallel).")
-                                        stopTcpClient()
-                                    }
-                                    latch.countDown()
-                                }
-                            }
-                        }
-                        
-                        try {
-                            latch.await(3000, java.util.concurrent.TimeUnit.MILLISECONDS)
-                        } catch (e: Exception) {}
-                        executor.shutdownNow()
-                        
-                        if (isSocketRunning) {
-                            // Block this loop until socket dies
-                            while (isSocketRunning) {
-                                Thread.sleep(1000)
-                            }
-                        }
-                    }
-                }
-                Thread.sleep(3000)
-            }
-        }.apply { isDaemon = true; start() }
-    }
-
-    private fun stopUdpBeaconListener() {
-        udpStarted = false
-        try { udpSocket?.close() } catch (_: Exception) {}
-        udpSocket = null
-        try { udpListenerThread?.interrupt() } catch (_: Exception) {}
-        udpListenerThread = null
-    }
-
-    // ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
-    // TCP CLIENT (UDP BEACON INITIATED) 
-    // ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
-
-    private fun startTcpClientWithFailover(ips: List<String>, port: Int) {
-        if (isSocketRunning) return
-        isSocketRunning = true
-        Thread {
-            for (ip in ips) {
-                try {
-                    writeLog("TCP connecting to failover $ip:$port...")
-                    val socket = Socket()
-                    activeWifiNetwork?.let {
-                        writeLog("Binding socket to active Wi-Fi network before connecting...")
-                        it.bindSocket(socket)
-                        socketWasBound = true
-                    } ?: run {
-                        socketWasBound = false
-                    }
-                    socket.connect(InetSocketAddress(ip, port), 10000)
-                    
-                    socket.tcpNoDelay = true
-                    socket.soTimeout = 0
-                    tcpSocket = socket
-                    
-                    socketWriter = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
-                    socketReader = BufferedReader(InputStreamReader(BufferedInputStream(socket.getInputStream(), BUFFER_SIZE), Charsets.UTF_8))
-                    
-                    writeLog("TCP Connected to $ip:$port")
-                    
-                    sendSocketLine("HELLO_FROM_WATCH")
-
-                    while (isSocketRunning) {
-                        val line = socketReader?.readLine() ?: break
-                        handleSocketCommand(line, socket.getInputStream())
-                    }
-                    
-                    stopTcpClient()
-                    return@Thread // Successfully connected and handled, break the loop
-                } catch (e: Exception) {
-                    writeLog("Failed to connect to $ip:$port - ${e.message}")
-                    try { tcpSocket?.close() } catch (_: Exception) {}
-                    tcpSocket = null
-                    socketWriter = null
-                }
-            }
-            writeLog("Failed to connect to all IPs: $ips")
-            isSocketRunning = false
-        }.apply { isDaemon = true; start() }
-    }
-
-    private fun startTcpClient(ip: String, port: Int) {
-        if (isSocketRunning) return
-        isSocketRunning = true
-        Thread {
-            try {
-                writeLog("TCP connecting to $ip:$port...")
-                val socket = Socket()
-                socket.receiveBufferSize = BUFFER_SIZE
-                socket.sendBufferSize = BUFFER_SIZE
-
-                activeWifiNetwork?.let {
-                    it.bindSocket(socket)
-                }
-
-                socket.connect(InetSocketAddress(ip, port), 15000)
-                tcpSocket = socket
-                writeLog("TCP connected to $ip:$port!")
-
-                socketWriter = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
-                socketReader = BufferedReader(InputStreamReader(BufferedInputStream(socket.getInputStream(), BUFFER_SIZE), Charsets.UTF_8))
-
-                sendSocketLine("HELLO_FROM_WATCH")
-
-                while (isSocketRunning) {
-                    val line = socketReader?.readLine() ?: break
-                    handleSocketCommand(line, socket.getInputStream())
-                }
-            } catch (e: Exception) {
-                writeLog("TCP error: ${e.message}")
-            } finally {
-                writeLog("TCP closed. Resetting socket state for retry...")
-                stopTcpClient()
-                // Do NOT call stopSelf() here ??let directConnectFallback retry automatically.
-            }
-        }.apply { isDaemon = true; start() }
-    }
-
-    private fun stopTcpClient() {
-        isSocketRunning = false
-        socketWasBound = false
-        try { tcpSocket?.close() } catch (_: Exception) {}
-        try { socketWriter?.close() } catch (_: Exception) {}
-        try { socketReader?.close() } catch (_: Exception) {}
-        socketWriter = null; socketReader = null; tcpSocket = null
-    }
-
-    private fun sendSocketLine(text: String) {
-        try { socketWriter?.run { write(text + "\n"); flush() } }
-        catch (e: Exception) { writeLog("Socket write error: ${e.message}") }
-    }
-
-    private fun handleSocketCommand(command: String, inStream: InputStream) {
-        writeLog("CMD: $command")
+    private fun handleCommand(cmd: String) {
         when {
-            command == "GET_FILE_LIST" -> {
-                // Calculate virtual zip names and send file list immediately (no local compression!)
-                sendSocketLine("FILE_LIST:${getFileListJson()}")
-            }
-            command.startsWith("DOWNLOAD_FILE:") -> {
-                val filename = command.substring("DOWNLOAD_FILE:".length).trim()
-                val file = File("/sdcard/Documents/COLA_FILE/", filename)
-                if (file.exists()) {
-                    sendSocketFile(filename)
-                } else if (filename.startsWith("COLA_FILE_")) {
-                    streamColaZip(filename)
-                } else if (filename.startsWith("log_")) {
-                    streamLogZip(filename)
-                } else {
-                    sendSocketLine("ERROR:File not found")
+            cmd == "GET_FILE_LIST" -> sendFileList()
+            cmd.startsWith("DOWNLOAD_FILE:") -> {
+                val fn = cmd.substring("DOWNLOAD_FILE:".length)
+                Executors.newSingleThreadExecutor().execute {
+                    prepareAndSendFile(fn)
                 }
             }
-            command == "DELETE_WATCH_FILES" -> {
-                try {
-                    val colaDir = File("/sdcard/Documents/COLA_FILE")
-                    if (colaDir.exists()) {
-                        colaDir.listFiles()?.forEach { it.deleteRecursively() }
-                    }
-                    val logDir = File("/sdcard/log")
-                    if (logDir.exists()) {
-                        logDir.deleteRecursively()
-                    }
-                    writeLog("Deleted watch files (COLA & log)")
-                } catch (e: Exception) {
-                    writeLog("Error deleting watch files: ${e.message}")
-                } finally {
-                    sendSocketLine("DELETE_WATCH_FILES_OK")
-                }
-            }
+            cmd == "DELETE_WATCH_FILES" -> deleteLogFiles()
         }
     }
 
-    // ????????????????????????????????????????????????????????????????
-    // COLA FILE COMPRESSION
-    // ????????????????????????????????????????????????????????????????
-
-    private var totalUncompressedBytes = 0L
-    private var currentUncompressedBytes = 0L
-    private var lastProgressReportTime = 0L
-
-    private fun streamColaZip(zipName: String) {
-        val folder = File("/sdcard/Documents/COLA_FILE/")
-        val colaPattern = Regex("^\\d{10}$")
-        val targets = folder.listFiles { f ->
-            f.isDirectory && colaPattern.matches(f.name)
-        }?.sortedBy { it.name }
-        
-        if (targets.isNullOrEmpty()) {
-            sendSocketLine("ERROR:COLA folder missing")
-            return
-        }
-        
-        totalUncompressedBytes = targets.sumOf { getFolderSize(it) }
-        currentUncompressedBytes = 0L
-        lastProgressReportTime = System.currentTimeMillis()
-        
+    // -----------------------------------------------------------------------------------------
+    // FILE HANDLING LOGIC
+    // -----------------------------------------------------------------------------------------
+    private fun sendFileList() {
         try {
-            sendSocketLine("FILE_START_CHUNKED:$zipName")
-            socketWriter?.flush()
-            
-            val chunkedOut = ChunkedOutputStream(socketWriter!!, tcpSocket!!.getOutputStream())
-            this.activeChunkedOut = chunkedOut
-            try {
-                ZipOutputStream(chunkedOut).use { zos ->
-                    zos.setLevel(java.util.zip.Deflater.BEST_SPEED)
-                    for (target in targets) {
-                        addFolderToZip(target, target.name, zos)
-                    }
-                }
-            } finally {
-                this.activeChunkedOut = null
-                try { chunkedOut.close() } catch (_: Exception) {}
+            val jsonArr = JSONArray()
+            val logFolder = File("/sdcard/log/")
+            if (logFolder.exists() && logFolder.isDirectory) {
+                val obj = JSONObject()
+                obj.put("name", "log_" + System.currentTimeMillis() + ".zip")
+                obj.put("size", -1)
+                obj.put("last_modified", System.currentTimeMillis())
+                jsonArr.put(obj)
             }
-            writeLog("Streaming zip $zipName completed")
+            val colaFolder = File("/sdcard/cola/")
+            if (colaFolder.exists() && colaFolder.isDirectory) {
+                val obj = JSONObject()
+                obj.put("name", "COLA_FILE_" + System.currentTimeMillis() + ".zip")
+                obj.put("size", -1)
+                obj.put("last_modified", System.currentTimeMillis())
+                jsonArr.put(obj)
+            }
+            sendCommand("FILE_LIST:$jsonArr")
         } catch (e: Exception) {
-            writeLog("Streaming zip error: ${e.message}")
+            writeLog("Error creating file list: ${e.message}")
         }
     }
 
-    private fun streamLogZip(zipName: String) {
-        val logFolder = File("/sdcard/log/")
-        if (!logFolder.exists()) {
-            sendSocketLine("ERROR:Log folder missing")
-            return
+    private var currentTransferZip: File? = null
+
+    private fun prepareAndSendFile(filename: String) {
+        val targets = mutableListOf<File>()
+        if (filename.startsWith("log_")) {
+            targets.add(File("/sdcard/log/"))
+        } else if (filename.startsWith("COLA_FILE_")) {
+            targets.add(File("/sdcard/cola/"))
         }
-        totalUncompressedBytes = getFolderSize(logFolder)
-        currentUncompressedBytes = 0L
-        lastProgressReportTime = System.currentTimeMillis()
-        streamZipFolder(logFolder, "log", zipName)
-    }
+        
+        if (targets.isEmpty()) return
 
-    private fun getFolderSize(file: File): Long {
-        if (!file.exists()) return 0
-        if (!file.isDirectory) return file.length()
-        return file.listFiles()?.sumOf { getFolderSize(it) } ?: 0L
-    }
-
-    private fun streamZipFolder(folder: File, zipPrefix: String, zipName: String) {
+        val zipFile = File(cacheDir, filename)
+        currentTransferZip = zipFile
         try {
-            sendSocketLine("FILE_START_CHUNKED:$zipName")
-            socketWriter?.flush()
-            
-            val chunkedOut = ChunkedOutputStream(socketWriter!!, tcpSocket!!.getOutputStream())
-            this.activeChunkedOut = chunkedOut
-            try {
-                ZipOutputStream(chunkedOut).use { zos ->
-                    zos.setLevel(java.util.zip.Deflater.BEST_SPEED)
-                    addFolderToZip(folder, zipPrefix, zos)
+            writeLog("Compressing ${targets.size} folders to ${zipFile.absolutePath}...")
+            ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+                zos.setLevel(java.util.zip.Deflater.BEST_SPEED)
+                for (target in targets) {
+                    if (target.exists()) addFolderToZip(target, target.name, zos)
                 }
-            } finally {
-                this.activeChunkedOut = null
-                try { chunkedOut.close() } catch (_: Exception) {}
             }
-            writeLog("Streaming zip $zipName completed")
+            writeLog("Compression done. Size: ${zipFile.length()} bytes. Starting Payload transfer...")
+            sendCommand("FILE_START:$filename")
+            val ep = connectedEndpointId
+            if (ep != null) {
+                Nearby.getConnectionsClient(this).sendPayload(ep, Payload.fromFile(zipFile))
+            }
         } catch (e: Exception) {
-            writeLog("Streaming zip error: ${e.message}")
+            writeLog("Error compressing/sending: ${e.message}")
+            zipFile.delete()
         }
     }
-    private var activeChunkedOut: ChunkedOutputStream? = null
-
-    class ChunkedOutputStream(private val writer: java.io.BufferedWriter, private val rawOut: OutputStream) : OutputStream() {
-        private val buffer = ByteArray(65536)
-        private var pos = 0
-        
-        fun sendProgress(current: Long, total: Long) {
-            flushChunk()
-            writer.write("PROGRESS:$current:$total\n")
-            writer.flush()
-        }
-        
-        override fun write(b: Int) {
-            buffer[pos++] = b.toByte()
-            if (pos == buffer.size) flushChunk()
-        }
-        
-        override fun write(b: ByteArray, off: Int, len: Int) {
-            var remaining = len
-            var currentOff = off
-            while (remaining > 0) {
-                val space = buffer.size - pos
-                val toCopy = minOf(remaining, space)
-                System.arraycopy(b, currentOff, buffer, pos, toCopy)
-                pos += toCopy
-                currentOff += toCopy
-                remaining -= toCopy
-                if (pos == buffer.size) flushChunk()
-            }
-        }
-        
-        private fun flushChunk() {
-            if (pos > 0) {
-                writer.write("CHUNK:$pos\n")
-                writer.flush()
-                rawOut.write(buffer, 0, pos)
-                rawOut.flush()
-                pos = 0
-            }
-        }
-        
-        override fun close() {
-            flushChunk()
-            writer.write("CHUNK:0\n")
-            writer.flush()
-        }
-    }
-
-    /** Returns the watch firmware version string from Build.DISPLAY, safe for filenames. */
-    private fun getWatchSoftwareVersion(): String {
-        return Build.DISPLAY
-            .replace("/", "_")
-            .replace("\\", "_")
-            .replace(" ", "_")
-            .replace(":", "_")
-    }
-
-    /**
-     * Parses a folder name in YYMMDDHHMM format (10 digits) into
-     * a (YYYYMMDD, HHMMSS) pair suitable for the zip filename.
-     * Falls back to current time if the name doesn't match.
-     */
-    private fun parseColaDateTime(name: String): Pair<String, String> {
-        return if (name.length >= 10 && name.take(10).all { it.isDigit() }) {
-            val yy  = name.substring(0, 2)
-            val mon = name.substring(2, 4)
-            val dd  = name.substring(4, 6)
-            val hh  = name.substring(6, 8)
-            val min = name.substring(8, 10)
-            Pair("20${yy}${mon}${dd}", "${hh}${min}00")
-        } else {
-            val sdf = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US)
-            val parts = sdf.format(java.util.Date()).split("_")
-            Pair(parts[0], parts[1])
-        }
-    }
-
-    /** Builds the zip output filename from the source folder name. */
-    private fun buildColaZipName(folderName: String): String {
-        val version = getWatchSoftwareVersion()
-        val (dateStr, timeStr) = parseColaDateTime(folderName)
-        return "COLA_FILE_${version}_${dateStr}_${timeStr}.zip"
-    }
-
-    private fun buildLogZipName(): String {
-        val version = getWatchSoftwareVersion()
-        val (dateStr, timeStr) = parseColaDateTime("ALL")
-        return "log_${version}_${dateStr}_${timeStr}.zip"
-    }
-
-    private fun compressLogFiles() {
-        val logFolder = File("/sdcard/log/")
-        writeLog("COMPRESS: logFolder exists? ${logFolder.exists()}, isDir? ${logFolder.isDirectory}, canRead? ${logFolder.canRead()}")
-        
-        if (!logFolder.exists()) {
-            writeLog("COMPRESS: /sdcard/log/ does not exist. Aborting log compression.")
-            return
-        }
-
-        val targetFolder = File("/sdcard/Documents/COLA_FILE/")
-        if (!targetFolder.exists()) { targetFolder.mkdirs() }
-
-        val zipName = buildLogZipName()
-        val zipFile = File(targetFolder, zipName)
-
-        targetFolder.listFiles { _, n -> n.startsWith("log_") && n.endsWith(".zip") }?.forEach { f ->
-            try { f.delete() } catch (_: Exception) {}
-        }
-
-        writeLog("COMPRESS: log folder ??$zipName")
-        try {
-            ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFile))).use { zos ->
-                zos.setLevel(java.util.zip.Deflater.NO_COMPRESSION)
-                addFolderToZip(logFolder, "log", zos)
-            }
-            writeLog("COMPRESS: done ??$zipName")
-        } catch (e: Exception) {
-            writeLog("COMPRESS log error: ${e.message}")
-            try { zipFile.delete() } catch (_: Exception) {}
-        }
-    }
-
-    // Original compressColaFiles logic removed.
 
     private fun addFolderToZip(folder: File, parentPath: String, zos: ZipOutputStream) {
         val children = folder.listFiles() ?: return
@@ -960,168 +247,57 @@ class SyncService : Service() {
                 var bytesRead: Int
                 while (input.read(buffer).also { bytesRead = it } >= 0) {
                     zos.write(buffer, 0, bytesRead)
-                    currentUncompressedBytes += bytesRead
-                    val now = System.currentTimeMillis()
-                    if (now - lastProgressReportTime > 500) {
-                        activeChunkedOut?.sendProgress(currentUncompressedBytes, totalUncompressedBytes)
-                        lastProgressReportTime = now
-                    }
                 }
             }
             zos.closeEntry()
-        } catch (e: java.net.SocketException) {
-            throw e
         } catch (e: Exception) {
             writeLog("Skip zip ${file.name}: ${e.message}")
-            try { zos.closeEntry() } catch (_: Exception) {}
         }
     }
 
-    private fun sendSocketFile(filename: String) {
-        val file = File("/sdcard/Documents/COLA_FILE/", filename)
-        if (!file.exists()) { sendSocketLine("ERROR:File not found"); return }
+    private fun deleteLogFiles() {
         try {
-            val md5 = getMd5(file)
-            val size = file.length()
-            writeLog("Sending $filename ($size bytes) with 1MB Buffer...")
-            sendSocketLine("FILE_START:$filename:$size:$md5")
-            socketWriter?.flush()
-            
-            // ?⑦궥 蹂묓빀 諛⑹?: ?곗쓽 BufferedReader媛 ?뚯씪 ?곗씠?곌퉴吏 誘몃━ ?쎌뼱踰꾨━???꾩긽??留됯린 ?꾪빐 ?⑦궥 寃쎄퀎??Delay) ?뺤꽦
-            Thread.sleep(200)
-            
-            val out = BufferedOutputStream(tcpSocket?.getOutputStream() ?: return, BUFFER_SIZE)
-            FileInputStream(file).use { fis ->
-                val buf = ByteArray(65536)
-                var r: Int
-                while (fis.read(buf).also { r = it } != -1) {
-                    out.write(buf, 0, r)
-                }
-                out.flush()
-            }
-            writeLog("$filename sent successfully.")
+            File("/sdcard/log/").deleteRecursively()
+            File("/sdcard/cola/").deleteRecursively()
+            writeLog("Log files deleted")
         } catch (e: Exception) {
-            writeLog("File send error: ${e.message}")
-            sendSocketLine("ERROR:${e.message}")
+            writeLog("Failed to delete log files: ${e.message}")
         }
     }
 
-    private fun getFileListJson(): String {
-        val folder = File("/sdcard/Documents/COLA_FILE/")
-        if (!folder.exists()) folder.mkdirs()
-        val arr = JSONArray()
-        
-        folder.listFiles { _, n -> n.endsWith(".zip", true) }?.forEach { f ->
-            arr.put(JSONObject().apply { put("name", f.name); put("size", f.length()); put("last_modified", f.lastModified()) })
-        }
-        
-        val colaPattern = Regex("^\\d{10}$")
-        val targets = folder.listFiles { f -> f.isDirectory && colaPattern.matches(f.name) }?.sortedBy { it.name }
-        if (targets != null && targets.isNotEmpty()) {
-            val virtualName = buildColaZipName(targets.last().name)
-            if (!File(folder, virtualName).exists()) {
-                arr.put(JSONObject().apply { put("name", virtualName); put("size", -1L); put("last_modified", System.currentTimeMillis()) })
-            }
-        }
-        
-        val logFolder = File("/sdcard/log/")
-        if (logFolder.exists() && logFolder.isDirectory) {
-            val virtualLogName = buildLogZipName()
-            if (!File(folder, virtualLogName).exists()) {
-                arr.put(JSONObject().apply { put("name", virtualLogName); put("size", -1L); put("last_modified", System.currentTimeMillis()) })
-            }
-        }
-        
-        return arr.toString()
-    }
-
-    // ????????????????????????????????????????????????????????????????
+    // -----------------------------------------------------------------------------------------
     // UTILITIES
-    // ????????????????????????????????????????????????????????????????
-
-    private fun getWifiGatewayIps(): List<String> {
-        val ips = mutableListOf<String>()
-        try {
-            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val dhcp = wm.dhcpInfo
-            
-            val gateway = dhcp.gateway
-            if (gateway != 0) {
-                val ip = String.format(java.util.Locale.US, "%d.%d.%d.%d",
-                    gateway and 0xff, gateway shr 8 and 0xff, gateway shr 16 and 0xff, gateway shr 24 and 0xff)
-                writeLog("DHCP detected Gateway IP: $ip")
-                ips.add(ip)
-            }
-            
-            val server = dhcp.serverAddress
-            if (server != 0 && server != gateway) {
-                val ip = String.format(java.util.Locale.US, "%d.%d.%d.%d",
-                    server and 0xff, server shr 8 and 0xff, server shr 16 and 0xff, server shr 24 and 0xff)
-                writeLog("DHCP detected Server IP: $ip")
-                ips.add(ip)
-            }
-            
-            val dns1 = dhcp.dns1
-            if (dns1 != 0 && dns1 != gateway && dns1 != server) {
-                val ip = String.format(java.util.Locale.US, "%d.%d.%d.%d",
-                    dns1 and 0xff, dns1 shr 8 and 0xff, dns1 shr 16 and 0xff, dns1 shr 24 and 0xff)
-                writeLog("DHCP detected DNS IP: $ip")
-                ips.add(ip)
-            }
-        } catch (e: Exception) {
-            writeLog("Failed to read DHCP IPs: ${e.message}")
-        }
-        return ips
-    }
-
-    private fun getSubnetRouterIps(): List<String> {
-        val ips = mutableListOf<String>()
-        try {
-            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val dhcp = wm.dhcpInfo
-            val ip = dhcp.ipAddress
-            if (ip != 0) {
-                val ipAddr = String.format(java.util.Locale.US, "%d.%d.%d.",
-                    ip and 0xff, ip shr 8 and 0xff, ip shr 16 and 0xff)
-                ips.add(ipAddr + "1")
-                ips.add(ipAddr + "254")
-                writeLog("Derived subnet router IPs: ${ipAddr}1, ${ipAddr}254")
-            }
-        } catch (e: Exception) {}
-        return ips
-    }
-
-    private fun getMd5(file: File): String {
-        val d = MessageDigest.getInstance("MD5")
-        FileInputStream(file).use { fis ->
-            val b = ByteArray(32768)
-            var r: Int
-            while (fis.read(b).also { r = it } > 0) d.update(b, 0, r)
-        }
-        return java.math.BigInteger(1, d.digest()).toString(16).padStart(32, '0')
-    }
-
-    fun writeLog(msg: String) {
+    // -----------------------------------------------------------------------------------------
+    private fun writeLog(msg: String) {
         Log.d(TAG, msg)
-        try {
-            val folder = File("/sdcard/Documents/COLA_FILE/")
-            if (!folder.exists()) folder.mkdirs()
-            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-            File(folder, "sync_log.txt").appendText("[$ts] $msg\n")
-        } catch (_: Exception) {}
+        updateNotification("Sync", msg)
+    }
+
+    private fun acquireWakeLock() {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HealthClient::SyncWakeLock")
+        wakeLock?.acquire(30 * 60 * 1000L /*30 minutes*/)
+    }
+
+    private fun releaseWakeLock() {
+        if (wakeLock?.isHeld == true) wakeLock?.release()
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val ch = NotificationChannel(CHANNEL_ID, "Watch Sync", NotificationManager.IMPORTANCE_LOW)
-            (getSystemService(NotificationManager::class.java))?.createNotificationChannel(ch)
-        }
+        val channel = NotificationChannel(CHANNEL_ID, "Watch Sync Service", NotificationManager.IMPORTANCE_LOW)
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
     }
 
-    private fun createNotification(): Notification =
-        NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("HealthPort Sync")
-            .setContentText("湲곌린 ?곕룞 ?湲?以?..")
-            .setSmallIcon(android.R.drawable.stat_notify_sync)
+    private fun buildNotification(title: String, content: String): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(android.R.drawable.stat_sys_download)
             .build()
+    }
+
+    private fun updateNotification(title: String, content: String) {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(1, buildNotification(title, content))
+    }
 }

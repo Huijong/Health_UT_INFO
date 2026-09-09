@@ -162,14 +162,8 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
     }
 
     private fun sendWifiJoinToService() {
-        val serviceIntent = Intent(this, SyncService::class.java).apply {
-                action = "ACTION_TRIGGER_WIFI_JOIN"
-                intent?.extras?.let { putExtras(it) }
-            }
-        // 서비스가 이미 실행 중이므로, startForegroundService 대신 startService를 호출하여
-        // ForegroundService 시작 후 5초 내 startForeground 미호출로 인한 강제 종료(Crash)를 방지합니다.
-        startService(serviceIntent)
-        wifiJoinPending = false
+        // Use existing startSyncService which handles all permission checks
+        startSyncService()
     }
 
     private fun checkAndUpdateServiceState() {
@@ -199,11 +193,17 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
     private fun checkPermissionsAndStart() {
         val permissions = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            "android.permission.ACCESS_LOCAL_NETWORK"
         )
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
             permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissions.add(Manifest.permission.BLUETOOTH_SCAN)
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+            permissions.add(Manifest.permission.BLUETOOTH_ADVERTISE)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
@@ -255,15 +255,24 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         if (requestCode == 101) {
-            val denied = permissions.filterIndexed { index, _ -> 
-                index < grantResults.size && grantResults[index] != PackageManager.PERMISSION_GRANTED 
+            val denied = permissions.filterIndexed { index, _ ->
+                index < grantResults.size && grantResults[index] != PackageManager.PERMISSION_GRANTED
             }
             if (denied.isEmpty() && grantResults.isNotEmpty()) {
                 checkManageExternalStorageAndStart()
             } else {
-                Toast.makeText(this, "거부된 권한:\n${denied.joinToString("\n") { it.substringAfterLast(".") }}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "거부된 권한:\n${denied.joinToString("\n") { it.substringAfterLast('.') }}", Toast.LENGTH_LONG).show()
+            }
+        } else if (requestCode == 102) {
+            // POST_NOTIFICATIONS permission result
+            val granted = permissions.isNotEmpty() && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            if (granted) {
+                // Permission granted, start sync service now
+                startSyncService()
+            } else {
+                Toast.makeText(this, "알림 권한이 필요합니다.", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -282,6 +291,15 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
     }
 
     private fun startSyncService() {
+        // Ensure notification permission (required on Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            // Request the permission and defer starting the service until granted
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 102)
+            // Store pending flag to start after permission result
+            wifiJoinPending = true
+            return
+        }
         val serviceIntent = Intent(this, SyncService::class.java).apply {
             if (wifiJoinPending) {
                 action = "ACTION_TRIGGER_WIFI_JOIN"
@@ -294,6 +312,10 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
             startService(serviceIntent)
         }
         wifiJoinPending = false
+        // Give the service a moment to set its running flag, then refresh UI
+        actionButton.postDelayed({
+            checkAndUpdateServiceState()
+        }, 500)
         isServiceRunning = true
         statusText.text = "HealthPort Sync\n작동 중..."
         actionButton.text = "연동 종료"
