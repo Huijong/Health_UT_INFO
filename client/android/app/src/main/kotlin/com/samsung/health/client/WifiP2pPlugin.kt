@@ -1,8 +1,13 @@
 package com.samsung.health.client
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -48,6 +53,29 @@ class WifiP2pPlugin(private val context: Context) {
                         result.success(true) 
                     }
                     else result.error("BAD_ARGS", "filename required", null)
+                }
+                "checkManageStorage"  -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        result.success(Environment.isExternalStorageManager())
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "requestManageStorage"-> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        try {
+                            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                            intent.addCategory("android.intent.category.DEFAULT")
+                            intent.data = Uri.parse(String.format("package:%s", context.packageName))
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        }
+                    }
+                    result.success(true)
                 }
                 "deleteWatchFiles"    -> { sendCommand("DELETE_WATCH_FILES"); result.success(true) }
                 "clearSyncCache"      -> {
@@ -162,13 +190,11 @@ class WifiP2pPlugin(private val context: Context) {
         if (!destDir.exists()) destDir.mkdirs()
         val destFile = File(destDir, filename)
         
-        sendEvent("downloadProgress", mapOf(
-            "progress" to -1.0,
-            "transferred" to 0,
-            "total" to -1
-        ))
-
         try {
+            val dataIn = java.io.DataInputStream(inputStream)
+            val expectedSize = dataIn.readLong()
+            Log.d(TAG, "TCP expected file size: $expectedSize bytes for $filename")
+
             var receivedBytes = 0L
             val buffer = ByteArray(1048576) // 1MB chunks
             var bytesRead: Int
@@ -176,17 +202,18 @@ class WifiP2pPlugin(private val context: Context) {
             val fos = FileOutputStream(destFile)
             var lastUpdate = System.currentTimeMillis()
             
-            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+            while (dataIn.read(buffer).also { bytesRead = it } != -1) {
                 fos.write(buffer, 0, bytesRead)
                 receivedBytes += bytesRead
                 
                 val now = System.currentTimeMillis()
                 if (now - lastUpdate > 200) { // Update every 200ms
                     lastUpdate = now
+                    val progress = if (expectedSize > 0) receivedBytes.toDouble() / expectedSize.toDouble() else -1.0
                     sendEvent("downloadProgress", mapOf(
-                        "progress" to -1.0,
-                        "transferred" to receivedBytes.toInt(),
-                        "total" to -1
+                        "progress" to progress,
+                        "transferred" to receivedBytes.toLong(),
+                        "total" to expectedSize
                     ))
                 }
             }
@@ -198,9 +225,6 @@ class WifiP2pPlugin(private val context: Context) {
                 "filename" to filename,
                 "path" to destFile.absolutePath
             ))
-            
-            // Re-fetch file list after completion
-            uiHandler.postDelayed({ sendCommand("GET_FILE_LIST") }, 500)
             
         } catch (e: Exception) {
             Log.e(TAG, "TCP receive error: ${e.message}")
@@ -251,6 +275,8 @@ class WifiP2pPlugin(private val context: Context) {
                     } catch (e: Exception) {
                         Log.e(TAG, "JSON Parse error: ${e.message}")
                     }
+                } else if (msg == "PREPARING_FILE") {
+                    sendEvent("compressing", "watch")
                 }
             }
         }
