@@ -8,17 +8,16 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import com.google.android.gms.nearby.Nearby
-import com.google.android.gms.nearby.connection.AdvertisingOptions
-import com.google.android.gms.nearby.connection.ConnectionInfo
-import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback
-import com.google.android.gms.nearby.connection.ConnectionResolution
-import com.google.android.gms.nearby.connection.Payload
-import com.google.android.gms.nearby.connection.PayloadCallback
-import com.google.android.gms.nearby.connection.PayloadTransferUpdate
-import com.google.android.gms.nearby.connection.Strategy
+import com.google.android.gms.nearby.connection.*
+import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
+import java.net.NetworkInterface
+import java.net.ServerSocket
+import java.net.InetAddress
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
 
 class WifiP2pPlugin(private val context: Context) {
     companion object {
@@ -31,6 +30,9 @@ class WifiP2pPlugin(private val context: Context) {
     private val uiHandler = Handler(Looper.getMainLooper())
     private var eventSink: EventChannel.EventSink? = null
     private var connectedEndpointId: String? = null
+    
+    private var serverSocket: ServerSocket? = null
+    private var isTcpServerRunning = false
 
     fun register(engine: FlutterEngine) {
         MethodChannel(engine.dartExecutor.binaryMessenger, METHOD_CHANNEL).setMethodCallHandler { call, result ->
@@ -41,7 +43,10 @@ class WifiP2pPlugin(private val context: Context) {
                 "requestFileList"     -> { sendCommand("GET_FILE_LIST"); result.success(true) }
                 "requestFileDownload" -> {
                     val fn = call.argument<String>("filename")
-                    if (fn != null) { sendCommand("DOWNLOAD_FILE:$fn"); result.success(true) }
+                    if (fn != null) { 
+                        startTcpServerAndNotifyWatch(fn)
+                        result.success(true) 
+                    }
                     else result.error("BAD_ARGS", "filename required", null)
                 }
                 "deleteWatchFiles"    -> { sendCommand("DELETE_WATCH_FILES"); result.success(true) }
@@ -62,96 +67,205 @@ class WifiP2pPlugin(private val context: Context) {
     private fun startAdvertising() {
         val options = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_POINT_TO_POINT).build()
         Nearby.getConnectionsClient(context).startAdvertising("Phone", SERVICE_ID, connCallback, options)
-            .addOnSuccessListener {
-                Log.i(TAG, "Advertising started")
-                sendEvent("hotspotStarted", mapOf("ssid" to "Nearby", "password" to "Connections", "ip" to "P2P"))
+            .addOnSuccessListener { 
+                Log.i(TAG, "Advertising started") 
+                // Send dummy hotspotStarted event so Dart UI triggers requestWatchWifiJoin
+                sendEvent("hotspotStarted", mapOf(
+                    "ssid" to "healthport",
+                    "password" to "12345678",
+                    "ip" to getActiveIpAddress()
+                ))
             }
-            .addOnFailureListener { e -> sendEvent("serverError", e.message) }
+            .addOnFailureListener { e -> Log.e(TAG, "Advertising failed: ${e.message}") }
     }
 
     fun stopServer() {
         Nearby.getConnectionsClient(context).stopAdvertising()
         Nearby.getConnectionsClient(context).stopAllEndpoints()
+        stopTcpServer()
         connectedEndpointId = null
         sendEvent("connectionStateChanged", mapOf("connected" to false))
     }
 
+    // -----------------------------------------------------------------------------------------
+    // HYBRID TCP SERVER LOGIC
+    // -----------------------------------------------------------------------------------------
+    private fun getActiveIpAddress(): String {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            var fallbackIp = "192.168.43.1"
+            while (interfaces.hasMoreElements()) {
+                val iface = interfaces.nextElement()
+                val addresses = iface.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val addr = addresses.nextElement()
+                    if (!addr.isLoopbackAddress && addr.hostAddress.contains(".")) {
+                        val ip = addr.hostAddress
+                        // Look for typical Android hotspot subnets
+                        if (ip.startsWith("192.168.") || ip.startsWith("172.") || ip.startsWith("10.")) {
+                            // If it's literally the hotspot gateway, prefer it
+                            if (ip == "192.168.43.1") return ip
+                            fallbackIp = ip
+                        }
+                    }
+                }
+            }
+            return fallbackIp
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting IP: ${e.message}")
+        }
+        return "192.168.43.1" // Fallback default Android hotspot IP
+    }
+
+    private fun startTcpServerAndNotifyWatch(filename: String) {
+        // Prevent double TCP server if already running
+        if (isTcpServerRunning) {
+            Log.w(TAG, "TCP server already running, skipping duplicate request")
+            return
+        }
+        Executors.newSingleThreadExecutor().execute {
+            try {
+                val ip = getActiveIpAddress()
+                serverSocket = ServerSocket(34567, 50, InetAddress.getByName(ip)).apply {
+                    receiveBufferSize = 1048576 // 1MB
+                    soTimeout = 120_000 // Wait max 2 minutes for watch to connect
+                }
+                isTcpServerRunning = true
+                
+                // Tell the Watch to connect via TCP
+                sendCommand("TCP_READY:$ip:34567:$filename")
+                
+                Log.d(TAG, "TCP Server listening on $ip:34567 for $filename")
+                val clientSocket = serverSocket?.accept()
+                if (clientSocket != null) {
+                    Log.d(TAG, "Watch connected via TCP from ${clientSocket.inetAddress.hostAddress}")
+                    clientSocket.receiveBufferSize = 1048576
+                    receiveFileViaTcp(clientSocket.getInputStream(), filename)
+                    clientSocket.close()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "TCP Server error: ${e.message}")
+                stopTcpServer()
+            }
+        }
+    }
+
+
+    private fun stopTcpServer() {
+        isTcpServerRunning = false
+        try { serverSocket?.close() } catch (_: Exception) {}
+        serverSocket = null
+    }
+
+    private fun receiveFileViaTcp(inputStream: InputStream, filename: String) {
+        val destDir = File(context.cacheDir, "sh_sync")
+        if (!destDir.exists()) destDir.mkdirs()
+        val destFile = File(destDir, filename)
+        
+        sendEvent("downloadProgress", mapOf(
+            "progress" to -1.0,
+            "transferred" to 0,
+            "total" to -1
+        ))
+
+        try {
+            var receivedBytes = 0L
+            val buffer = ByteArray(1048576) // 1MB chunks
+            var bytesRead: Int
+            
+            val fos = FileOutputStream(destFile)
+            var lastUpdate = System.currentTimeMillis()
+            
+            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                fos.write(buffer, 0, bytesRead)
+                receivedBytes += bytesRead
+                
+                val now = System.currentTimeMillis()
+                if (now - lastUpdate > 200) { // Update every 200ms
+                    lastUpdate = now
+                    sendEvent("downloadProgress", mapOf(
+                        "progress" to -1.0,
+                        "transferred" to receivedBytes.toInt(),
+                        "total" to -1
+                    ))
+                }
+            }
+            fos.flush()
+            fos.close()
+            
+            Log.d(TAG, "TCP File received completely: $receivedBytes bytes")
+            sendEvent("downloadComplete", mapOf(
+                "filename" to filename,
+                "path" to destFile.absolutePath
+            ))
+            
+            // Re-fetch file list after completion
+            uiHandler.postDelayed({ sendCommand("GET_FILE_LIST") }, 500)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "TCP receive error: ${e.message}")
+            destFile.delete()
+        } finally {
+            stopTcpServer()
+        }
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // NEARBY CONNECTIONS LOGIC
+    // -----------------------------------------------------------------------------------------
+    private val connCallback = object : ConnectionLifecycleCallback() {
+        override fun onConnectionInitiated(epId: String, info: ConnectionInfo) {
+            Log.i(TAG, "Connection initiated by ${info.endpointName}")
+            Nearby.getConnectionsClient(context).acceptConnection(epId, payloadCallback)
+        }
+        override fun onConnectionResult(epId: String, res: ConnectionResolution) {
+            if (res.status.isSuccess) {
+                Log.i(TAG, "Connected to $epId")
+                connectedEndpointId = epId
+                sendEvent("connectionStateChanged", mapOf("connected" to true, "deviceName" to "Smartwatch"))
+            } else {
+                Log.e(TAG, "Connection failed: ${res.status.statusCode}")
+            }
+        }
+        override fun onDisconnected(epId: String) {
+            Log.i(TAG, "Disconnected from $epId")
+            if (connectedEndpointId == epId) {
+                connectedEndpointId = null
+                sendEvent("connectionStateChanged", mapOf("connected" to false))
+            }
+        }
+    }
+
+    private val payloadCallback = object : PayloadCallback() {
+        override fun onPayloadReceived(epId: String, p: Payload) {
+            if (p.type == Payload.Type.BYTES) {
+                val msg = String(p.asBytes()!!, StandardCharsets.UTF_8)
+                Log.i(TAG, "Received msg: $msg")
+                if (msg == "HELLO_FROM_WATCH") {
+                    // Start by requesting file list
+                    uiHandler.postDelayed({ sendCommand("GET_FILE_LIST") }, 500)
+                } else if (msg.startsWith("FILE_LIST:")) {
+                    val jsonStr = msg.substring("FILE_LIST:".length)
+                    try {
+                        sendEvent("fileListReceived", jsonStr)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "JSON Parse error: ${e.message}")
+                    }
+                }
+            }
+        }
+        override fun onPayloadTransferUpdate(epId: String, upd: PayloadTransferUpdate) {}
+    }
+
     private fun sendCommand(cmd: String) {
         val ep = connectedEndpointId ?: return
+        Log.i(TAG, "Sending command: $cmd")
         Nearby.getConnectionsClient(context).sendPayload(ep, Payload.fromBytes(cmd.toByteArray(StandardCharsets.UTF_8)))
     }
 
-    private val connCallback = object : ConnectionLifecycleCallback() {
-        override fun onConnectionInitiated(ep: String, info: ConnectionInfo) {
-            Nearby.getConnectionsClient(context).acceptConnection(ep, payloadCb)
+    private fun sendEvent(method: String, arguments: Any) {
+        uiHandler.post {
+            eventSink?.success(mapOf("type" to method, "data" to arguments))
         }
-        override fun onConnectionResult(ep: String, res: ConnectionResolution) {
-            if (res.status.isSuccess) {
-                connectedEndpointId = ep
-                sendEvent("connectionStateChanged", mapOf("connected" to true, "deviceName" to "Watch"))
-                sendCommand("HELLO_FROM_PHONE")
-            } else {
-                sendEvent("serverError", "Connection failed")
-            }
-        }
-        override fun onDisconnected(ep: String) {
-            if (connectedEndpointId == ep) connectedEndpointId = null
-            sendEvent("connectionStateChanged", mapOf("connected" to false))
-        }
-    }
-
-    private val incomingFilePayloads = mutableMapOf<Long, Payload>()
-    private var currentDownloadFilename: String? = null
-
-    private val payloadCb = object : PayloadCallback() {
-        override fun onPayloadReceived(ep: String, p: Payload) {
-            if (p.type == Payload.Type.BYTES) {
-                val msg = String(p.asBytes()!!, StandardCharsets.UTF_8)
-                if (msg == "HELLO_FROM_WATCH") {
-                    sendEvent("connectionStateChanged", mapOf("connected" to true, "deviceName" to "Watch"))
-                } else if (msg.startsWith("FILE_LIST:")) {
-                    sendEvent("fileListReceived", msg.substring(10))
-                } else if (msg.startsWith("FILE_START:")) {
-                    currentDownloadFilename = msg.substring(11)
-                }
-            } else if (p.type == Payload.Type.FILE) {
-                incomingFilePayloads[p.id] = p
-            }
-        }
-
-        override fun onPayloadTransferUpdate(ep: String, upd: PayloadTransferUpdate) {
-            val fn = currentDownloadFilename ?: "unknown.zip"
-            if (upd.status == PayloadTransferUpdate.Status.IN_PROGRESS) {
-                val progress = if (upd.totalBytes > 0) upd.bytesTransferred.toDouble() / upd.totalBytes else -1.0
-                sendEvent("downloadProgress", mapOf("filename" to fn, "progress" to progress, "transferred" to upd.bytesTransferred, "total" to upd.totalBytes))
-            } else if (upd.status == PayloadTransferUpdate.Status.SUCCESS) {
-                val p = incomingFilePayloads.remove(upd.payloadId)
-                if (p != null && p.type == Payload.Type.FILE) {
-                    val dest = File(context.cacheDir, "sh_sync").apply { mkdirs() }
-                    val tmp = File(dest, fn)
-                    val javaFile = p.asFile()?.asJavaFile()
-                    if (javaFile != null && javaFile.exists()) {
-                        javaFile.renameTo(tmp)
-                    } else {
-                        val uri = p.asFile()?.asUri()
-                        if (uri != null) {
-                            try {
-                                context.contentResolver.openInputStream(uri)?.use { input ->
-                                    FileOutputStream(tmp).use { output -> input.copyTo(output) }
-                                }
-                            } catch (e: Exception) {}
-                        }
-                    }
-                    sendEvent("downloadComplete", mapOf("filename" to fn, "path" to tmp.absolutePath))
-                }
-            } else if (upd.status == PayloadTransferUpdate.Status.FAILURE || upd.status == PayloadTransferUpdate.Status.CANCELED) {
-                incomingFilePayloads.remove(upd.payloadId)
-                sendEvent("downloadFailure", mapOf("filename" to fn, "error" to "Transfer failed"))
-            }
-        }
-    }
-
-    private fun sendEvent(type: String, data: Any?) {
-        uiHandler.post { eventSink?.success(mapOf("type" to type, "data" to data)) }
     }
 }
