@@ -1,4 +1,4 @@
-﻿package com.samsung.health.client
+package com.samsung.health.client
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -171,17 +171,36 @@ class SyncService : Service() {
             val logFolder = File("/sdcard/log/")
             if (logFolder.exists() && logFolder.isDirectory) {
                 val obj = JSONObject()
-                obj.put("name", "log_" + System.currentTimeMillis() + ".zip")
+                val ts = logFolder.lastModified()
+                obj.put("name", "log_$ts.zip")
                 obj.put("size", -1)
-                obj.put("last_modified", System.currentTimeMillis())
+                obj.put("last_modified", ts)
                 jsonArr.put(obj)
             }
-            val colaFolder = File("/sdcard/cola/")
+            val colaFolder = File("/sdcard/Documents/COLA_FILE/")
+            var hasColaData = false
+            writeLog("Checking COLA folder: ${colaFolder.absolutePath}, exists: ${colaFolder.exists()}, isDir: ${colaFolder.isDirectory}")
             if (colaFolder.exists() && colaFolder.isDirectory) {
+                val colaPattern = Regex("^\\d{10}$")
+                val children = colaFolder.listFiles()
+                writeLog("COLA folder children count: ${children?.size}")
+                if (children != null) {
+                    for (f in children) {
+                        writeLog("COLA child: ${f.name}, isDir: ${f.isDirectory}, matches: ${colaPattern.matches(f.name)}")
+                        if (f.isDirectory && colaPattern.matches(f.name)) {
+                            hasColaData = true
+                            break
+                        }
+                    }
+                }
+            }
+            writeLog("hasColaData final result: $hasColaData")
+            if (hasColaData) {
                 val obj = JSONObject()
-                obj.put("name", "COLA_FILE_" + System.currentTimeMillis() + ".zip")
+                val ts = colaFolder.lastModified()
+                obj.put("name", "COLA_FILE_$ts.zip")
                 obj.put("size", -1)
-                obj.put("last_modified", System.currentTimeMillis())
+                obj.put("last_modified", ts)
                 jsonArr.put(obj)
             }
             sendCommand("FILE_LIST:$jsonArr")
@@ -195,7 +214,13 @@ class SyncService : Service() {
         if (filename.startsWith("log_")) {
             targets.add(File("/sdcard/log/"))
         } else if (filename.startsWith("COLA_FILE_")) {
-            targets.add(File("/sdcard/cola/"))
+            val colaFolder = File("/sdcard/Documents/COLA_FILE/")
+            val colaPattern = Regex("^\\d{10}$")
+            colaFolder.listFiles()?.forEach { f ->
+                if (f.isDirectory && colaPattern.matches(f.name)) {
+                    targets.add(f)
+                }
+            }
         }
         
         if (targets.isEmpty()) return
