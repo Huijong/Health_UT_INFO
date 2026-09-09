@@ -227,6 +227,7 @@ class SyncService : Service() {
 
         val zipFile = File(cacheDir, filename)
         try {
+            sendCommand("PREPARING_FILE")
             writeLog("Compressing ${targets.size} folders to ${zipFile.absolutePath}...")
             ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
                 zos.setLevel(java.util.zip.Deflater.BEST_SPEED)
@@ -240,8 +241,13 @@ class SyncService : Service() {
             socket.sendBufferSize = 1048576 // 1MB
             val outputStream = socket.getOutputStream()
             
-            writeLog("TCP Connected! Streaming file...")
-            FileInputStream(zipFile).use { input ->
+            writeLog("TCP Connected! Sending file size header...")
+            val dataOut = java.io.DataOutputStream(outputStream)
+            dataOut.writeLong(zipFile.length())
+            dataOut.flush()
+            
+            writeLog("Streaming file...")
+            java.io.FileInputStream(zipFile).use { input ->
                 val buffer = ByteArray(1048576) // 1MB chunks
                 var bytesRead: Int
                 while (input.read(buffer).also { bytesRead = it } >= 0) {

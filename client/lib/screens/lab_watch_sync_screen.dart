@@ -50,11 +50,12 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   int? _compressTransferredBytes;
   int? _compressTotalBytes;
   int? _compressStartTimeMs;
-  int _syncTransferredBytes = 0;
-  int _syncTotalBytes = 0;
+  int? _syncTransferredBytes;
+  int? _syncTotalBytes;
   String? _targetColaFilename;
   String? _targetLogFilename;
   bool _autoDeleteWatchFiles = true;
+  bool _isWatchCompressing = false;
 
   final Set<String> _downloadedFiles = {};
 
@@ -305,7 +306,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
           if (missingFiles.isNotEmpty) {
             _showMissingFileDialog(missingFiles);
-          } else {
+          } else if (_autoSyncStage <= 1) {
             _startNextAutoSyncPhase();
           }
         } catch (e) {
@@ -318,6 +319,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
 
       case "compressing":
         _addLog("워치에서 데이터 패키징 중...");
+        setState(() {
+          _isWatchCompressing = true;
+        });
         break;
 
       case "compressingProgress":
@@ -342,6 +346,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         
         setState(() {
           _syncProgress = progress;
+          if (transferred != null && transferred > 0) {
+            _isWatchCompressing = false;
+          }
         });
         _updateNativeNotification();
         setState(() {
@@ -588,6 +595,37 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   }
 
   void _startDiscovery() async {
+    try {
+      final bool hasPermission = await _wifiP2pChannel.invokeMethod("checkManageStorage");
+      if (!hasPermission) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('⚠️ 저장소 권한 필요', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            content: const Text('워치에서 수신한 대용량 데이터를 폰에 저장하고 자동 첨부하려면 \'모든 파일 접근 권한\'이 필요합니다.\n설정 화면으로 이동하여 권한을 허용해 주세요.', style: TextStyle(color: Colors.white70)),
+            backgroundColor: const Color(0xFF1E2020),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('취소', style: TextStyle(color: Colors.white54)),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _wifiP2pChannel.invokeMethod("requestManageStorage");
+                },
+                child: const Text('설정으로 이동', style: TextStyle(color: Color(0xFF3366FF), fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      _addLog("Permission check error: $e");
+    }
+
     _downloadedFiles.clear();
     setState(() {
       _isSearching = true;
@@ -712,6 +750,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         _autoSyncStage = 2;
         _syncProgress = 0.0;
         _syncStartTimeMs = null;
+        _syncTransferredBytes = null;
+        _syncTotalBytes = null;
+        _isWatchCompressing = false;
       });
       _updateNativeNotification();
       _requestDownload(_targetColaFilename!);
@@ -720,6 +761,9 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         _autoSyncStage = 3;
         _syncProgress = 0.0;
         _syncStartTimeMs = null;
+        _syncTransferredBytes = null;
+        _syncTotalBytes = null;
+        _isWatchCompressing = false;
       });
       _updateNativeNotification();
       _requestDownload(_targetLogFilename!);
@@ -1032,7 +1076,10 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     String etaStr = "";
     
     if (isActive) {
-      if (total == -1 && transferred != null) {
+      if (_isWatchCompressing && (step == 2 || step == 3)) {
+        etaStr = "워치에서 전송을 위해 파일을 압축하고 있습니다...\n(수십 초 소요될 수 있습니다)";
+        percentStr = "";
+      } else if (total == -1 && transferred != null) {
         // Streaming mode (unknown total size)
         if (progress != null && progress >= 0.0) {
           percentStr = " ${(progress * 100).toStringAsFixed(1)}%";
@@ -1054,16 +1101,24 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       } else if (progress != null) {
         // Normal mode (known total size)
         percentStr = " ${(progress * 100).toStringAsFixed(1)}%";
-        if (transferred != null && total != null && startTime != null && progress < 1.0 && transferred > 0) {
-          final elapsedMs = DateTime.now().millisecondsSinceEpoch - startTime;
-          if (elapsedMs > 500) {
-            final speedBytesPerSec = (transferred / (elapsedMs / 1000)).round();
-            if (speedBytesPerSec > 0) {
-              final remainingBytes = total - transferred;
-              final remainingSec = (remainingBytes / speedBytesPerSec).ceil();
-              final speedMBps = (speedBytesPerSec / (1024 * 1024)).toStringAsFixed(2);
-              etaStr = "남은 시간: 약 ${remainingSec}초 ($speedMBps MB/s)";
+        if (transferred != null && total != null) {
+          final totalMB = (total / (1024 * 1024)).toStringAsFixed(1);
+          final transMB = (transferred / (1024 * 1024)).toStringAsFixed(1);
+          
+          if (startTime != null && progress < 1.0 && transferred > 0) {
+            final elapsedMs = DateTime.now().millisecondsSinceEpoch - startTime;
+            if (elapsedMs > 500) {
+              final speedBytesPerSec = (transferred / (elapsedMs / 1000)).round();
+              if (speedBytesPerSec > 0) {
+                final remainingBytes = total - transferred;
+                final remainingSec = (remainingBytes / speedBytesPerSec).ceil();
+                final speedMBps = (speedBytesPerSec / (1024 * 1024)).toStringAsFixed(2);
+                etaStr = "$transMB / $totalMB MB 수신됨 ($speedMBps MB/s) | 남은 시간: 약 ${remainingSec}초";
+              }
             }
+          }
+          if (etaStr.isEmpty) {
+            etaStr = "$transMB / $totalMB MB 수신됨...";
           }
         }
       }
