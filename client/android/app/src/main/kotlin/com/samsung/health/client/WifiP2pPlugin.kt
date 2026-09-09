@@ -277,6 +277,8 @@ class WifiP2pPlugin(private val context: Context) {
                     }
                 } else if (msg == "PREPARING_FILE") {
                     sendEvent("compressing", "watch")
+                } else if (msg == "DELETE_WATCH_FILES_OK") {
+                    sendEvent("deleteWatchFilesOk", "ok")
                 }
             }
         }

@@ -295,10 +295,12 @@ class SyncService : Service() {
     private fun deleteLogFiles() {
         try {
             File("/sdcard/log/").deleteRecursively()
-            File("/sdcard/cola/").deleteRecursively()
-            writeLog("Log files deleted")
+            File("/sdcard/Documents/COLA_FILE/").deleteRecursively()
+            writeLog("Log and COLA files deleted")
+            sendCommand("DELETE_WATCH_FILES_OK")
         } catch (e: Exception) {
             writeLog("Failed to delete log files: ${e.message}")
+            sendCommand("DELETE_WATCH_FILES_OK") // Prevent UI from freezing
         }
     }
 
