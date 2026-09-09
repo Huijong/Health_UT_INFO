@@ -1,9 +1,9 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!--
-      image_picker: 갤러리 접근 권한
-        - Android 12 이하: READ_EXTERNAL_STORAGE (maxSdkVersion="32"로 자동 제한)
-        - Android 13 이상: READ_MEDIA_IMAGES (Photo Picker 사용 시 불필요하지만 명시)
-      file_picker: SAF(Storage Access Framework) 방식 → 별도 권한 불필요
+      image_picker: 媛ㅻ윭由??묎렐 沅뚰븳
+        - Android 12 ?댄븯: READ_EXTERNAL_STORAGE (maxSdkVersion="32"濡??먮룞 ?쒗븳)
+        - Android 13 ?댁긽: READ_MEDIA_IMAGES (Photo Picker ?ъ슜 ??遺덊븘?뷀븯吏留?紐낆떆)
+      file_picker: SAF(Storage Access Framework) 諛⑹떇 ??蹂꾨룄 沅뚰븳 遺덊븘??
     -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -25,10 +25,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"  />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"  />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
@@ -65,7 +65,7 @@
             android:name="flutterEmbedding"
             android:value="2" />
             
-        <!-- FCM 기본 알림 채널 설정 -->
+        <!-- FCM 湲곕낯 ?뚮┝ 梨꾨꼸 ?ㅼ젙 -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="high_importance_channel" />
@@ -92,17 +92,17 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        <!-- url_launcher: sms: 스킴 확인용 -->
+        <!-- url_launcher: sms: ?ㅽ궡 ?뺤씤??-->
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="sms"/>
         </intent>
-        <!-- android_intent_plus: ACTION_SENDTO (SMS body 안정 전송) -->
+        <!-- android_intent_plus: ACTION_SENDTO (SMS body ?덉젙 ?꾩넚) -->
         <intent>
             <action android:name="android.intent.action.SENDTO"/>
             <data android:scheme="smsto"/>
         </intent>
-        <!-- url_launcher: http/https 스킴 확인용 -->
+        <!-- url_launcher: http/https ?ㅽ궡 ?뺤씤??-->
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <category android:name="android.intent.category.BROWSABLE"/>
@@ -113,7 +113,7 @@
             <category android:name="android.intent.category.BROWSABLE"/>
             <data android:scheme="https"/>
         </intent>
-        <!-- Samsung Health 패키지 조회를 위한 권한 획득 -->
+        <!-- Samsung Health ?⑦궎吏 議고쉶瑜??꾪븳 沅뚰븳 ?띾뱷 -->
         <package android:name="com.sec.android.app.shealth" />
     </queries>
 </manifest>
