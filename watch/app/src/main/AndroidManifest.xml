@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-feature android:name="android.hardware.type.watch" />
@@ -12,6 +12,8 @@
 
     <!-- Wi-Fi & Nearby Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -20,6 +22,7 @@
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Location Permissions -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -41,7 +44,7 @@
         android:theme="@android:style/Theme.DeviceDefault"
         android:requestLegacyExternalStorage="true">
 
-        <uses-library android:name="com.google.android.wearable" android:required="true" />
+        <uses-library android:name="com.google.android.wearable" android:required="false" />
         <meta-data android:name="com.google.android.wearable.standalone" android:value="true" />
 
         <activity

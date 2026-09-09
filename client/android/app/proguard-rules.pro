@@ -1,0 +1,4 @@
+-dontwarn io.flutter.plugins.videoplayer.AndroidVideoPlayerApi$Companion
+-dontwarn io.flutter.plugins.videoplayer.AndroidVideoPlayerApi
+-dontwarn io.flutter.plugins.videoplayer.PlatformVideoViewCreationParams
+-dontwarn io.flutter.plugins.videoplayer.VideoPlayerInstanceApi

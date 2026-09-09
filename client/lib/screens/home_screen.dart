@@ -4612,7 +4612,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              onPressed: (!_isHotspotOn || _ssidCtrl.text.trim().isEmpty || _pwdCtrl.text.trim().isEmpty) ? null : () async {
+                              onPressed: (_ssidCtrl.text.trim().isEmpty || _pwdCtrl.text.trim().isEmpty) ? null : () async {
                                 final oldFiles = _getSnapshotFiles();
                                 Navigator.pop(ctx);
                                 await Navigator.push(context, MaterialPageRoute(
@@ -4633,7 +4633,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         ],
                       ),
                     ),
-                    if (!_isHotspotOn || _ssidCtrl.text.trim().isEmpty || _pwdCtrl.text.trim().isEmpty)
+                    if (_ssidCtrl.text.trim().isEmpty || _pwdCtrl.text.trim().isEmpty)
                       Positioned(
                         right: 16,
                         bottom: 56,

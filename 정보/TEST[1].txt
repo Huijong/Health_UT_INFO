@@ -1,0 +1,46 @@
+저장소: https://github.com/Huijong/Health_UT_INFO/
+커밋 48d3d59cd42eb1dfda1e287a3e4b061c3b607044에서 폰-워치 파일 전송 방식이
+LocalOnlyHotspot(폰 핫스팟) + 소켓 방식에서 WifiP2pManager(WiFi Direct 그룹 생성)
+방식으로 잘못 리팩토링되어 워치에서 폰으로 파일 전송이 안 되고 있어.
+직전 정상 동작 시점은 커밋 74639bd6e672f3406aeb3643e519682c31f41ae0 기준이야.
+
+목표: WifiP2pPlugin.kt(폰 쪽)와 SyncService.kt(워치 쪽)에서 전송 방식을
+LocalOnlyHotspot + TCP/UDP 소켓 방식으로 되돌리되, 48d3d59에서 같이 들어온
+개선 사항은 최대한 살려줘.
+
+되돌려야 할 것 (48d3d59에서 깨진 부분):
+1. WifiP2pPlugin.kt: `hotspotReservation: WifiManager.LocalOnlyHotspotReservation?`
+   필드와 `wifiManager.startLocalOnlyHotspot(...)` 호출 흐름을 복원하고,
+   `wifiP2pManager`/`p2pChannel`/`createGroup()` 관련 코드는 제거해줘.
+2. `stopServer()`에서 `wifiP2pManager?.removeGroup(p2pChannel, null)`을
+   `hotspotReservation?.close(); hotspotReservation = null`로 되돌려줘.
+3. 네트워크 인터페이스 탐지 로직에서 삭제된
+   - `192.168.43.` / `192.168.44.` / `192.168.45.` 대역 우선 매칭
+   - 인터페이스명 `"hotspot"` 매칭
+   을 복원해줘. 단, 48d3d59에서 추가된 `wlan1`, `swlan`, `ap`, `bt-pan`,
+   `rndis` 매칭은 그대로 같이 둬도 괜찮아 (핫스팟 인터페이스명이 기기마다
+   달라서 커버리지가 넓어지는 거니까).
+4. SSID를 `"DIRECT-healthport"`로 하드코딩한 부분(update_main_activity.py가
+   적용한 변경)을 원복해서, 원래처럼
+   `call.argument<String>("ssid") ?: "healthport"` 형태로 되돌려줘.
+   (WiFi Direct 그룹 이름 규칙(`DIRECT-` 접두어)은 핫스팟 SSID에는 필요 없음)
+
+유지해도 되는 것 (48d3d59에서 개선된 부분, 그대로 둬):
+- TCP/UDP 포트 8888 → 34567 변경
+- `ServerSocket()` + 명시적 `bind(InetSocketAddress(TCP_PORT))` 방식
+- UDP 소켓 `DatagramSocket(null)` + `reuseAddress` + 명시적 IP bind
+- 로깅 강화, null-safety 체크
+- SyncService.kt의 `startTcpClientWithFailover()`, 서브넷 병렬 스캔,
+  게이트웨이 IP 감지 로직 (핫스팟 환경에서도 유효한 페일오버니까 유지)
+
+작업 순서:
+1. 먼저 `git diff 74639bd6e672f3406aeb3643e519682c31f41ae0 48d3d59cd42eb1dfda1e287a3e4b061c3b607044 -- '*WifiP2pPlugin.kt' '*SyncService.kt' '*MainActivity.kt'`로
+   실제 변경 라인을 정확히 확인해줘.
+2. 위 "되돌려야 할 것"만 선택적으로 revert하고, "유지해도 되는 것"은 그대로 둔
+   새 커밋을 만들어줘 (전체 revert 금지, 부분 되돌리기).
+3. 변경 후 WifiP2pPlugin.kt에 `WifiP2pManager` 관련 import/참조가 남아있지
+   않은지 확인해줘.
+4. 빌드가 되는지 확인하고, 변경 사항을 요약해서 알려줘.
+
+실제 기기 테스트는 내가 직접 할 테니, 코드 레벨 revert와 빌드 확인까지만
+해주면 돼.
