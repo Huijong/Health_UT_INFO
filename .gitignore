@@ -7,3 +7,6 @@ watch/app/build/
 *.aab
 firebase-adminsdk.json
 **/firebase-adminsdk.json
+
+# Ignore backup files
+docs/asserts/backup_2/
