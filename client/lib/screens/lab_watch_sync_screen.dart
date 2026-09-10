@@ -257,16 +257,13 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         break;
 
       case "hotspotStarted":
-        String? pluginSsid = data["ssid"] as String?;
-        String? pluginPw = data["password"] as String?;
-        
-        final ssid = (pluginSsid != null && pluginSsid.isNotEmpty && pluginSsid != "healthport" && pluginSsid != "Unknown") 
-            ? pluginSsid 
-            : (widget.hotspotSsid ?? "healthport");
+        final ssid = (widget.hotspotSsid != null && widget.hotspotSsid!.isNotEmpty) 
+            ? widget.hotspotSsid! 
+            : "healthport";
             
-        final pw = (pluginPw != null && pluginPw.isNotEmpty && pluginPw != "00000000") 
-            ? pluginPw 
-            : (widget.hotspotPwd ?? "12345678");
+        final pw = (widget.hotspotPwd != null && widget.hotspotPwd!.isNotEmpty) 
+            ? widget.hotspotPwd! 
+            : "12345678";
 
         _addLog("Direct Hotspot Started: SSID=$ssid, PW=$pw");
         

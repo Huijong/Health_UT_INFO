@@ -6,7 +6,12 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.wifi.WifiManager
+import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -49,6 +54,8 @@ class SyncService : Service() {
     private var wifiLock: WifiManager.WifiLock? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var connectedEndpointId: String? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var wifiJoinRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -61,8 +68,13 @@ class SyncService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == "ACTION_TRIGGER_WIFI_JOIN") {
-            writeLog("Received Wake-Up Command. Starting Nearby Discovery...")
-            startDiscovery()
+            val ssid = intent.getStringExtra("ssid") ?: "healthport"
+            val pwd = intent.getStringExtra("pwd") ?: "12345678"
+            writeLog("Received Wake-Up Command. Starting Wi-Fi join in 1.5s...")
+            
+            wifiJoinRunnable?.let { mainHandler.removeCallbacks(it) }
+            wifiJoinRunnable = Runnable { connectToWifi(ssid, pwd) }
+            mainHandler.postDelayed(wifiJoinRunnable!!, 1500)
         }
         return START_NOT_STICKY
     }
@@ -145,6 +157,14 @@ class SyncService : Service() {
 
     private fun handleCommand(cmd: String) {
         when {
+            cmd.startsWith("WAKE_UP:") -> {
+                val parts = cmd.split(":", limit = 3)
+                if (parts.size >= 3) {
+                    val ssid = parts[1]
+                    val pwd = parts[2]
+                    connectToWifi(ssid, pwd)
+                }
+            }
             cmd == "GET_FILE_LIST" -> sendFileList()
             cmd.startsWith("TCP_READY:") -> {
                 // Format: TCP_READY:ip:port:filename
@@ -310,6 +330,11 @@ class SyncService : Service() {
     private fun writeLog(msg: String) {
         Log.d(TAG, msg)
         updateNotification("Sync", msg)
+        try {
+            val logFile = java.io.File(android.os.Environment.getExternalStorageDirectory(), "Documents/COLA_FILE/watch_debug.log")
+            logFile.parentFile?.mkdirs()
+            logFile.appendText("${System.currentTimeMillis()}: $msg\n")
+        } catch (e: Exception) {}
     }
 
     private fun acquireLocks() {
@@ -325,6 +350,11 @@ class SyncService : Service() {
     private fun releaseLocks() {
         if (wakeLock?.isHeld == true) wakeLock?.release()
         if (wifiLock?.isHeld == true) wifiLock?.release()
+        try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            networkCallback?.let { cm.unregisterNetworkCallback(it) }
+            cm.bindProcessToNetwork(null)
+        } catch (e: Exception) {}
     }
 
     private fun createNotificationChannel() {
@@ -343,5 +373,79 @@ class SyncService : Service() {
     private fun updateNotification(title: String, content: String) {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(1, buildNotification(title, content))
+    }
+
+    private fun connectToWifi(ssid: String, pwd: String) {
+        try {
+            val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            networkCallback?.let { 
+                try { cm.unregisterNetworkCallback(it) } catch (e: Exception) {} 
+            }
+            networkCallback = null
+
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            if (!wm.isWifiEnabled) {
+                @Suppress("DEPRECATION")
+                wm.isWifiEnabled = true
+            }
+
+            writeLog("Attempting to connect to Wi-Fi SSID: $ssid")
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val specifier = WifiNetworkSpecifier.Builder()
+                    .setSsid(ssid)
+                    .setWpa2Passphrase(pwd)
+                    .build()
+                
+                val request = NetworkRequest.Builder()
+                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                    .setNetworkSpecifier(specifier)
+                    .build()
+
+                val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                networkCallback = object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        super.onAvailable(network)
+                        writeLog("Wi-Fi network available! Binding process...")
+                        cm.bindProcessToNetwork(network)
+                        writeLog("Starting Nearby Discovery now that Wi-Fi is connected...")
+                        mainHandler.post { startDiscovery() }
+                    }
+                    override fun onLost(network: Network) {
+                        super.onLost(network)
+                        writeLog("Wi-Fi network lost.")
+                        cm.bindProcessToNetwork(null)
+                    }
+                }
+                cm.requestNetwork(request, networkCallback!!)
+                writeLog("Requested network via WifiNetworkSpecifier")
+            } else {
+                @Suppress("DEPRECATION")
+                val wifiConfig = android.net.wifi.WifiConfiguration().apply {
+                    this.SSID = "\"$ssid\""
+                    this.preSharedKey = "\"$pwd\""
+                }
+                
+                @Suppress("DEPRECATION")
+                val netId = wm.addNetwork(wifiConfig)
+                if (netId != -1) {
+                    @Suppress("DEPRECATION")
+                    wm.disconnect()
+                    @Suppress("DEPRECATION")
+                    wm.enableNetwork(netId, true)
+                    @Suppress("DEPRECATION")
+                    wm.reconnect()
+                    writeLog("Wi-Fi addNetwork triggered for netId: $netId")
+                } else {
+                    writeLog("addNetwork returned -1, API 29+ device fallback?")
+                }
+                mainHandler.postDelayed({
+                    writeLog("Starting Nearby Discovery after fallback addNetwork...")
+                    startDiscovery()
+                }, 3000)
+            }
+        } catch (e: Exception) {
+            writeLog("Wi-Fi connection error: ${e.message}")
+        }
     }
 }
