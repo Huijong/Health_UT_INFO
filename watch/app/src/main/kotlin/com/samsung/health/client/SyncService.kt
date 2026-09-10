@@ -188,11 +188,27 @@ class SyncService : Service() {
     private fun sendFileList() {
         try {
             val jsonArr = JSONArray()
+            val dateFormat = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault())
+            val dateString = dateFormat.format(java.util.Date())
+            
+            val display = Build.DISPLAY
+            val buildId = Build.ID
+            
+            var model4 = Build.MODEL
+            val regex = Regex("\\((.{4})\\)")
+            val matchResult = regex.find(model4)
+            if (matchResult != null) {
+                model4 = matchResult.groupValues[1]
+            } else {
+                model4 = if (model4.length >= 4) model4.takeLast(4) else model4
+            }
+
             val logFolder = File("/sdcard/log/")
             if (logFolder.exists() && logFolder.isDirectory) {
                 val obj = JSONObject()
                 val ts = logFolder.lastModified()
-                obj.put("name", "log_$ts.zip")
+                val logFileName = "log_${buildId}.${display}_${dateString}.zip"
+                obj.put("name", logFileName)
                 obj.put("size", -1)
                 obj.put("last_modified", ts)
                 jsonArr.put(obj)
@@ -218,7 +234,8 @@ class SyncService : Service() {
             if (hasColaData) {
                 val obj = JSONObject()
                 val ts = colaFolder.lastModified()
-                obj.put("name", "COLA_FILE_$ts.zip")
+                val colaFileName = "COLA_FILE_${display}_${model4}_1.1.08_${dateString}.zip"
+                obj.put("name", colaFileName)
                 obj.put("size", -1)
                 obj.put("last_modified", ts)
                 jsonArr.put(obj)
