@@ -42,10 +42,24 @@ class WifiP2pPlugin(private val context: Context) {
     fun register(engine: FlutterEngine) {
         MethodChannel(engine.dartExecutor.binaryMessenger, METHOD_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
-                "startServer"         -> { startAdvertising(); result.success(true) }
+                "startServer"         -> { 
+                    sendEvent("hotspotStarted", mapOf(
+                        "ssid" to "healthport",
+                        "password" to "12345678",
+                        "ip" to getActiveIpAddress()
+                    ))
+                    uiHandler.postDelayed({ startAdvertising() }, 10000)
+                    result.success(true) 
+                }
                 "stopServer"          -> { stopServer();  result.success(true) }
                 "updateNotification"  -> { result.success(true) }
                 "requestFileList"     -> { sendCommand("GET_FILE_LIST"); result.success(true) }
+                "sendWakeUpRequest"   -> {
+                    val ssid = call.argument<String>("ssid") ?: ""
+                    val pwd = call.argument<String>("pwd") ?: ""
+                    sendCommand("WAKE_UP:$ssid:$pwd")
+                    result.success(true)
+                }
                 "requestFileDownload" -> {
                     val fn = call.argument<String>("filename")
                     if (fn != null) { 
@@ -97,12 +111,6 @@ class WifiP2pPlugin(private val context: Context) {
         Nearby.getConnectionsClient(context).startAdvertising("Phone", SERVICE_ID, connCallback, options)
             .addOnSuccessListener { 
                 Log.i(TAG, "Advertising started") 
-                // Send dummy hotspotStarted event so Dart UI triggers requestWatchWifiJoin
-                sendEvent("hotspotStarted", mapOf(
-                    "ssid" to "healthport",
-                    "password" to "12345678",
-                    "ip" to getActiveIpAddress()
-                ))
             }
             .addOnFailureListener { e -> Log.e(TAG, "Advertising failed: ${e.message}") }
     }
