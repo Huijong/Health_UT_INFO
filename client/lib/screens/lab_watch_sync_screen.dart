@@ -799,6 +799,14 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
       ToastUtil.showToast(context, message);
     }
+    
+    // Tell Watch to stop service and go to home screen
+    try {
+      _wifiP2pChannel.invokeMethod("syncComplete");
+    } catch (e) {
+      _addLog("Failed to send syncComplete: $e");
+    }
+
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) Navigator.pop(context);
     });

@@ -60,6 +60,7 @@ class WifiP2pPlugin(private val context: Context) {
                     sendCommand("WAKE_UP:$ssid:$pwd")
                     result.success(true)
                 }
+                "syncComplete"        -> { sendCommand("SYNC_COMPLETE"); result.success(true) }
                 "requestFileDownload" -> {
                     val fn = call.argument<String>("filename")
                     if (fn != null) { 
@@ -274,8 +275,7 @@ class WifiP2pPlugin(private val context: Context) {
                 val msg = String(p.asBytes()!!, StandardCharsets.UTF_8)
                 Log.i(TAG, "Received msg: $msg")
                 if (msg == "HELLO_FROM_WATCH") {
-                    // Start by requesting file list
-                    uiHandler.postDelayed({ sendCommand("GET_FILE_LIST") }, 500)
+                    // Dart handles requesting the file list via requestFileList
                 } else if (msg.startsWith("FILE_LIST:")) {
                     val jsonStr = msg.substring("FILE_LIST:".length)
                     try {
