@@ -32,6 +32,17 @@ class MainActivity : Activity(), MessageClient.OnMessageReceivedListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // Wake up screen and keep it on
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setTurnScreenOn(true)
+            setShowWhenLocked(true)
+        }
+        window.addFlags(
+            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+            android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+            android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+        )
+        
         // Simple UI Layout
         // ScrollView wrapper to support circular screens perfectly
         // FrameLayout: fills screen so child can be CENTER-gravity

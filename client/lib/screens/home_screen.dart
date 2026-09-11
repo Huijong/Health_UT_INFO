@@ -4302,32 +4302,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     bool added = false;
     final dir = Directory('/storage/emulated/0/Documents/COLA_FILE');
     if (dir.existsSync()) {
-      final files = dir.listSync();
-      for (var f in files) {
-        if (f is File) {
-          final fileName = f.path.split('/').last;
-          final oldTime = oldFiles[fileName];
-          final newTime = f.lastModifiedSync().millisecondsSinceEpoch;
-          
-          if (oldTime == null || newTime > oldTime) {
-            final nameLowerCase = fileName.toLowerCase();
-            if (nameLowerCase.endsWith('.zip')) {
-              if (nameLowerCase.startsWith('cola_file')) {
-                _colaFiles.removeWhere((e) => e.name == fileName);
-                setState(() {
-                  _colaFiles.add(AttachedFile(originalPath: f.path, name: fileName, sizeBytes: f.lengthSync(), type: AttachType.cola));
-                });
-                added = true;
-              } else if (nameLowerCase.startsWith('log_')) {
-                _logFiles.removeWhere((e) => e.name == fileName);
-                setState(() {
-                  _logFiles.add(AttachedFile(originalPath: f.path, name: fileName, sizeBytes: f.lengthSync(), type: AttachType.log));
-                });
-                added = true;
-              }
-            }
-          }
-        }
+      final files = dir.listSync().whereType<File>().toList();
+      if (files.isEmpty) return false;
+
+      // Find the most recent COLA file
+      final colaZips = files.where((f) => f.path.split('/').last.toLowerCase().startsWith('cola_file_') && f.path.toLowerCase().endsWith('.zip')).toList();
+      colaZips.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+
+      // Find the most recent log file
+      final logZips = files.where((f) => f.path.split('/').last.toLowerCase().startsWith('log_') && f.path.toLowerCase().endsWith('.zip')).toList();
+      logZips.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+
+      if (colaZips.isNotEmpty) {
+        final newestCola = colaZips.first;
+        final fileName = newestCola.path.split('/').last;
+        setState(() {
+          _colaFiles.clear();
+          _colaFiles.add(AttachedFile(originalPath: newestCola.path, name: fileName, sizeBytes: newestCola.lengthSync(), type: AttachType.cola));
+        });
+        added = true;
+      }
+
+      if (logZips.isNotEmpty) {
+        final newestLog = logZips.first;
+        final fileName = newestLog.path.split('/').last;
+        setState(() {
+          _logFiles.clear();
+          _logFiles.add(AttachedFile(originalPath: newestLog.path, name: fileName, sizeBytes: newestLog.lengthSync(), type: AttachType.log));
+        });
+        added = true;
       }
     }
     return added;

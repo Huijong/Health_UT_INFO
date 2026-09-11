@@ -11,8 +11,8 @@ android {
         applicationId "com.samsung.health.client"
         minSdk 29
         targetSdk 37
-        versionCode 108
-        versionName "1.108"
+        versionCode 111
+        versionName "1.111"
     }
 
     signingConfigs {

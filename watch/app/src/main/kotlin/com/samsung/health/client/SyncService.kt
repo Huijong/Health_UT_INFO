@@ -72,6 +72,15 @@ class SyncService : Service() {
             val pwd = intent.getStringExtra("pwd") ?: "12345678"
             writeLog("Received Wake-Up Command. Starting Wi-Fi join in 1.5s...")
             
+            try {
+                val launchIntent = Intent(this, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+                startActivity(launchIntent)
+            } catch (e: Exception) {
+                writeLog("Failed to launch MainActivity for wakeup: ${e.message}")
+            }
+            
             wifiJoinRunnable?.let { mainHandler.removeCallbacks(it) }
             wifiJoinRunnable = Runnable { connectToWifi(ssid, pwd) }
             mainHandler.postDelayed(wifiJoinRunnable!!, 1500)
