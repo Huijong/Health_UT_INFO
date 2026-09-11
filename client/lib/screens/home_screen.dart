@@ -4071,12 +4071,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   }
 
   Future<void> _openHotspotSettings({bool skipGuidePopup = false}) async {
-    if (!_isHotspotOn && !skipGuidePopup) {
+    final prefs = await SharedPreferences.getInstance();
+    bool hideGuide = prefs.getBool('hide_hotspot_guide') ?? false;
+
+    if (!_isHotspotOn && !skipGuidePopup && !hideGuide) {
       bool? goNext = await showDialog<bool>(
         context: context,
         barrierDismissible: true,
         builder: (context) {
-          return Dialog(
+          bool doNotShowAgain = false;
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return Dialog(
             insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
             backgroundColor: const Color(0xFF1E2640),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -4167,23 +4173,65 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     ),
                   ),
                   const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3366FF),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          setDialogState(() {
+                            doNotShowAgain = !doNotShowAgain;
+                          });
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Checkbox(
+                                value: doNotShowAgain,
+                                onChanged: (val) {
+                                  setDialogState(() {
+                                    doNotShowAgain = val ?? false;
+                                  });
+                                },
+                                activeColor: const Color(0xFF3366FF),
+                                side: const BorderSide(color: Colors.white54),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '다시 보지 않기',
+                              style: TextStyle(color: Colors.white70, fontSize: 14),
+                            ),
+                          ],
+                        ),
                       ),
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('확인', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3366FF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          onPressed: () {
+                            if (doNotShowAgain) {
+                              prefs.setBool('hide_hotspot_guide', true);
+                            }
+                            Navigator.pop(context, true);
+                          },
+                          child: const Text('확인', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           );
+          },
+        );
         },
       );
       if (goNext != true) return;
@@ -4612,7 +4660,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              onPressed: (_ssidCtrl.text.trim().isEmpty || _pwdCtrl.text.trim().isEmpty) ? null : () async {
+                              onPressed: (!_isHotspotOn || _ssidCtrl.text.trim().isEmpty || _pwdCtrl.text.trim().isEmpty) ? null : () async {
                                 final oldFiles = _getSnapshotFiles();
                                 Navigator.pop(ctx);
                                 await Navigator.push(context, MaterialPageRoute(
@@ -4633,7 +4681,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         ],
                       ),
                     ),
-                    if (_ssidCtrl.text.trim().isEmpty || _pwdCtrl.text.trim().isEmpty)
+                    if (!_isHotspotOn || _ssidCtrl.text.trim().isEmpty || _pwdCtrl.text.trim().isEmpty)
                       Positioned(
                         right: 16,
                         bottom: 56,
