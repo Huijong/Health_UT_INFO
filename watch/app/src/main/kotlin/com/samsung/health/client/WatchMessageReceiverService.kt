@@ -40,6 +40,19 @@ class WatchMessageReceiverService : WearableListenerService() {
                 // 1. Trigger Notification (Vibration & Backup access)
                 sendSysDumpNotification()
                 
+                // 1.5. Wake up screen
+                try {
+                    val pm = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+                    @Suppress("DEPRECATION")
+                    val wakeLock = pm.newWakeLock(
+                        android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                        "HealthClient::SysDumpWakeUpLock"
+                    )
+                    wakeLock.acquire(3000)
+                } catch (e: Exception) {
+                    writeLog("[SysDump_Msg] Failed to wake screen: ${e.message}")
+                }
+                
                 // 2. Launch Dialer directly on Watch screen
                 try {
                     val intent = Intent(Intent.ACTION_DIAL).apply {
