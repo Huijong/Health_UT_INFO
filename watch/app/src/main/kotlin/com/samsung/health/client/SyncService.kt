@@ -179,6 +179,19 @@ class SyncService : Service() {
                 }
             }
             cmd == "DELETE_WATCH_FILES" -> deleteLogFiles()
+            cmd == "SYNC_COMPLETE" -> {
+                writeLog("Received SYNC_COMPLETE. Exiting to home and stopping service...")
+                try {
+                    val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_HOME)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(homeIntent)
+                } catch (e: Exception) {
+                    writeLog("Failed to launch home: ${e.message}")
+                }
+                stopSelf()
+            }
         }
     }
 
@@ -207,7 +220,11 @@ class SyncService : Service() {
             if (logFolder.exists() && logFolder.isDirectory) {
                 val obj = JSONObject()
                 val ts = logFolder.lastModified()
-                val logFileName = "log_${buildId}.${display}_${dateString}.zip"
+                val logFileName = if (display.startsWith(buildId)) {
+                    "log_${display}_${dateString}.zip"
+                } else {
+                    "log_${buildId}.${display}_${dateString}.zip"
+                }
                 obj.put("name", logFileName)
                 obj.put("size", -1)
                 obj.put("last_modified", ts)
