@@ -615,7 +615,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
         backgroundColor: const Color(0xFF1E1E1E),
         title: const Text('Wi-Fi 연결 지연', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: const Text(
-          '워치가 핫스팟(Wi-Fi)에 연결하지 못하고 있습니다.\n\n모바일 핫스팟이 켜져 있는지 확인해 주세요.',
+          '워치가 핫스팟(Wi-Fi)에 연결하지 못하고 있습니다.\n\n모바일 핫스팟 활성화 상태 및 입력하신 네트워크 이름(SSID)과 비밀번호가 정확한지 점검해 주세요.',
           style: TextStyle(color: Colors.white70, fontSize: 13),
         ),
         actions: [
