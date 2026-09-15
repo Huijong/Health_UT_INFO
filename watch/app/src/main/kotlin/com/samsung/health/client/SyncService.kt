@@ -57,6 +57,43 @@ class SyncService : Service() {
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var wifiJoinRunnable: Runnable? = null
 
+    @Volatile private var lastActivityTimeMs: Long = 0
+    private var watchdogRunnable: Runnable? = null
+
+    private fun startWatchdog() {
+        lastActivityTimeMs = System.currentTimeMillis()
+        watchdogRunnable?.let { mainHandler.removeCallbacks(it) }
+        watchdogRunnable = object : Runnable {
+            override fun run() {
+                val idleTime = System.currentTimeMillis() - lastActivityTimeMs
+                if (idleTime >= 5 * 60 * 1000L - 1000) {
+                    writeLog("Watchdog timeout (5 min). Stopping SyncService and returning to home.")
+                    forceStopAndExit()
+                } else {
+                    mainHandler.postDelayed(this, 5 * 60 * 1000L - idleTime)
+                }
+            }
+        }
+        mainHandler.postDelayed(watchdogRunnable!!, 5 * 60 * 1000L)
+    }
+
+    private fun pingWatchdog() {
+        lastActivityTimeMs = System.currentTimeMillis()
+    }
+
+    private fun forceStopAndExit() {
+        try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(homeIntent)
+        } catch (e: Exception) {
+            writeLog("Failed to launch home: ${e.message}")
+        }
+        stopSelf()
+    }
+
     override fun onCreate() {
         super.onCreate()
         isServiceActive = true
@@ -64,6 +101,7 @@ class SyncService : Service() {
         createNotificationChannel()
         startForeground(1, buildNotification("Ready", "Waiting for command"))
         acquireLocks()
+        startWatchdog()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -91,6 +129,7 @@ class SyncService : Service() {
     override fun onDestroy() {
         isServiceActive = false
         isRunning = false
+        watchdogRunnable?.let { mainHandler.removeCallbacks(it) }
         stopDiscovery()
         connectedEndpointId?.let { Nearby.getConnectionsClient(this).disconnectFromEndpoint(it) }
         releaseLocks()
@@ -155,13 +194,16 @@ class SyncService : Service() {
 
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(epId: String, p: Payload) {
+            pingWatchdog()
             if (p.type == Payload.Type.BYTES) {
                 val cmd = String(p.asBytes()!!, StandardCharsets.UTF_8)
                 writeLog("Received cmd: $cmd")
                 handleCommand(cmd)
             }
         }
-        override fun onPayloadTransferUpdate(epId: String, upd: PayloadTransferUpdate) {}
+        override fun onPayloadTransferUpdate(epId: String, upd: PayloadTransferUpdate) {
+            pingWatchdog()
+        }
     }
 
     private fun handleCommand(cmd: String) {
@@ -190,16 +232,7 @@ class SyncService : Service() {
             cmd == "DELETE_WATCH_FILES" -> deleteLogFiles()
             cmd == "SYNC_COMPLETE" -> {
                 writeLog("Received SYNC_COMPLETE. Exiting to home and stopping service...")
-                try {
-                    val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                        addCategory(Intent.CATEGORY_HOME)
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    startActivity(homeIntent)
-                } catch (e: Exception) {
-                    writeLog("Failed to launch home: ${e.message}")
-                }
-                stopSelf()
+                forceStopAndExit()
             }
         }
     }
@@ -314,6 +347,7 @@ class SyncService : Service() {
                 val buffer = ByteArray(1048576) // 1MB chunks
                 var bytesRead: Int
                 while (input.read(buffer).also { bytesRead = it } >= 0) {
+                    pingWatchdog()
                     outputStream.write(buffer, 0, bytesRead)
                 }
                 outputStream.flush()
