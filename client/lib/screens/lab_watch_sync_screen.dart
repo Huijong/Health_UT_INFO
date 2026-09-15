@@ -65,6 +65,8 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
   AnimationController? _radarController;
   AnimationController? _spinController;
   StreamSubscription? _wifiP2pSubscription;
+  Timer? _wifiTimeoutTimer;
+  bool _isTimeoutDialogShowing = false;
 
   final List<String> _logs = [];
 
@@ -211,6 +213,7 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     _radarController?.dispose();
     _spinController?.dispose();
     _wifiP2pSubscription?.cancel();
+    _wifiTimeoutTimer?.cancel();
     _wifiP2pChannel.invokeMethod("stopServer");
     super.dispose();
   }
@@ -231,6 +234,11 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
       case "connectionStateChanged":
         final connected = data["connected"] as bool;
         if (connected) {
+          _wifiTimeoutTimer?.cancel();
+          if (_isTimeoutDialogShowing) {
+            Navigator.of(context).pop();
+            _isTimeoutDialogShowing = false;
+          }
           final deviceName = data["deviceName"] as String? ?? "Smartwatch";
           _addLog("Wi-Fi connected with $deviceName.");
           setState(() {
@@ -275,6 +283,13 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
             "pwd": pw,
           }).catchError((e) {
             _addLog("Failed to send Wi-Fi join request: $e");
+          });
+
+          _wifiTimeoutTimer?.cancel();
+          _wifiTimeoutTimer = Timer(const Duration(seconds: 15), () {
+            if (_connectedEndpointId == null && mounted && _autoSyncStage <= 1) {
+              _showWifiTimeoutDialog();
+            }
           });
         }
         break;
@@ -589,6 +604,41 @@ class _LabWatchSyncScreenState extends State<LabWatchSyncScreen> with TickerProv
     } catch (e) {
       debugPrint("Nearby permissions check failed: $e");
     }
+  }
+
+  void _showWifiTimeoutDialog() {
+    _isTimeoutDialogShowing = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Wi-Fi 연결 지연', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text(
+          '워치가 핫스팟(Wi-Fi)에 연결하지 못하고 있습니다.\n\n모바일 핫스팟이 켜져 있는지 확인해 주세요.',
+          style: TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+            },
+            child: const Text('취소', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3366FF)),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _startDiscovery();
+            },
+            child: const Text('재시도', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    ).then((_) {
+      _isTimeoutDialogShowing = false;
+    });
   }
 
   void _startDiscovery() async {
