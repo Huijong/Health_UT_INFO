@@ -12,6 +12,7 @@ import 'dart:io';
 import 'dart:math';
 import '../widgets/custom_file_picker.dart';
 import 'lab_watch_sync_screen.dart';
+import 'chat_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 import '../config/app_config.dart';
@@ -2707,6 +2708,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           }
         },
         child: Scaffold(
+          floatingActionButton: (_currentStep == 4) ? FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ChatScreen()),
+              );
+            },
+            backgroundColor: const Color(0xFFFFEB33), // 카카오톡 노란색
+            shape: const CircleBorder(), // 완전한 원형
+            elevation: 4.0,
+            child: const Icon(Icons.chat_bubble, color: Color(0xFF3C1E1E)), // 카카오톡 갈색
+          ) : null,
           body: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
