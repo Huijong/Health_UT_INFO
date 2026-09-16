@@ -1,5 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -75,10 +77,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('ko_KR', null);
 
   // Firebase 초기화 (FCM 연동)
   try {
     await Firebase.initializeApp();
+
+    // Firestore Offline Persistence 비활성화 (SQLite Locked Exception 방지)
+    FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
     
     // 백그라운드 핸들러 등록
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
