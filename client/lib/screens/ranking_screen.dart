@@ -766,7 +766,7 @@ class _RankingScreenState extends State<RankingScreen> with TickerProviderStateM
           ),
         ),
         Padding(
-          padding: const EdgeInsets.only(top: 40, bottom: 24, left: 0, right: 0),
+          padding: const EdgeInsets.only(top: 10, bottom: 0, left: 0, right: 0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -789,25 +789,14 @@ class _RankingScreenState extends State<RankingScreen> with TickerProviderStateM
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(
-                radius: rank == 1 ? 28 : 24,
-                backgroundColor: Colors.white10,
-                child: const Text('-', style: TextStyle(color: Colors.white30)),
+              Image.asset(
+                'assets/images/characters/rank${rank}_char.png',
+                height: rank == 1 ? 120 : 90,
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 8),
               const Text('-', style: TextStyle(color: Colors.white30, fontSize: 12)),
               const SizedBox(height: 4),
-              Container(
-                height: barHeight,
-                width: 60,
-                decoration: const BoxDecoration(
-                  color: Colors.white10,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -849,7 +838,6 @@ class _RankingScreenState extends State<RankingScreen> with TickerProviderStateM
           final double currentBlur = rank == 1 ? 10.0 + (10.0 * animValue) : 10.0;
           final double currentSpread = rank == 1 ? 2.0 + (4.0 * animValue) : 1.5;
           final Color currentAvatarGlow = rank == 1 ? glowColor.withOpacity(0.25 + (0.45 * animValue)) : glowColor;
-          final Color currentBarGlow = rank == 1 ? glowColor.withOpacity(0.15 + (0.3 * animValue)) : glowColor.withOpacity(0.15);
 
           return GestureDetector(
             onTap: () => _showTesterHistory(name),
@@ -857,123 +845,56 @@ class _RankingScreenState extends State<RankingScreen> with TickerProviderStateM
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-              Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: currentAvatarGlow,
-                          blurRadius: currentBlur,
-                          spreadRadius: currentSpread,
-                        ),
-                      ],
-                    ),
-                    child: CircleAvatar(
-                      radius: avatarRadius,
-                      backgroundColor: isMe ? const Color(0xFF3366FF) : themeColor.withOpacity(0.15),
-                      child: CircleAvatar(
-                        radius: avatarRadius - 2,
-                        backgroundColor: const Color(0xFF1E2020),
-                        child: Text(
-                          rank == 1
-                              ? '🥇'
-                              : rank == 2
-                                  ? '🥈'
-                                  : '🥉',
-                          style: TextStyle(
-                            fontSize: rank == 1 ? 22 : 18,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (rank >= 1 && rank <= 3)
-                    Positioned(
-                      bottom: avatarRadius * 2 - (rank == 1 ? 10 : 6),
-                      child: AnimatedSpeechBubble(
-                        rank: rank,
-                        rank1Item: rank1Item,
-                        rank2Item: rank2Item,
-                        rank3Item: rank3Item,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
+                AnimatedSpeechBubble(
+                  rank: rank,
+                  rank1Item: rank1Item,
+                  rank2Item: rank2Item,
+                  rank3Item: rank3Item,
+                ),
+                const SizedBox(height: 2),
+                Image.asset(
+                  'assets/images/characters/rank${rank}_char.png',
+                  height: rank == 1 ? 140 : 110,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 8),
+                Text(
                   name,
-                  maxLines: 1,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
                   overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                    color: isMe ? const Color(0xFF3366FF) : Colors.white,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${_formatPoints(points)}P ($submissions건)',
+                  style: TextStyle(color: themeColor, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  width: 60,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: themeColor.withOpacity(0.5), width: 1),
                   ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${_formatPoints(points)}P (${submissions}건)',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.bold,
-                  color: themeColor,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                height: barHeight,
-                width: 60,
-                decoration: BoxDecoration(
-                  boxShadow: [
-                    BoxShadow(
-                      color: currentBarGlow,
-                      blurRadius: currentBlur,
-                      spreadRadius: rank == 1 ? 1.0 + (3.0 * animValue) : 1.5,
-                      offset: const Offset(0, -4),
+                  child: Center(
+                    child: Text(
+                      '$rank위',
+                      style: TextStyle(
+                        color: themeColor,
+                        fontSize: rank == 1 ? 16 : 14,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ],
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      rank == 1 ? const Color(0xFFFFD700).withOpacity(0.8) : themeColor.withOpacity(0.6),
-                      rank == 1 ? const Color(0xFFFDD835).withOpacity(0.1) : themeColor.withOpacity(0.05),
-                    ],
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
-                  border: Border.all(
-                    color: themeColor.withOpacity(0.3),
-                    width: 1,
                   ),
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$rank',
-                  style: TextStyle(
-                    fontSize: rank == 1 ? 18 : 14,
-                    fontWeight: FontWeight.bold,
-                    color: themeColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
-
 
   Widget _buildRankingItem(dynamic item, int index) {
     final name = item['tester_name'] ?? '알 수 없음';
@@ -1358,86 +1279,41 @@ class _AnimatedSpeechBubbleState extends State<AnimatedSpeechBubble> with Single
   late Color _bubbleColor;
   late Color _textColor;
 
-  static const List<String> rank1Phrases = [
-    "야호~~ 1등 달달하다! 😝",
-    "2등님, 가고~~ 있는데~~ 언제 오시나요? 🤣",
-    "이게 바로 1등의 여유지 ☕️",
-    "폼 미쳤다이! 내가 바로 1등! 🔥",
-    "럭키비키잖아? 1등이라니 완전 럭키비키! 🍀",
-    "너 T야? 왜 1등을 못 해? 🤖",
-    "정상은 외롭군... 훗 😏",
-    "언제쯤 날 넘어설 텐가? 😜",
-    "쉿, 1등은 지금 명상 중 🧘‍♂️",
-    "중꺾마! 내 1등도 안 꺾임! 💪",
-    "1등석 공기는 확실히 다르네 🌬️",
-    "너 내 동료(2등)가 돼라! 🏴‍☠️",
-    "아~ 1등 너무 지루해 (거짓말) 🥱",
-    "내 점수 실화냐? 가슴이 웅장해진다 🏰",
-    "2등아, 조금만 더 분발해! 깐부잖아 🦑",
-    "여기가 바로 무릉도원인가요? 🍑",
-    "따라올 테면 따라와 봐 😎",
-    "내가 제일 잘나가~ 🥇",
-    "영차 영차! 1등 수성 중 🏰",
-    "내가 1등인 건... '숙명'이다. 🗡️",
-    "다 비켜라! 1위 납신다 🚗💨",
-    "이 구역의 짱은 나야 나! 🥇",
-    "2등, 3등! 어서 와서 인사 안 하고 뭐 해? 🙇‍♂️",
-    "1등을 향한 내 열정, 폼 찢어따이! 🎸",
-    "폼생폼사! 1등 아니면 안 살아 👑"
+    static const List<String> rank1Phrases = [
+    "아유 깜짝이야, 내가 1등이네! 🤣",
+    "1등석 공기는 역시 다르네요~ 🌬️",
+    "이 기분 마치... 런닝맨! 🏃‍♂️",
+    "얍쓰! 메뚜기 점프! 🦗",
+    "내가 1등이라니 무야호~ 🥳",
+    "국민 1등 유재석입니다! 👑",
+    "아유 감사합니다, 다 여러분 덕분이에요~ 🙏",
+    "진실의 방 말고 1등의 방으로 가시죠! 🚪",
+    "이게 바로 1등의 여유지 ☕",
+    "모두 수고하셨습니다 짝짝짝! 👏"
   ];
   static const List<String> rank2Phrases = [
-    "1등! 가고~~ 있는데~~ 딱 기다려라! 🏃‍♂️💨",
-    "야호~~ 2등도 폼 미쳤다이! 😝",
-    "아깝다... 쪼금만 더 하면 1등인데! 😫",
-    "1등, 자리 비워둬라. 곧 간다 🚀",
-    "두고 봐, 내일은 내가 1등이야 🔥",
-    "은메달도 나쁘지 않... 지만 배아파 😭",
-    "1등... 너 T야? 좀 양보 좀 해라! 😠",
-    "3등, 넌 내 상대가 아니야 훗 😤",
-    "1등석 바로 뒷자리... 뷰는 좋네 💺",
-    "완전 럭키비키...가 될 뻔했는데 2등이네 🥲",
-    "만년 2인자의 설움... 오늘로 끝낸다! ⚔️",
-    "1등 턱밑까지 추격 완료! 🕵️‍♂️",
-    "2등도 잘한 거야! (셀프 토닥토닥) 👏",
-    "3등님, 너무 바짝 쫓아오지 마세요 😅",
-    "1등 점수 버그 아님? 왜 이렇게 높아! 🐛",
-    "1등! 폼 미친 거 인정하지만, 내일은 다르다! 🌟",
-    "2위의 반란을 보여주지 🌪️",
-    "후하후하, 1등 뒷모습이 보인다 🏃‍♂️💨",
-    "2등이라니... 오히려 좋아 (강한 부정) 🫠",
-    "1등, 내가 널 주시하고 있다 👁️👁️",
-    "금메달에 손만 뻗으면 닿을 듯... 🤲",
-    "뒤통수 조심해라 1등 👀",
-    "은은하게 빛나는 은메달도 멋지다고! ✨",
-    "영차 영차! 1등 잡으러 가자! 밧줄 꽉 잡아! 🪢",
-    "1등, 내가 빙다리 핫바지로 보이냐? 🃏"
+    "2등석 흠뻑쇼 가즈아! 💦",
+    "오빤 2등스타일! 🕶️",
+    "챔피언~ 소리 지르는 네가 2등! 🎤",
+    "뛰어! 2등도 춤추자! 🕺",
+    "강남스타일 말고 2등스타일! 🐴",
+    "새됐어! 1등 놓쳤어! 🦅",
+    "나폴나폴~ 2등으로 간다 🦋",
+    "마 2등도 나쁘지 않다 아이가! 😎",
+    "다음엔 내가 1등! 폼생폼사! 🔥",
+    "열정! 열정! 열정! 2등도 달린다! 🚀"
   ];
   static const List<String> rank3Phrases = [
-    "4등아 미안! 내가 3등으로 가고~~ 있는데~~ 🤣",
-    "야호~~ 어쨌든 단상 위로 올라왔다! 😝",
-    "저기요... 위쪽 공기는 맑습니까? 🥺",
-    "럭키비키! 턱걸이로 3등이라니 완전 럭키! 🍀",
-    "너 T야? 3등도 엄청 잘한 거라고 해줘! 🥺",
-    "동메달도 메달이잖아?! 🥉",
-    "나도 언젠간 저 자리에... 부럽다 ✨",
-    "1, 2등... 기다려라! 내가 치고 올라간다 🏃‍♂️",
-    "휴~ 턱걸이로 시상대 입성 성공! 💦",
-    "1, 2등 싸움에 새우(3등) 등 터진다 🦐",
-    "3등석 뷰도 나쁘지 않네요 🍿",
-    "폼 미쳤다! 3등까지 올라왔어! 🔥",
-    "4등 님, 밑에서 발목 잡지 마세요 😱",
-    "여기가 바로 명예의 전당 문지기 자리인가요? 🚪",
-    "올라가긴 힘든데 떨어지는 건 순식간이겠지... ㄷㄷ 🥶",
-    "그래도 동메달이 어디야 🥉 츄베릅 🤤",
-    "앞만 보고 달린다... 4등 돌아볼 여유 없음 🐎",
-    "1, 2등 점수 차이 실화냐... 괴물들 👾",
-    "살아남는 자가 강한 거다! 3등 생존 완료 🛡️",
-    "휴, 4등 숨소리가 여기까지 들려 🏃‍♂️💨",
-    "3위면 어때? 중꺾마! 💖",
-    "3등도 상 줍니까? 🎁",
-    "1, 2등... 언젠간 끌어내리고 만다 밧줄 가져와! 🪢",
-    "3위의 저력을 보여주마 💥",
-    "단상 밑 공기보단 여기가 훨씬 낫네 🌬️"
+    "3등석 진실의 방으로... 🚪",
+    "아직 3등이네... 살려는 드릴게. 👊",
+    "혼자 왔니? 나 3등이다. 🪓",
+    "나 아트박스 사장인데 3등이네. 🕶️",
+    "어, 형은 3등이야. 😎",
+    "3등석, 싱글이야? 🤜",
+    "3등이라고 무시하면 큰일 나. 💥",
+    "근육으로 3등까지 밀고 왔다. 💪",
+    "어이 1등 2등, 기다려라 형이 간다. 🏃‍♂️",
+    "이 점수 실화냐? 가슴이 웅장해진다 🏰"
   ];
 
   @override

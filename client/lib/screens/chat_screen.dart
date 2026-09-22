@@ -7,6 +7,9 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'image_detail_screen.dart';
+import '../utils/toast_util.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -23,6 +26,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _myUserId;
   bool _isMuted = false;
   bool _isUploadingImage = false;
+  Timestamp? _latestMessageTimestamp;
 
   @override
   void initState() {
@@ -30,24 +34,42 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadUserConfig();
   }
 
+  @override
+  void dispose() {
+    _saveLatestTimestamp();
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _saveLatestTimestamp() {
+    SharedPreferences.getInstance().then((prefs) {
+      if (_latestMessageTimestamp != null) {
+        prefs.setInt('last_read_chat_timestamp', _latestMessageTimestamp!.millisecondsSinceEpoch);
+      } else {
+        prefs.setInt('last_read_chat_timestamp', DateTime.now().millisecondsSinceEpoch);
+      }
+    });
+  }
+
   Future<void> _loadUserConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    String? userId = prefs.getString('chat_user_id');
-    String? nickname = prefs.getString('chat_nickname');
-    bool isMuted = prefs.getBool('chat_is_muted') ?? false;
-
-    if (userId == null || nickname == null) {
-      userId = 'user_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(1000)}';
-      nickname = '유저_${Random().nextInt(9999)}';
-      await prefs.setString('chat_user_id', userId);
-      await prefs.setString('chat_nickname', nickname);
-    }
-
     setState(() {
-      _myUserId = userId;
-      _myNickname = nickname;
-      _isMuted = isMuted;
+      String? savedUuid = prefs.getString('device_uuid');
+      if (savedUuid == null || savedUuid.trim().isEmpty) {
+        savedUuid = 'unknown_id_${Random().nextInt(10000)}';
+        prefs.setString('device_uuid', savedUuid);
+      }
+      _myUserId = savedUuid;
+
+      String? savedName = prefs.getString('tester_name');
+      if (savedName == null || savedName.trim().isEmpty) {
+        _myNickname = '유저_${Random().nextInt(10000)}';
+      } else {
+        _myNickname = savedName;
+      }
+
+      _isMuted = prefs.getBool('chat_is_muted') ?? false;
     });
   }
 
@@ -59,13 +81,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await prefs.setBool('chat_is_muted', _isMuted);
     
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isMuted ? '채팅 알림을 껐습니다.' : '채팅 알림을 켰습니다.'),
-          duration: const Duration(seconds: 1),
-          backgroundColor: const Color(0xFF333333),
-        ),
-      );
+      ToastUtil.showToast(context, _isMuted ? '채팅 알림을 껐습니다.' : '채팅 알림을 켰습니다.');
     }
   }
 
@@ -159,7 +175,7 @@ class _ChatScreenState extends State<ChatScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
         title: const Text(
-          'HealthPort오픈 채팅방',
+          'HealthPort 오픈 채팅방',
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         actions: [
@@ -203,6 +219,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       }
 
                       final docs = snapshot.data?.docs ?? [];
+                      if (docs.isNotEmpty) {
+                        final data = docs.first.data() as Map<String, dynamic>;
+                        final ts = data['timestamp'] as Timestamp?;
+                        if (ts != null) {
+                          _latestMessageTimestamp = ts;
+                        }
+                      }
 
                       return ListView.builder(
                         controller: _scrollController,
@@ -321,9 +344,23 @@ class _ChatScreenState extends State<ChatScreen> {
                               )
                             : Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                                child: Text(
-                                  message,
+                                child: Linkify(
+                                  onOpen: (link) async {
+                                    final uri = Uri.parse(link.url);
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                    } else {
+                                      debugPrint('Could not launch ${link.url}');
+                                    }
+                                  },
+                                  text: message,
                                   style: const TextStyle(color: Colors.black87, fontSize: 14),
+                                  linkStyle: const TextStyle(
+                                    color: Colors.blue,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: Colors.blue,
+                                    decorationThickness: 2.0,
+                                  ),
                                 ),
                               ),
                         ),
