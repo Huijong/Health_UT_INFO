@@ -5,6 +5,7 @@ import '../widgets/custom_file_picker.dart';
 import 'dart:ui';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
@@ -478,10 +479,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   DeviceSession? _session;
   PrefsService? _prefs;
   bool _isLoading = true;
+  int _lastReadChatTimestamp = 0;
+
+  Future<void> _loadLastReadChatTimestamp() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _lastReadChatTimestamp = prefs.getInt('last_read_chat_timestamp') ?? 0;
+      });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadLastReadChatTimestamp();
     _deviceTabController = TabController(length: 2, vsync: this);
     _deviceTabController.addListener(() {
       if (mounted) setState(() {});
@@ -2528,13 +2540,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             _showFileError('Garmin FIT 파일', '선택한 파일이 .zip 파일이 아닙니다.');
             return;
           }
-                  if (f is File) {
-          final stat = f.statSync();
-          final name = f.path.split('/').last.split('\\').last;
-          setState(() => _garminFiles.add(AttachedFile(originalPath: f.path, name: name, sizeBytes: stat.size, type: AttachType.fit)));
-        } else {
-          setState(() => _garminFiles.add(f));
-        }
+          if (f is File) {
+            final stat = f.statSync();
+            final name = f.path.split('/').last.split('\\').last;
+            setState(() => _garminFiles.add(AttachedFile(originalPath: f.path, name: name, sizeBytes: stat.size, type: AttachType.fit)));
+          } else {
+            setState(() => _garminFiles.add(f));
+          }
         }
       } catch (e) {
         _showFileError('Garmin FIT 파일', e);
@@ -2708,17 +2720,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           }
         },
         child: Scaffold(
-          floatingActionButton: (_currentStep == 4) ? FloatingActionButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ChatScreen()),
+          floatingActionButton: (_currentStep == 4) ? StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('global_chat')
+                .where('timestamp', isGreaterThan: Timestamp.fromMillisecondsSinceEpoch(_lastReadChatTimestamp))
+                .limit(100)
+                .snapshots(),
+            builder: (context, snapshot) {
+              int unreadCount = snapshot.data?.docs.length ?? 0;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  FloatingActionButton(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ChatScreen()),
+                      );
+                      _loadLastReadChatTimestamp();
+                    },
+                    backgroundColor: const Color(0xFFFFEB33),
+                    shape: const CircleBorder(),
+                    elevation: 4.0,
+                    child: const Icon(Icons.chat_bubble, color: Color(0xFF3C1E1E)),
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 0,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Colors.redAccent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          unreadCount > 99 ? '99+' : unreadCount.toString(),
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
-            backgroundColor: const Color(0xFFFFEB33), // 카카오톡 노란색
-            shape: const CircleBorder(), // 완전한 원형
-            elevation: 4.0,
-            child: const Icon(Icons.chat_bubble, color: Color(0xFF3C1E1E)), // 카카오톡 갈색
           ) : null,
           body: Container(
             decoration: const BoxDecoration(
