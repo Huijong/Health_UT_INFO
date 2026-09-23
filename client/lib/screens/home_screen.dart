@@ -471,8 +471,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   bool _emailSending = false;
   bool _emailSent = false;
   String? _emailError;
+  bool _quickShareUploadComplete = false;
   String _step6State = 'waiting'; // waiting, sending, success
   DateTime? _shareSheetOpenTime;
+  Timer? _clipboardTimer;
+  StreamSubscription? _qsNotiSubscription;
   late TabController _deviceTabController;
   
 
@@ -1644,6 +1647,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   @override
   void dispose() {
+    _clipboardTimer?.cancel();
+    _qsNotiSubscription?.cancel();
     _deviceTabController.dispose();
     _confettiController.dispose();
     _customCompetitorCtrl.removeListener(_saveSportDetails);
@@ -1683,43 +1688,111 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       }
       if (_currentStep == 4) _scanGarminFilesFromDownload();
     }
-    if (state == AppLifecycleState.resumed && _packResult != null) {
-      Future.delayed(const Duration(milliseconds: 400), _checkClipboard);
+    if (state == AppLifecycleState.resumed && _packResult != null && !_emailSent) {
+      _checkClipboard();
     }
   }
 
+  // 수동 발송 버튼 동작
   Future<void> _checkClipboard() async {
     if (!mounted || _packResult == null || _emailSent) return;
     try {
       final data = await Clipboard.getData(Clipboard.kTextPlain);
       final text = data?.text?.trim() ?? '';
-      if (text.isEmpty) return;
-      if (text == _lastProcessedLink) return;
-      if (!text.startsWith('http')) return;
-
+      
       final lowerText = text.toLowerCase();
       final isQuickShare = lowerText.contains('quickshare.samsungcloud.com') ||
           lowerText.contains('sharing.samsung') ||
           lowerText.contains('q1team.cc') ||
           lowerText.contains('quickshare');
-      if (!isQuickShare) return;
 
-      if (_shareSheetOpenTime != null) {
-        final diff = DateTime.now().difference(_shareSheetOpenTime!);
-        if (diff.inMilliseconds < 100) return;
-      }
+      if (text.isEmpty || !isQuickShare) return;
+      if (text == _lastProcessedLink && _emailSending) return;
+      if (text == _lastProcessedLink && !_quickShareUploadComplete) return;
 
       setState(() {
         _lastProcessedLink = text;
       });
 
-      // 클립보드 링크가 감지되면 자동으로 이메일 전송 트리거
-      await _sendEmail(text);
+      // 클립보드 링크가 정상이면 이메일 전송 시작 (단, 업로드가 완료된 상태일 때만 자동 발송)
+      if (_quickShareUploadComplete) {
+        _clipboardTimer?.cancel();
+        await _sendEmail(text);
+      }
+    } catch (_) {
+      ToastUtil.showToast(context, '클립보드를 읽는 중 오류가 발생했습니다.');
+    }
+  }
+
+
+  // ── Quick Share 알림 리스너 시작 ──────────────────────────────────────
+  void _startQuickShareListener() {
+    _clipboardTimer?.cancel();
+    _qsNotiSubscription?.cancel();
+
+    // 혹시라도 노티피케이션에서 링크를 못 가져올 경우를 대비해 3초마다 클립보드 폴링도 병행
+    _clipboardTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (timer.tick > 60) { // 3분 타임아웃
+        timer.cancel();
+        _qsNotiSubscription?.cancel();
+        if (mounted) {
+          setState(() {
+            _step6State = 'error';
+            _emailError = 'Quick Share 업로드 대기 시간이 초과되었습니다. 다시 시도해주세요.';
+          });
+        }
+        return;
+      }
+      await _checkClipboard();
+    });
+
+    // EventChannel로 네이티브 알림 수신
+    const eventChannel = EventChannel('com.samsung.health.client/quickshare_noti');
+    _qsNotiSubscription = eventChannel.receiveBroadcastStream().listen((event) {
+      if (event is Map) {
+        final type = event['type'] as String?;
+        if (type == 'link_ready') {
+          setState(() { _quickShareUploadComplete = true; });
+          
+          final link = event['link'] as String? ?? '';
+          if (link.isNotEmpty && link.startsWith('http')) {
+            _clipboardTimer?.cancel();
+            _qsNotiSubscription?.cancel();
+            
+            setState(() { _lastProcessedLink = link; });
+            _sendEmail(link);
+          } else {
+            // 노티에서 링크 추출 실패 시 클립보드 한 번 강제 체크
+            _checkClipboard();
+          }
+        }
+      }
+    });
+  }
+
+  // ── 알림 접근 권한 확인/요청 ──────────────────────────────────────────
+  Future<bool> _checkNotificationListenerPermission() async {
+    const platform = MethodChannel('com.samsung.health.client/app_info');
+    try {
+      final isEnabled = await platform.invokeMethod('isNotificationListenerEnabled');
+      return isEnabled == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _requestNotificationListenerPermission() async {
+    const platform = MethodChannel('com.samsung.health.client/app_info');
+    try {
+      await platform.invokeMethod('openNotificationListenerSettings');
     } catch (_) {}
   }
 
   Future<void> _sendEmail(String link) async {
     if (!mounted) return;
+    
+    _clipboardTimer?.cancel();
+    
     setState(() {
       _emailSending = true;
       _emailError = null;
@@ -2254,6 +2327,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   }
 
   Future<void> _executePackaging() async {
+    // Quick Share 알림 감지를 위한 권한 확인
+    final hasNotiPermission = await _checkNotificationListenerPermission();
+    if (!hasNotiPermission && mounted) {
+      final shouldContinue = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1E2640),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.notifications_active, color: Color(0xFF3366FF), size: 24),
+              SizedBox(width: 8),
+              Expanded(child: Text('알림 접근 권한 필요', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+            ],
+          ),
+          content: const Text(
+            'Quick Share 업로드 완료를 자동 감지하려면 알림 접근 권한이 필요합니다.\n\n'
+            '설정 화면에서 "HealthPort"를 찾아 토글을 켜주세요.',
+            style: TextStyle(fontSize: 14, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('나중에', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3366FF),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                await _requestNotificationListenerPermission();
+                if (ctx.mounted) Navigator.pop(ctx, false);
+              },
+              child: const Text('설정으로 이동'),
+            ),
+          ],
+        ),
+      );
+      if (shouldContinue == false) return;
+    }
+
     setState(() {
       _isPackaging = true;
       _currentStep = 6;
@@ -2261,6 +2377,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       _emailError = null;
       _lastProcessedLink = null;
     });
+
 
     try {
       final newSession = await DeviceSession.collect();
@@ -2333,16 +2450,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         });
       }
 
-      // 클립보드 비우기 대신 현재 클립보드 값 읽어와 캐싱 (연결된 기기 복사 토스트 제거)
+      // 클립보드 강제 비우기 (오전/이전 링크에 의한 오동작 방지)
       try {
-        final currentClip = await Clipboard.getData(Clipboard.kTextPlain);
-        _lastProcessedLink = currentClip?.text?.trim() ?? '';
+        await Clipboard.setData(const ClipboardData(text: ''));
+        _lastProcessedLink = '';
       } catch (_) {
         _lastProcessedLink = '';
       }
       _shareSheetOpenTime = DateTime.now();
 
       // 압축 성공 후 자동으로 Quick Share 호출
+      _startQuickShareListener();
       await ShareService.shareZip(result.zipPath, result.zipName);
     } catch (e) {
       if (mounted) {
@@ -2357,6 +2475,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   // ── 데이터 초기화 후 1단계로 리셋 ──────────────────────────────
   void _resetVerification() {
+    _clipboardTimer?.cancel();
+    _qsNotiSubscription?.cancel();
     setState(() {
       _currentStep = (_prefs?.onboardingComplete ?? false) ? 4 : 1;
       _fitFiles.clear();
@@ -2379,6 +2499,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       _lastProcessedLink = null;
       _isPackaging = false;
       _emailSending = false;
+      _quickShareUploadComplete = false;
       _emailSent = false;
       _emailError = null;
       _step6State = 'waiting';
@@ -5720,6 +5841,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       _lastProcessedLink = '';
     }
     _shareSheetOpenTime = DateTime.now();
+    _quickShareUploadComplete = false;
+    _startQuickShareListener();
     await ShareService.shareZip(_packResult!.zipPath, _packResult!.zipName);
   }
 
@@ -5754,6 +5877,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     size: 52,
                   ),
                 )
+              else if (_step6State == 'waiting')
+                Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF3366FF).withOpacity(0.12),
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 4,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3366FF)),
+                  ),
+                )
               else
                 Container(
                   width: 110,
@@ -5779,7 +5916,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   ? '이메일로 전송을 완료하는 중...'
                   : (_step6State == 'success'
                       ? '데이터 제출 성공'
-                      : 'Quick Share 링크 대기 중...')),
+                      : 'Quick Share 업로드 완료 대기 중...')),
           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 24),
@@ -5826,14 +5963,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               // Timeline Step 2: 클립보드 Quick Share 링크 감지
               _buildTimelineStep(
                 title: 'Quick Share 링크 감지',
-                status: _lastProcessedLink != null
+                status: _lastProcessedLink != null && _lastProcessedLink!.isNotEmpty
                     ? '성공'
                     : (_packResult == null ? '대기 중' : '클립보드 복사 대기 중...'),
-                desc: _lastProcessedLink != null
+                desc: _lastProcessedLink != null && _lastProcessedLink!.isNotEmpty
                     ? (_lastProcessedLink!.length > 40 ? '${_lastProcessedLink!.substring(0, 40)}…' : _lastProcessedLink)
                     : '공유 창에서 Quick Share 링크를 복사해 주세요.',
-                isDone: _lastProcessedLink != null,
-                isWarning: _lastProcessedLink == null,
+                isDone: _lastProcessedLink != null && _lastProcessedLink!.isNotEmpty,
+                isWarning: _lastProcessedLink == null || _lastProcessedLink!.isEmpty,
               ),
 
               // Timeline Step 3: 백엔드 이메일 발송
@@ -5878,6 +6015,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             ),
           )
         else ...[
+          if (_step6State == 'waiting')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ElevatedButton.icon(
+                onPressed: _isPackaging || _emailSending ? null : _checkClipboard,
+                icon: const Icon(Icons.content_paste_search_rounded, color: Colors.black),
+                label: const Text(
+                  '클립보드 수동 확인',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFB300),
+                  minimumSize: const Size.fromHeight(54),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
           ElevatedButton.icon(
             onPressed: _isPackaging || _step6State == 'sending' ? null : _onReshare,
             icon: const Icon(Icons.share_rounded, color: Colors.black),

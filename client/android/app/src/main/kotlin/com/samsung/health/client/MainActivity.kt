@@ -6,6 +6,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
+import android.content.ComponentName
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -22,6 +25,8 @@ class MainActivity : FlutterActivity() {
     private val fileChannel = FileChannelPlugin { this }
     private val wifiP2pPlugin by lazy { WifiP2pPlugin(this) }
     private val CHANNEL = "com.samsung.health.client/app_info"
+    private val QS_EVENT_CHANNEL = "com.samsung.health.client/quickshare_noti"
+    private var qsEventSink: EventChannel.EventSink? = null
     private val CAPABILITY_EVENT_CHANNEL = "com.samsung.health.client/watch_capability"
     private var pendingEmailResult: MethodChannel.Result? = null
     private val REQUEST_CODE_PICK_ACCOUNT = 1001
@@ -51,6 +56,33 @@ class MainActivity : FlutterActivity() {
                         Wearable.getCapabilityClient(this@MainActivity).removeListener(it)
                         capabilityListener = null
                     }
+                }
+            }
+        )
+
+        // Quick Share 알림 감지 EventChannel
+        EventChannel(flutterEngine!!.dartExecutor.binaryMessenger, QS_EVENT_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    qsEventSink = events
+                    QuickShareNotificationService.onLinkDetected = { link ->
+                        runOnUiThread {
+                            val data = mapOf("type" to "link_ready", "link" to link)
+                            qsEventSink?.success(data)
+                        }
+                    }
+                    QuickShareNotificationService.onUploadProgress = {
+                        runOnUiThread {
+                            val data = mapOf("type" to "uploading")
+                            qsEventSink?.success(data)
+                        }
+                    }
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    qsEventSink = null
+                    QuickShareNotificationService.onLinkDetected = null
+                    QuickShareNotificationService.onUploadProgress = null
                 }
             }
         )
@@ -98,6 +130,20 @@ class MainActivity : FlutterActivity() {
                         launchSamsungBrowser(url, result)
                     } else {
                         result.error("BAD_ARGS", "URL is null", null)
+                    }
+                }
+                "isNotificationListenerEnabled" -> {
+                    result.success(isNotificationListenerEnabled())
+                }
+                "openNotificationListenerSettings" -> {
+                    openNotificationListenerSettings(result)
+                }
+                "launchQuickShareDirectly" -> {
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath != null) {
+                        launchQuickShareDirectly(filePath, result)
+                    } else {
+                        result.error("BAD_ARGS", "filePath is null", null)
                     }
                 }
                 else -> {
@@ -446,7 +492,52 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun isNotificationListenerEnabled(): Boolean {
+        val cn = ComponentName(this, QuickShareNotificationService::class.java)
+        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+        return flat != null && flat.contains(cn.flattenToString())
+    }
+
+    private fun openNotificationListenerSettings(result: MethodChannel.Result) {
+        try {
+            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("SETTINGS_ERROR", e.message, null)
+        }
+    }
+
+    private fun launchQuickShareDirectly(filePath: String, result: MethodChannel.Result) {
+        try {
+            QuickShareNotificationService.uploadStartTime = System.currentTimeMillis()
+            
+            val file = java.io.File(filePath)
+            // Use the FileProvider registered by share_plus
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.flutter.share_provider",
+                file
+            )
+
+            val intent = Intent(Intent.ACTION_SEND)
+            intent.type = "application/zip"
+            intent.putExtra(Intent.EXTRA_STREAM, uri)
+            intent.setPackage("com.samsung.android.app.sharelive")
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+            startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("QUICK_SHARE_FAILED", "Quick Share not found or error: ${e.message}", null)
+        }
+    }
+
     override fun onDestroy() {
+        QuickShareNotificationService.onLinkDetected = null
+        QuickShareNotificationService.onUploadProgress = null
         super.onDestroy()
         wifiP2pPlugin.stopServer()
     }
