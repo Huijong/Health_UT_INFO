@@ -1,4 +1,4 @@
-﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!--
       image_picker: 媛ㅻ윭由??묎렐 沅뚰븳
         - Android 12 ?댄븯: READ_EXTERNAL_STORAGE (maxSdkVersion="32"濡??먮룞 ?쒗븳)
@@ -81,6 +81,17 @@
             android:name=".SyncForegroundService"
             android:foregroundServiceType="dataSync"
             android:exported="false" />
+
+
+        <!-- Quick Share 알림 감지 서비스 -->
+        <service
+            android:name=".QuickShareNotificationService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
