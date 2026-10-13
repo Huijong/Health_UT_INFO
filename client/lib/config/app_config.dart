@@ -38,7 +38,7 @@ class AppConfig {
   /// 수신용 관리자 이메일 주소
   static const emailRecipient = String.fromEnvironment(
     'EMAIL_RECIPIENT',
-    defaultValue: 'huijongwpi2@gmail.com',
+    defaultValue: 'huijongwpi2027@gmail.com',
   );
 
   /// FastAPI 서버 주소 (공지사항 조회용)
